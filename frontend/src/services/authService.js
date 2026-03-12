@@ -1,8 +1,5 @@
 import { api } from './api'
 
-/**
- * Auth service — encapsulates all auth-related API calls.
- */
 export const authService = {
     login(identifier, password) {
         return api.post('/auth/login', { identifier, password })
@@ -23,4 +20,12 @@ export const authService = {
     listUsers() {
         return api.get('/admin/users')
     },
+
+    uploadAvatar(formData) {
+        return api.uploadFormData('/auth/avatar', formData)
+    },
+
+    deleteAvatar() {
+        return api.delete('/auth/avatar')
+    }
 }

@@ -22,6 +22,7 @@ function initializeDatabase() {
         password_hash TEXT NOT NULL,
         role TEXT DEFAULT 'user' CHECK(role IN ('user', 'admin', 'tecnico')),
         must_change_password INTEGER DEFAULT 0,
+        avatar TEXT,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP
       )
     `, (err) => {
@@ -29,7 +30,12 @@ function initializeDatabase() {
                 console.error('Error creating users table:', err.message);
                 return;
             }
-            seedAdminUser();
+
+            // Try to add avatar column to existing db (fails silently if already exists)
+            db.run(`ALTER TABLE users ADD COLUMN avatar TEXT;`, (alterErr) => {
+                // Ignore error, it means the column already exists
+                seedAdminUser();
+            });
         });
     });
 }

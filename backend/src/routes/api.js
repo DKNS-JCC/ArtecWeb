@@ -24,6 +24,7 @@ let robots = [
 // Controllers & Middleware
 const authController = require('../controllers/authController');
 const { authMiddleware, adminMiddleware } = require('../middleware/authMiddleware');
+const upload = require('../config/uploadConfig');
 
 // ─── PUBLIC Auth Routes ────────────────────────────────────────
 router.post('/auth/register', authController.register);   // only creates 'user' accounts
@@ -31,6 +32,8 @@ router.post('/auth/login', authController.login);         // username or email
 
 // ─── PROTECTED Auth Routes (any logged-in user) ───────────────
 router.post('/auth/change-password', authMiddleware, authController.changePassword);
+router.post('/auth/avatar', authMiddleware, upload.single('avatar'), authController.uploadAvatar);
+router.delete('/auth/avatar', authMiddleware, authController.deleteAvatar);
 
 // ─── ADMIN-ONLY Routes ────────────────────────────────────────
 router.post('/admin/create-staff', authMiddleware, adminMiddleware, authController.createStaff);

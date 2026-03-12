@@ -1,9 +1,4 @@
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:3000/api'
-
-/**
- * Base HTTP client for the Artec API.
- * Automatically injects the auth token and handles 401 redirects.
- */
 async function request(endpoint, options = {}) {
     const token = localStorage.getItem('artec_token')
 
@@ -21,7 +16,6 @@ async function request(endpoint, options = {}) {
         headers,
     })
 
-    // Global 401 handler — clear session & redirect
     if (res.status === 401 && token) {
         localStorage.removeItem('artec_token')
         localStorage.removeItem('artec_user')
@@ -52,4 +46,26 @@ export const api = {
         }),
     delete: (endpoint) =>
         request(endpoint, { method: 'DELETE' }),
+    uploadFormData: async (endpoint, formData) => {
+        const token = localStorage.getItem('artec_token')
+        const headers = {}
+        if (token) headers['Authorization'] = `Bearer ${token}`
+
+        const res = await fetch(`${API_BASE}${endpoint}`, {
+            method: 'POST',
+            body: formData,
+            headers
+        })
+
+        if (res.status === 401 && token) {
+            localStorage.removeItem('artec_token')
+            localStorage.removeItem('artec_user')
+            window.location.href = '/login'
+            throw new Error('Sesión expirada')
+        }
+
+        const data = await res.json()
+        if (!res.ok) throw new Error(data.error || `Error ${res.status}`)
+        return data
+    }
 }

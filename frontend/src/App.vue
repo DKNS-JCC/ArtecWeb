@@ -2,7 +2,7 @@
 import { ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { useDark, useToggle } from '@vueuse/core'
-import { Sun, Moon } from 'lucide-vue-next'
+import { Sun, Moon, User } from 'lucide-vue-next'
 import { useAuthStore } from '@/stores/auth'
 import { Button } from '@/components/ui/button'
 
@@ -15,6 +15,13 @@ const authStore = useAuthStore()
 
 const isAuthenticated = computed(() => authStore.isAuthenticated)
 const isAdmin = computed(() => authStore.isAdmin)
+
+const avatarUrl = computed(() => {
+  const avatar = authStore.user?.avatar
+  if (!avatar) return null
+  const baseUrl = import.meta.env.VITE_API_URL ? import.meta.env.VITE_API_URL.replace('/api', '') : 'http://localhost:3000'
+  return `${baseUrl}${avatar}`
+})
 
 const toggleMenu = () => {
   menuOpen.value = !menuOpen.value
@@ -45,25 +52,37 @@ router.afterEach(() => {
       </router-link>
     </div>
 
-    <!-- Theme Toggle (Fixed Top Right, next to menu) -->
-    <button @click="toggleDark()"
-      class="fixed top-6 right-20 z-50 w-12 h-12 rounded-full bg-card/80 backdrop-blur-md border border-border shadow-sm flex items-center justify-center transition-all hover:scale-105 hover:shadow-md focus:outline-none"
-      aria-label="Alternar modo oscuro">
-      <Sun v-if="isDark" class="w-5 h-5 text-yellow-500" />
-      <Moon v-else class="w-5 h-5 text-muted-foreground" />
-    </button>
+    <!-- Top Right Actions -->
+    <div class="fixed top-6 right-6 z-50 flex items-center gap-3">
+      <!-- User profile/login button -->
+      <router-link :to="isAuthenticated ? '/profile' : '/login'"
+        class="w-12 h-12 rounded-full bg-card/80 backdrop-blur-md border border-border shadow-sm flex items-center justify-center transition-all hover:scale-105 hover:shadow-md cursor-pointer pointer-events-auto overflow-hidden"
+        :title="isAuthenticated ? 'Mi Perfil' : 'Iniciar Sesión'">
 
-    <!-- Hidden Navigation Trigger (Fixed Top Right) -->
-    <button @click="toggleMenu"
-      class="fixed top-6 right-6 z-50 w-12 h-12 rounded-full bg-card/80 backdrop-blur-md border border-border shadow-sm flex flex-col items-center justify-center gap-[4px] transition-all hover:scale-105 hover:shadow-md focus:outline-none"
-      aria-label="Abrir menú">
-      <span class="block w-5 h-[2px] bg-foreground transition-all duration-300 rounded-full"
-        :class="{ 'rotate-45 translate-y-[6px]': menuOpen }"></span>
-      <span class="block w-5 h-[2px] bg-foreground transition-all duration-300 rounded-full"
-        :class="{ 'opacity-0': menuOpen }"></span>
-      <span class="block w-5 h-[2px] bg-foreground transition-all duration-300 rounded-full"
-        :class="{ '-rotate-45 -translate-y-[6px]': menuOpen }"></span>
-    </button>
+        <img v-if="isAuthenticated && avatarUrl" :src="avatarUrl" alt="Avatar" class="w-full h-full object-cover" />
+        <User v-else class="w-5 h-5" :class="isAuthenticated ? 'text-primary' : 'text-muted-foreground'" />
+      </router-link>
+
+      <!-- Theme Toggle -->
+      <button @click="toggleDark()"
+        class="w-12 h-12 rounded-full bg-card/80 backdrop-blur-md border border-border shadow-sm flex items-center justify-center transition-all hover:scale-105 hover:shadow-md focus:outline-none pointer-events-auto"
+        aria-label="Alternar modo oscuro">
+        <Sun v-if="isDark" class="w-5 h-5 text-yellow-500" />
+        <Moon v-else class="w-5 h-5 text-muted-foreground" />
+      </button>
+
+      <!-- Hidden Navigation Trigger -->
+      <button @click="toggleMenu"
+        class="w-12 h-12 rounded-full bg-card/80 backdrop-blur-md border border-border shadow-sm flex flex-col items-center justify-center gap-[4px] transition-all hover:scale-105 hover:shadow-md focus:outline-none pointer-events-auto"
+        aria-label="Abrir menú">
+        <span class="block w-5 h-[2px] bg-foreground transition-all duration-300 rounded-full"
+          :class="{ 'rotate-45 translate-y-[6px]': menuOpen }"></span>
+        <span class="block w-5 h-[2px] bg-foreground transition-all duration-300 rounded-full"
+          :class="{ 'opacity-0': menuOpen }"></span>
+        <span class="block w-5 h-[2px] bg-foreground transition-all duration-300 rounded-full"
+          :class="{ '-rotate-45 -translate-y-[6px]': menuOpen }"></span>
+      </button>
+    </div>
 
     <!-- Fullscreen Overlay Navigation -->
     <transition name="menu-fade">
@@ -76,30 +95,12 @@ router.afterEach(() => {
             Inicio
           </router-link>
 
-          <router-link to="/empresas"
-            class="text-4xl md:text-6xl font-black text-foreground hover:text-primary transition-colors drop-shadow-sm"
-            active-class="!text-primary">
-            Soluciones
-          </router-link>
-
-          <!-- Admin-only: Panel link -->
           <router-link v-if="isAdmin" to="/dashboard"
             class="text-4xl md:text-6xl font-black text-foreground hover:text-primary transition-colors drop-shadow-sm"
             active-class="!text-primary">
-            Panel
+            Panel de control
           </router-link>
 
-          <!-- Auth Actions -->
-          <div class="mt-8 flex flex-col items-center gap-4">
-            <button v-if="isAuthenticated" @click="logout"
-              class="text-xl font-bold text-destructive hover:text-destructive/80 transition-colors">
-              Cerrar Sesión
-            </button>
-            <router-link v-else to="/login"
-              class="text-xl md:text-2xl font-semibold text-muted-foreground hover:text-foreground transition-colors">
-              Acceder
-            </router-link>
-          </div>
         </nav>
 
         <div class="absolute bottom-12 text-muted-foreground font-semibold tracking-wider text-sm uppercase">

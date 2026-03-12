@@ -1,6 +1,7 @@
 const express = require('express');
 const cors = require('cors');
 const dotenv = require('dotenv');
+const path = require('path');
 const apiRoutes = require('./routes/api');
 
 // Cargar variables de entorno
@@ -12,6 +13,9 @@ const PORT = process.env.PORT || 3000;
 // Middleware
 app.use(cors());
 app.use(express.json());
+
+// Servir la carpeta uploads estáticamente
+app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
 
 // Main welcome route for backend root
 app.get('/', (req, res) => {

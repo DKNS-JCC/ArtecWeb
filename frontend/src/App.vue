@@ -14,7 +14,8 @@ const router = useRouter()
 const authStore = useAuthStore()
 
 const isAuthenticated = computed(() => authStore.isAuthenticated)
-const isAdmin = computed(() => authStore.isAdmin)
+const isMuseumAdmin = computed(() => authStore.isMuseumAdmin)
+const isPlatformAdmin = computed(() => authStore.isPlatformAdmin)
 
 const avatarUrl = computed(() => {
   const avatar = authStore.user?.avatar
@@ -95,7 +96,7 @@ router.afterEach(() => {
             Inicio
           </router-link>
 
-          <router-link v-if="isAdmin" to="/dashboard"
+          <router-link v-if="isMuseumAdmin || isPlatformAdmin" to="/dashboard"
             class="text-4xl md:text-6xl font-black text-foreground hover:text-primary transition-colors drop-shadow-sm"
             active-class="!text-primary">
             Panel de control

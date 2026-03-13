@@ -66,7 +66,7 @@ router.beforeEach((to, from, next) => {
     }
 
     // 2. Protect dashboard — admin only
-    if (to.meta.requiresAdmin && !authStore.isAdmin) {
+    if (to.meta.requiresAdmin && !authStore.isMuseumAdmin && !authStore.isPlatformAdmin) {
         return next({ name: 'forbidden' })
     }
 
@@ -77,7 +77,7 @@ router.beforeEach((to, from, next) => {
 
     // 4. Already logged in → skip login/register pages
     if ((to.name === 'login' || to.name === 'register') && authStore.isAuthenticated && !authStore.mustChangePassword) {
-        return next(authStore.isAdmin ? { name: 'dashboard' } : { name: 'home' })
+        return next(authStore.isMuseumAdmin || authStore.isPlatformAdmin ? { name: 'dashboard' } : { name: 'home' })
     }
 
     next()

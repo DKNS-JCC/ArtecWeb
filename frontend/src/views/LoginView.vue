@@ -30,7 +30,7 @@ const handleLogin = async () => {
 
         if (data.must_change_password) {
             router.push('/change-password')
-        } else if (data.user.role === 'admin') {
+        } else if (data.user.role === 'museum_admin' || data.user.role === 'platform_admin') {
             router.push('/dashboard')
         } else {
             router.push('/')

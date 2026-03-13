@@ -5,16 +5,16 @@ export const authService = {
         return api.post('/auth/login', { identifier, password })
     },
 
-    register(username, email, password) {
-        return api.post('/auth/register', { username, email, password })
+    register(name, email, password) {
+        return api.post('/auth/register', { name, email, password })
     },
 
     changePassword(current_password, new_password) {
         return api.post('/auth/change-password', { current_password, new_password })
     },
 
-    createStaff(username, email, password, role) {
-        return api.post('/admin/create-staff', { username, email, password, role })
+    createStaff(name, email, role, museum_id) {
+        return api.post('/admin/create-staff', { name, email, role, museum_id })
     },
 
     listUsers() {

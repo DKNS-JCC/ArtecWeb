@@ -15,7 +15,8 @@ export const useAuthStore = defineStore('auth', () => {
     const user = ref(null)
 
     const isAuthenticated = computed(() => !!token.value)
-    const isAdmin = computed(() => user.value?.role === 'admin')
+    const isMuseumAdmin = computed(() => user.value?.role === 'museum_admin' || user.value?.role === 'platform_admin')
+    const isPlatformAdmin = computed(() => user.value?.role === 'platform_admin')
     const mustChangePassword = computed(() => {
         if (!token.value) return false
         const payload = decodeToken(token.value)
@@ -76,7 +77,8 @@ export const useAuthStore = defineStore('auth', () => {
         token,
         user,
         isAuthenticated,
-        isAdmin,
+        isMuseumAdmin,
+        isPlatformAdmin,
         mustChangePassword,
         initFromStorage,
         login,

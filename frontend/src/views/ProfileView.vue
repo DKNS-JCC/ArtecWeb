@@ -109,7 +109,7 @@ const handleDeleteAvatar = async (event) => {
                     <input type="file" ref="fileInput" class="hidden" accept="image/*" @change="handleFileChange" />
                 </div>
                 <h1 class="text-3xl font-bold tracking-tight text-foreground">
-                    Hola, {{ authStore.user?.username }}
+                    Hola, {{ authStore.user?.name }}
                 </h1>
                 <p class="text-muted-foreground mt-2">
                     Gestiona tu cuenta y credenciales
@@ -127,7 +127,7 @@ const handleDeleteAvatar = async (event) => {
                                 <User class="w-5 h-5" />
                                 <span class="font-medium">Usuario</span>
                             </div>
-                            <span class="font-bold text-foreground">{{ authStore.user?.username }}</span>
+                            <span class="font-bold text-foreground">{{ authStore.user?.name }}</span>
                         </div>
                         <div
                             class="flex items-center justify-between p-4 rounded-xl bg-secondary/50 border border-border">

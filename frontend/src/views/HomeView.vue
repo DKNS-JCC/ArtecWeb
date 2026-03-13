@@ -37,7 +37,7 @@ onUnmounted(() => window.removeEventListener('scroll', handleScroll));
                     </h1>
 
                     <p class="hero-subtitle">
-                        Descubre exposiciones, museos y galerías de arte con nuestro asistente.
+                        Explora exposiciones, museos y galerías de arte con nuestro asistente.
                     </p>
 
                     <div class="hero-actions">

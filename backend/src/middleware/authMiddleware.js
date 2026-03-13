@@ -18,8 +18,15 @@ module.exports.authMiddleware = (req, res, next) => {
 };
 
 module.exports.adminMiddleware = (req, res, next) => {
-    if (!req.user || req.user.role !== 'admin') {
+    if (!req.user || (req.user.role !== 'museum_admin' && req.user.role !== 'platform_admin')) {
         return res.status(403).json({ error: 'Admin access required' });
+    }
+    next();
+};
+
+module.exports.superAdminMiddleware = (req, res, next) => {
+    if (!req.user || req.user.role !== 'platform_admin') {
+        return res.status(403).json({ error: 'Platform admin access required' });
     }
     next();
 };

@@ -38,7 +38,7 @@ const handleChange = async () => {
 
     try {
         await authStore.changePassword(currentPassword.value, newPassword.value)
-        router.push(authStore.isAdmin ? '/dashboard' : '/')
+        router.push(authStore.isMuseumAdmin || authStore.isPlatformAdmin ? '/dashboard' : '/')
     } catch (err) {
         errorMsg.value = err.message
     } finally {

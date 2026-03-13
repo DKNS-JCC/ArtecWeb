@@ -1,29 +1,11 @@
 const express = require('express');
 const router = express.Router();
 
-// Mock Data for ROS2 Robots
-let robots = [
-    {
-        id: 'rob_001',
-        name: 'Wally',
-        status: 'idle',
-        battery: 89,
-        position: { x: 0.5, y: -1.2, theta: 0.0 },
-        last_update: new Date().toISOString()
-    },
-    {
-        id: 'rob_002',
-        name: 'Eve',
-        status: 'moving',
-        battery: 45,
-        position: { x: 5.2, y: 3.4, theta: 1.57 },
-        last_update: new Date().toISOString()
-    }
-];
-
 // Controllers & Middleware
+const db = require('../database');
 const authController = require('../controllers/authController');
-const { authMiddleware, adminMiddleware } = require('../middleware/authMiddleware');
+const museumController = require('../controllers/museumController');
+const { authMiddleware, adminMiddleware, superAdminMiddleware } = require('../middleware/authMiddleware');
 const upload = require('../config/uploadConfig');
 
 // ─── PUBLIC Auth Routes ────────────────────────────────────────
@@ -36,8 +18,13 @@ router.post('/auth/avatar', authMiddleware, upload.single('avatar'), authControl
 router.delete('/auth/avatar', authMiddleware, authController.deleteAvatar);
 
 // ─── ADMIN-ONLY Routes ────────────────────────────────────────
+// adminMiddleware allows both admin and superadmin
 router.post('/admin/create-staff', authMiddleware, adminMiddleware, authController.createStaff);
 router.get('/admin/users', authMiddleware, adminMiddleware, authController.listUsers);
+
+// ─── SUPERADMIN-ONLY Routes ───────────────────────────────────
+router.post('/museums', authMiddleware, superAdminMiddleware, museumController.createMuseum);
+router.get('/museums', authMiddleware, superAdminMiddleware, museumController.listMuseums);
 
 // ─── API Info ─────────────────────────────────────────────────
 router.get('/', (req, res) => {
@@ -58,39 +45,112 @@ router.get('/', (req, res) => {
 
 // ─── Robot Routes (admin only) ────────────────────────────────
 router.get('/robots', authMiddleware, adminMiddleware, (req, res) => {
-    res.json(robots);
+    const isSuperAdmin = req.user.role === 'platform_admin';
+    const museumId = req.user.museum_id;
+
+    let query = `SELECT * FROM robots`;
+    let params = [];
+
+    if (!isSuperAdmin) {
+        query += ` WHERE museum_id = ?`;
+        params.push(museumId);
+    }
+
+    db.all(query, params, (err, rows) => {
+        if (err) return res.status(500).json({ error: 'Database error fetching robots' });
+
+        // Parse position (storing as flat fields but returning as object for frontend compatibility)
+        const formattedRobots = rows.map(r => ({
+            id: r.id,
+            names: r.name, // Keep property mapping consistent with old frontend if needed, wait old frontend used 'name'
+            name: r.name,
+            status: r.status,
+            battery: r.battery,
+            position: { x: r.position_x, y: r.position_y, theta: r.position_theta },
+            last_update: r.last_update,
+            museum_id: r.museum_id
+        }));
+
+        res.json(formattedRobots);
+    });
 });
 
 router.get('/robots/:id', authMiddleware, adminMiddleware, (req, res) => {
-    const robot = robots.find(r => r.id === req.params.id);
-    if (!robot) return res.status(404).json({ error: 'Robot not found' });
-    res.json(robot);
+    const isSuperAdmin = req.user.role === 'platform_admin';
+    const museumId = req.user.museum_id;
+    const robotId = req.params.id;
+
+    let query = `SELECT * FROM robots WHERE id = ?`;
+    let params = [robotId];
+
+    if (!isSuperAdmin) {
+        query += ` AND museum_id = ?`;
+        params.push(museumId);
+    }
+
+    db.get(query, params, (err, robot) => {
+        if (err) return res.status(500).json({ error: 'Database error fetching robot' });
+        if (!robot) return res.status(404).json({ error: 'Robot not found or unauthorized' });
+
+        const formattedRobot = {
+            id: robot.id,
+            name: robot.name,
+            status: robot.status,
+            battery: robot.battery,
+            position: { x: robot.position_x, y: robot.position_y, theta: robot.position_theta },
+            last_update: robot.last_update,
+            museum_id: robot.museum_id
+        };
+        res.json(formattedRobot);
+    });
 });
 
 router.post('/robots/:id/command', authMiddleware, adminMiddleware, (req, res) => {
     const { command, payload } = req.body;
-    const robotIndex = robots.findIndex(r => r.id === req.params.id);
+    const isSuperAdmin = req.user.role === 'platform_admin';
+    const museumId = req.user.museum_id;
+    const robotId = req.params.id;
 
-    if (robotIndex === -1) return res.status(404).json({ error: 'Robot not found' });
-
-    if (command === 'move' && payload) {
-        robots[robotIndex].status = 'moving';
-        robots[robotIndex].position = { ...robots[robotIndex].position, ...payload };
-        robots[robotIndex].last_update = new Date().toISOString();
-        return res.json({ message: 'Command move sent', robot: robots[robotIndex] });
-    }
-    if (command === 'stop') {
-        robots[robotIndex].status = 'idle';
-        robots[robotIndex].last_update = new Date().toISOString();
-        return res.json({ message: 'Command stop sent', robot: robots[robotIndex] });
-    }
-    if (command === 'charge') {
-        robots[robotIndex].status = 'charging';
-        robots[robotIndex].last_update = new Date().toISOString();
-        return res.json({ message: 'Command charge sent', robot: robots[robotIndex] });
+    // Verify ownership first
+    let verifyQuery = `SELECT * FROM robots WHERE id = ?`;
+    let verifyParams = [robotId];
+    if (!isSuperAdmin) {
+        verifyQuery += ` AND museum_id = ?`;
+        verifyParams.push(museumId);
     }
 
-    res.status(400).json({ error: 'Unknown command' });
+    db.get(verifyQuery, verifyParams, (err, robot) => {
+        if (err) return res.status(500).json({ error: 'Database error' });
+        if (!robot) return res.status(404).json({ error: 'Robot not found or unauthorized' });
+
+        let status = robot.status;
+        let px = robot.position_x;
+        let py = robot.position_y;
+        let pt = robot.position_theta;
+
+        if (command === 'move' && payload) {
+            status = 'moving';
+            if (payload.x !== undefined) px = payload.x;
+            if (payload.y !== undefined) py = payload.y;
+            if (payload.theta !== undefined) pt = payload.theta;
+        } else if (command === 'stop') {
+            status = 'idle';
+        } else if (command === 'charge') {
+            status = 'charging';
+        } else {
+            return res.status(400).json({ error: 'Unknown command' });
+        }
+
+        const updateQuery = `
+            UPDATE robots 
+            SET status = ?, position_x = ?, position_y = ?, position_theta = ?, last_update = CURRENT_TIMESTAMP 
+            WHERE id = ?
+        `;
+        db.run(updateQuery, [status, px, py, pt, robotId], function (err) {
+            if (err) return res.status(500).json({ error: 'Database error updating robot' });
+            res.json({ message: `Command ${command} sent successfully` });
+        });
+    });
 });
 
 module.exports = router;

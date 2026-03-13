@@ -11,14 +11,14 @@ import { Card, CardContent } from '@/components/ui/card'
 const router = useRouter()
 const authStore = useAuthStore()
 
-const username = ref('')
+const name = ref('')
 const email = ref('')
 const password = ref('')
 const loading = ref(false)
 const errorMsg = ref('')
 
 const handleRegister = async () => {
-    if (!username.value || !email.value || !password.value) {
+    if (!name.value || !email.value || !password.value) {
         errorMsg.value = 'Todos los campos son obligatorios.'
         return
     }
@@ -27,7 +27,7 @@ const handleRegister = async () => {
     errorMsg.value = ''
 
     try {
-        await authStore.register(username.value, email.value, password.value)
+        await authStore.register(name.value, email.value, password.value)
         router.push('/')
     } catch (err) {
         errorMsg.value = err.message
@@ -59,9 +59,9 @@ const handleRegister = async () => {
                         </Alert>
 
                         <div>
-                            <Label for="username">Nombre de usuario</Label>
-                            <Input id="username" type="text" v-model="username" placeholder="Ej: joseantonio_99"
-                                required autocomplete="username" />
+                            <Label for="name">Nombre de usuario</Label>
+                            <Input id="name" type="text" v-model="name" placeholder="Ej: Juan12" required
+                                autocomplete="name" />
                         </div>
 
                         <div>

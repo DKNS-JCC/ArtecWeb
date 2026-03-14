@@ -15,4 +15,12 @@ export const robotService = {
     sendCommand(id, command, payload = null) {
         return api.post(`/robots/${id}/command`, { command, payload })
     },
+
+    create(name, museum_id) {
+        return api.post('/robots', { name, museum_id })
+    },
+
+    update(id, data) {
+        return api.put(`/robots/${id}`, data)
+    },
 }

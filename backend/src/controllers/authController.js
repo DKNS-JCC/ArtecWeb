@@ -6,51 +6,95 @@ const crypto = require('crypto');
 const JWT_SECRET = process.env.JWT_SECRET || 'super-secret-artec-key';
 const SALT_ROUNDS = 10;
 
-// ──────── PUBLIC: Register (creates 'user' role only) ────────
-exports.register = async (req, res) => {
-    const { name, email, password } = req.body;
+// ──────── PUBLIC: Create Visitor Session ────────
+exports.createVisitor = (req, res) => {
+    const { robotId, name } = req.body;
 
-    if (!name || !email || !password) {
-        return res.status(400).json({ error: 'Name, email and password are required' });
+    if (!robotId) {
+        return res.status(400).json({ error: 'Se requiere el ID del robot leído del QR' });
     }
-    if (password.length < 6) {
-        return res.status(400).json({ error: 'Password must be at least 6 characters' });
-    }
+    
+    const visitorName = name ? name.trim() : 'Visitante';
 
-    try {
-        const passwordHash = await bcrypt.hash(password, SALT_ROUNDS);
+    db.get('SELECT id, name, museum_id, locked_until FROM robots WHERE id = ?', [robotId], (err, robot) => {
+        if (err) return res.status(500).json({ error: 'Error verificando el robot' });
+        if (!robot) return res.status(404).json({ error: 'Robot no válido o no encontrado' });
 
-        const newUserId = crypto.randomUUID();
+        const now = new Date();
+        if (robot.locked_until && new Date(robot.locked_until) > now) {
+            return res.status(403).json({ error: 'Este robot ya está siendo utilizado por otro visitante. Por favor, espera a que termine su visita.' });
+        }
 
-        db.run(
-            `INSERT INTO users (id, name, email, password_hash, role) VALUES (?, ?, ?, ?, 'user')`,
-            [newUserId, name.trim(), email.trim().toLowerCase(), passwordHash],
-            function (err) {
+        const visitorId = crypto.randomUUID();
+        const sessionId = crypto.randomUUID();
+        
+        // Bloquear robot por 10 minutos iniciales
+        const newLockTime = new Date(now.getTime() + 10 * 60000).toISOString();
+
+        db.run('UPDATE robots SET locked_until = ?, current_visitor_id = ? WHERE id = ?', [newLockTime, visitorId, robot.id], (updErr) => {
+            if (updErr) return res.status(500).json({ error: 'Error reservando el robot' });
+            
+            db.run(
+                `INSERT INTO visitors (id, session_id, robot_id, name) VALUES (?, ?, ?, ?)`,
+                [visitorId, sessionId, robot.id, visitorName],
+                function (err) {
                 if (err) {
-                    if (err.message.includes('UNIQUE constraint failed')) {
-                        const field = err.message.includes('name') ? 'name' : 'email';
-                        return res.status(409).json({ error: `That ${field} is already taken` });
-                    }
-                    return res.status(500).json({ error: 'Error registering user' });
+                    console.error('VISITOR ERROR:', err);
+                    return res.status(500).json({ error: 'Error creating visitor session' });
                 }
 
                 const token = jwt.sign(
-                    { id: newUserId, name: name.trim(), role: 'user', must_change_password: false },
+                    { 
+                        id: visitorId, 
+                        session_id: sessionId, 
+                        role: 'visitor',
+                        robot_id: robot.id,
+                        robot_name: robot.name,
+                        museum_id: robot.museum_id,
+                        name: visitorName
+                    },
                     JWT_SECRET,
-                    { expiresIn: '24h' }
+                    { expiresIn: '12h' } // Visitors get temporary access
                 );
 
                 res.status(201).json({
-                    message: 'Account created successfully',
+                    message: 'Visitor session created',
                     token,
-                    user: { id: newUserId, name: name.trim(), email: email.trim().toLowerCase(), role: 'user', avatar: null }
+                    visitor: { id: visitorId, session_id: sessionId, role: 'visitor', robot_id: robot.id, robot_name: robot.name, name: visitorName }
                 });
             }
         );
-    } catch (err) {
-        console.error('REGISTER ERROR:', err);
-        res.status(500).json({ error: 'Server error' });
-    }
+        });
+    });
+};
+
+exports.pingVisitor = (req, res) => {
+    const robotId = req.user.robot_id;
+    if (!robotId) return res.status(400).json({ error: 'No robot assigned' });
+    
+    // Extiende el bloqueo por otros 10 minutos
+    const newLockTime = new Date(new Date().getTime() + 10 * 60000).toISOString();
+    db.run('UPDATE robots SET locked_until = ? WHERE id = ?', [newLockTime, robotId], (err) => {
+        if (err) return res.status(500).json({ error: 'Database error' });
+        res.json({ message: 'Session extended' });
+    });
+};
+
+exports.endVisitor = (req, res) => {
+    const robotId = req.user.robot_id;
+    const visitorId = req.user.id;
+    if (!robotId) return res.status(400).json({ error: 'No robot assigned' });
+
+    // Libera el robot para otros
+    db.run('UPDATE robots SET locked_until = NULL, current_visitor_id = NULL WHERE id = ?', [robotId], (err) => {
+        if (err) return res.status(500).json({ error: 'Database error' });
+        
+        // Registrar fin de la sesión del visitante
+        db.run('UPDATE visitors SET ended_at = CURRENT_TIMESTAMP WHERE id = ?', [visitorId], (err2) => {
+            if (err2) console.error('Error updating visitor ended_at', err2);
+            res.json({ message: 'Session ended' });
+        });
+    });
 };
 
 exports.login = (req, res) => {
@@ -63,6 +107,10 @@ exports.login = (req, res) => {
     db.get(query, [identifier.trim(), identifier.trim().toLowerCase()], async (err, user) => {
         if (err) return res.status(500).json({ error: 'Database error' });
         if (!user) return res.status(401).json({ error: 'Invalid credentials' });
+
+        if (!['platform_admin', 'museum_admin', 'technician'].includes(user.role)) {
+            return res.status(403).json({ error: 'Access denied: Valid administrative role required' });
+        }
 
         try {
             const match = await bcrypt.compare(password, user.password_hash);

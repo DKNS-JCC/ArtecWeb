@@ -1,6 +1,6 @@
 <script setup>
 import { ref, computed } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRouter, useRoute } from 'vue-router'
 import { useDark, useToggle } from '@vueuse/core'
 import { Sun, Moon, User } from 'lucide-vue-next'
 import { useAuthStore } from '@/stores/auth'
@@ -11,11 +11,13 @@ const toggleDark = useToggle(isDark)
 
 const menuOpen = ref(false)
 const router = useRouter()
+const route = useRoute()
 const authStore = useAuthStore()
 
 const isAuthenticated = computed(() => authStore.isAuthenticated)
 const isMuseumAdmin = computed(() => authStore.isMuseumAdmin)
 const isPlatformAdmin = computed(() => authStore.isPlatformAdmin)
+const isVisitor = computed(() => authStore.isVisitor)
 
 const avatarUrl = computed(() => {
   const avatar = authStore.user?.avatar
@@ -45,7 +47,7 @@ router.afterEach(() => {
     class="min-h-screen flex flex-col font-sans antialiased bg-background text-foreground transition-colors duration-300 relative">
 
     <!-- Minimal Logo (Fixed Top Left) -->
-    <div class="fixed top-6 left-6 z-40">
+    <div v-show="route.name !== 'chat'" class="fixed top-6 left-6 z-40">
       <router-link to="/" class="flex items-center gap-3 group">
         <img src="/icon.ico" alt="Artec"
           class="w-10 h-10 rounded-xl shadow-[0_4px_14px_rgba(37,99,235,0.3)] transition-transform group-hover:scale-105 object-contain" />
@@ -54,9 +56,9 @@ router.afterEach(() => {
     </div>
 
     <!-- Top Right Actions -->
-    <div class="fixed top-6 right-6 z-50 flex items-center gap-3">
-      <!-- User profile/login button -->
-      <router-link :to="isAuthenticated ? '/profile' : '/login'"
+    <div v-show="route.name !== 'chat'" class="fixed top-6 right-6 z-50 flex items-center gap-3">
+      <!-- User profile/login button (Hidden for Visitors) -->
+      <router-link v-if="!isVisitor" :to="isAuthenticated ? '/profile' : '/login'"
         class="w-12 h-12 rounded-full bg-card/80 backdrop-blur-md border border-border shadow-sm flex items-center justify-center transition-all hover:scale-105 hover:shadow-md cursor-pointer pointer-events-auto overflow-hidden"
         :title="isAuthenticated ? 'Mi Perfil' : 'Iniciar Sesión'">
 

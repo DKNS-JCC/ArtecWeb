@@ -9,10 +9,11 @@ const app = createApp(App)
 const pinia = createPinia()
 
 app.use(pinia)
-app.use(router)
 
-// Hydrate auth state from localStorage before mounting
+// Hydrate auth state from localStorage before configuring the router
 const authStore = useAuthStore()
 authStore.initFromStorage()
+
+app.use(router)
 
 app.mount('#app')

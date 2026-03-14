@@ -11,14 +11,15 @@ const router = createRouter({
             component: HomeView
         },
         {
+            path: '/chat',
+            name: 'chat',
+            component: () => import('../views/ChatView.vue'),
+            meta: { requiresAuth: true }
+        },
+        {
             path: '/login',
             name: 'login',
             component: () => import('../views/LoginView.vue')
-        },
-        {
-            path: '/register',
-            name: 'register',
-            component: () => import('../views/RegisterView.vue')
         },
         {
             path: '/change-password',
@@ -30,13 +31,18 @@ const router = createRouter({
             path: '/profile',
             name: 'profile',
             component: () => import('../views/ProfileView.vue'),
-            meta: { requiresAuth: true }
+            meta: { requiresAuth: true, requiresStaff: true }
         },
         {
             path: '/dashboard',
             name: 'dashboard',
             component: () => import('../views/DashboardView.vue'),
             meta: { requiresAuth: true, requiresAdmin: true }
+        },
+        {
+            path: '/r/:id',
+            name: 'scan',
+            component: () => import('../views/ScanView.vue')
         },
         {
             path: '/403',
@@ -60,9 +66,19 @@ const router = createRouter({
 router.beforeEach((to, from, next) => {
     const authStore = useAuthStore()
 
+    // 0. Force active visitors to stay in the chat until they end the session
+    if (authStore.isAuthenticated && authStore.isVisitor && to.name !== 'chat') {
+        return next({ name: 'chat' })
+    }
+
     // 1. Protect any route requiring auth
     if (to.meta.requiresAuth && !authStore.isAuthenticated) {
         return next({ name: 'login' })
+    }
+
+    // 1.5 Protect staff routes (like profile) from visitors
+    if (to.meta.requiresStaff && authStore.user?.role === 'visitor') {
+        return next({ name: 'home' })
     }
 
     // 2. Protect dashboard — admin only
@@ -75,8 +91,8 @@ router.beforeEach((to, from, next) => {
         return next({ name: 'change-password' })
     }
 
-    // 4. Already logged in → skip login/register pages
-    if ((to.name === 'login' || to.name === 'register') && authStore.isAuthenticated && !authStore.mustChangePassword) {
+    // 4. Already logged in → skip login pages
+    if (to.name === 'login' && authStore.isAuthenticated && !authStore.mustChangePassword) {
         return next(authStore.isMuseumAdmin || authStore.isPlatformAdmin ? { name: 'dashboard' } : { name: 'home' })
     }
 

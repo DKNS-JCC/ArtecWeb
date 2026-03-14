@@ -80,13 +80,6 @@ const handleLogin = async () => {
                             {{ loading ? 'Entrando...' : 'Entrar' }}
                         </Button>
                     </form>
-
-                    <div class="mt-8 text-center text-sm">
-                        <span class="text-muted-foreground">¿No tienes cuenta? </span>
-                        <router-link to="/register" class="font-bold text-primary hover:underline">
-                            Regístrate gratis
-                        </router-link>
-                    </div>
                 </CardContent>
             </Card>
 

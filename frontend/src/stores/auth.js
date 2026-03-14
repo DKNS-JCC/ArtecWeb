@@ -17,6 +17,7 @@ export const useAuthStore = defineStore('auth', () => {
     const isAuthenticated = computed(() => !!token.value)
     const isMuseumAdmin = computed(() => user.value?.role === 'museum_admin' || user.value?.role === 'platform_admin')
     const isPlatformAdmin = computed(() => user.value?.role === 'platform_admin')
+    const isVisitor = computed(() => user.value?.role === 'visitor')
     const mustChangePassword = computed(() => {
         if (!token.value) return false
         const payload = decodeToken(token.value)
@@ -46,10 +47,25 @@ export const useAuthStore = defineStore('auth', () => {
         return data
     }
 
-    async function register(username, email, password) {
-        const data = await authService.register(username, email, password)
-        persist(data.token, data.user)
+    async function createVisitor(robotId, name) {
+        const data = await authService.createVisitor(robotId, name)
+        persist(data.token, data.visitor)
         return data
+    }
+
+    async function pingVisitor() {
+        if (!isAuthenticated.value) return;
+        return await authService.pingVisitor()
+    }
+
+    async function endVisitor() {
+        if (!isAuthenticated.value) return;
+        try {
+            await authService.endVisitor()
+        } catch (e) {
+            console.error('Error ending visitor session', e)
+        }
+        logout()
     }
 
     async function changePassword(currentPassword, newPassword) {
@@ -79,10 +95,13 @@ export const useAuthStore = defineStore('auth', () => {
         isAuthenticated,
         isMuseumAdmin,
         isPlatformAdmin,
+        isVisitor,
         mustChangePassword,
         initFromStorage,
         login,
-        register,
+        createVisitor,
+        pingVisitor,
+        endVisitor,
         changePassword,
         updateUserAvatar,
         logout,

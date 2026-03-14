@@ -5,8 +5,16 @@ export const authService = {
         return api.post('/auth/login', { identifier, password })
     },
 
-    register(name, email, password) {
-        return api.post('/auth/register', { name, email, password })
+    createVisitor(robotId, name) {
+        return api.post('/auth/visitor', { robotId, name })
+    },
+
+    pingVisitor() {
+        return api.post('/auth/visitor/ping')
+    },
+
+    endVisitor() {
+        return api.post('/auth/visitor/end')
     },
 
     changePassword(current_password, new_password) {

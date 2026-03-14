@@ -1,15 +1,16 @@
 <script setup>
 import { ref, onMounted, onUnmounted, computed } from 'vue'
+import { api } from '@/services/api'
 import { robotService } from '@/services/robotService'
 import { authService } from '@/services/authService'
 import { museumService } from '@/services/museumService'
 import { useAuthStore } from '@/stores/auth'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent } from '@/components/ui/card'
+import { Card, CardContent, CardHeader } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Alert } from '@/components/ui/alert'
-import { RefreshCw, Zap, MapPin, Plus, X, Building2, Users } from 'lucide-vue-next'
+import { RefreshCw, Zap, MapPin, Plus, X, Building2, Users, BarChart3, Clock, Settings, Wifi } from 'lucide-vue-next'
 
 const authStore = useAuthStore()
 const user = computed(() => authStore.user)
@@ -17,6 +18,7 @@ const isMuseumAdmin = computed(() => authStore.isMuseumAdmin)
 const isPlatformAdmin = computed(() => authStore.isPlatformAdmin)
 
 const activeTab = ref('robots')
+const originUrl = window?.location?.origin || ''
 
 // ---------------- ROBOTS ----------------
 const robots = ref([])
@@ -36,9 +38,58 @@ const fetchRobots = async () => {
     }
 }
 
+const showRobotModal = ref(false)
+const showEditRobotModal = ref(false)
+const robotError = ref(null)
+const robotSuccess = ref(null)
+const robotForm = ref({ id: '', name: '', museum_id: '', ip: '' })
+
+const openRobotModal = () => {
+    robotForm.value = { id: '', name: '', museum_id: '', ip: '' }
+    robotError.value = null
+    robotSuccess.value = null
+    showRobotModal.value = true
+}
+
+const openEditRobotModal = (robot) => {
+    robotForm.value = { id: robot.id, name: robot.name, museum_id: robot.museum_id, ip: robot.ip || '127.0.0.1' }
+    robotError.value = null
+    robotSuccess.value = null
+    showEditRobotModal.value = true
+}
+
+const handleCreateRobot = async () => {
+    robotError.value = null
+    robotSuccess.value = null
+    try {
+        await robotService.create(robotForm.value.name, robotForm.value.museum_id)
+        robotSuccess.value = 'Robot creado correctamente.'
+        await fetchRobots()
+        setTimeout(() => showRobotModal.value = false, 1500)
+    } catch (err) {
+        robotError.value = err.message || 'Error al crear robot'
+    }
+}
+
+const handleEditRobot = async () => {
+    robotError.value = null
+    robotSuccess.value = null
+    try {
+        await robotService.update(robotForm.value.id, {
+            name: robotForm.value.name,
+            ip: robotForm.value.ip
+        })
+        robotSuccess.value = 'Robot actualizado correctamente.'
+        await fetchRobots()
+        setTimeout(() => showEditRobotModal.value = false, 1500)
+    } catch (err) {
+        robotError.value = err.message || 'Error al actualizar robot'
+    }
+}
+
 const sendCommand = async (id, command) => {
     try {
-        const payload = command === 'move' ? { x: Math.random() * 10, y: Math.random() * 10 } : null
+        const payload = command === 'move' ? { linearX: 0.5, angularZ: 0.0 } : null
         await robotService.sendCommand(id, command, payload)
         await fetchRobots()
     } catch (err) { }
@@ -123,18 +174,41 @@ const handleCreateMuseum = async () => {
     }
 }
 
+// ---------------- STATS ----------------
+const stats = ref({
+    totalRobots: 0,
+    activeRobots: 0,
+    totalVisitors: 0,
+    avgSessionTime: 0,
+    totalMuseums: 0
+})
+
+const fetchStats = async () => {
+    try {
+        const data = await api.get('/admin/stats')
+        stats.value = data
+    } catch (e) {
+        console.error("Error fetching stats:", e)
+    }
+}
+
 // ---------------- GLOBAL TAB REFRESH ----------------
 const refreshCurrentTab = () => {
     if (activeTab.value === 'robots') fetchRobots()
     if (activeTab.value === 'staff') fetchStaff()
     if (activeTab.value === 'museums') fetchMuseums()
+    if (activeTab.value === 'stats') fetchStats()
 }
 
 onMounted(() => {
     fetchRobots()
     if (isMuseumAdmin.value || isPlatformAdmin.value) fetchStaff()
     if (isPlatformAdmin.value) fetchMuseums()
-    intervalId = setInterval(() => { if (activeTab.value === 'robots') fetchRobots() }, 3000)
+    fetchStats()
+    intervalId = setInterval(() => { 
+        if (activeTab.value === 'robots') fetchRobots() 
+        if (activeTab.value === 'stats') fetchStats()
+    }, 3000)
 })
 
 onUnmounted(() => {
@@ -171,10 +245,21 @@ onUnmounted(() => {
                 :class="activeTab === 'museums' ? 'border-primary text-foreground' : 'border-transparent text-muted-foreground hover:text-foreground'">
                 Gestión de Museos
             </button>
+            <button @click="activeTab = 'stats'"
+                class="px-4 py-2 text-sm font-medium transition-colors border-b-2 flex items-center gap-2"
+                :class="activeTab === 'stats' ? 'border-primary text-foreground' : 'border-transparent text-muted-foreground hover:text-foreground'">
+                <BarChart3 class="w-4 h-4" /> Estadísticas
+            </button>
         </div>
 
         <!-- TAB: ROBOTS -->
         <div v-show="activeTab === 'robots'">
+            <div class="flex justify-between items-center mb-6">
+                <h2 class="text-xl font-bold">Gestión de Robots</h2>
+                <Button v-if="isPlatformAdmin" @click="openRobotModal" class="flex gap-2 items-center">
+                    <Plus class="w-4 h-4" /> Crear Robot
+                </Button>
+            </div>
             <div v-if="loadingRobots" class="flex justify-center items-center h-64">
                 <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
             </div>
@@ -197,16 +282,12 @@ onUnmounted(() => {
                         </div>
                         <div class="flex items-center gap-2">
                             <span class="relative flex h-3 w-3">
-                                <span v-if="robot.status === 'moving'"
-                                    class="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
-                                <span class="relative inline-flex rounded-full h-3 w-3" :class="{
-                                    'bg-green-500': robot.status === 'idle',
-                                    'bg-blue-500': robot.status === 'moving',
-                                    'bg-yellow-500': robot.status === 'charging',
-                                    'bg-red-500': robot.status === 'error',
-                                }"></span>
+                                <span v-if="robot.connected" class="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+                                <span class="relative inline-flex rounded-full h-3 w-3" :class="robot.connected ? 'bg-green-500' : 'bg-red-500'"></span>
                             </span>
-                            <span class="text-sm font-medium capitalize text-foreground">{{ robot.status }}</span>
+                            <span class="text-sm font-medium capitalize text-foreground">
+                                {{ robot.connected ? 'Conectado' : 'Desconectado' }}
+                            </span>
                         </div>
                     </div>
                     <div class="space-y-3 mb-6">
@@ -214,7 +295,7 @@ onUnmounted(() => {
                             <span class="text-muted-foreground flex items-center gap-1">
                                 <Zap class="w-4 h-4" /> Batería
                             </span>
-                            <div class="flex items-center gap-2">
+                            <div class="flex items-center gap-2" v-if="robot.connected">
                                 <div class="w-24 h-2 bg-secondary rounded-full overflow-hidden">
                                     <div class="h-full rounded-full"
                                         :class="robot.battery > 20 ? 'bg-green-500' : 'bg-red-500'"
@@ -222,25 +303,66 @@ onUnmounted(() => {
                                 </div>
                                 <span class="font-medium w-8 text-right text-foreground">{{ robot.battery }}%</span>
                             </div>
+                            <div v-else class="text-xs text-muted-foreground italic">Sin Telemetría</div>
                         </div>
                         <div class="flex justify-between items-center text-sm">
                             <span class="text-muted-foreground flex items-center gap-1">
                                 <MapPin class="w-4 h-4" /> Posición
                             </span>
-                            <span class="font-mono bg-secondary px-2 py-0.5 rounded text-xs text-secondary-foreground">
-                                x:{{ robot.position.x.toFixed(1) }}, y:{{ robot.position.y.toFixed(1) }}
+                            <span v-if="robot.connected" class="font-mono bg-secondary px-2 py-0.5 rounded text-xs text-secondary-foreground">
+                                x:{{ (robot.position?.x || 0).toFixed(1) }}, y:{{ (robot.position?.y || 0).toFixed(1) }}
+                            </span>
+                            <span v-else class="text-xs text-muted-foreground italic">Sin Telemetría</span>
+                        </div>
+                        <div class="flex justify-between items-center text-sm">
+                            <span class="text-muted-foreground flex items-center gap-1">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-4 h-4"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg> Ocupación
+                            </span>
+                            <span v-if="robot.is_occupied" class="bg-primary/10 text-primary px-2 py-0.5 rounded text-xs font-semibold">
+                                Ocupado por: {{ robot.visitor_name }}
+                            </span>
+                            <span v-else class="text-muted-foreground text-xs">
+                                Libre
                             </span>
                         </div>
+                        <div class="flex justify-between items-center text-sm pt-2 border-t border-border/50">
+                            <span class="text-muted-foreground flex items-center gap-1">
+                                <Wifi class="w-4 h-4" :class="robot.connected ? 'text-green-500' : 'text-red-500'" />
+                                WS: {{ robot.ip || '127.0.0.1' }}
+                            </span>
+                            <div class="flex items-center gap-1">
+                                <span :class="robot.connected ? 'text-green-500 bg-green-500/10' : 'text-red-500 bg-red-500/10'" class="px-2 py-0.5 rounded text-xs font-semibold">
+                                    {{ robot.connected ? 'Conectado' : 'Desconectado' }}
+                                </span>
+                                <Button v-if="isPlatformAdmin" @click="openEditRobotModal(robot)" variant="ghost" size="icon" class="h-6 w-6 ml-1">
+                                    <Settings class="w-3.5 h-3.5" />
+                                </Button>
+                            </div>
+                        </div>
                     </div>
-                    <div class="border-t border-border pt-4 flex gap-2">
-                        <Button @click="sendCommand(robot.id, 'move')" :disabled="robot.status === 'moving'" size="sm"
-                            class="flex-1">Mover</Button>
-                        <Button @click="sendCommand(robot.id, 'stop')" :disabled="robot.status === 'idle'"
-                            variant="secondary" size="sm" class="flex-1">Detener</Button>
-                        <Button @click="sendCommand(robot.id, 'charge')" :disabled="robot.status === 'charging'"
-                            variant="outline" size="sm" class="flex-1">Cargar</Button>
-                    </div>
-                </Card>
+                    <div class="border-t border-border pt-4 flex flex-col gap-2">
+                        <div class="flex gap-2">
+                            <Button v-if="!robot.connected" @click="sendCommand(robot.id, 'connect')" size="sm" class="flex-1 bg-green-600 hover:bg-green-700 text-white">
+                                Conectar
+                            </Button>
+                            <Button v-else @click="sendCommand(robot.id, 'disconnect')" size="sm" variant="destructive" class="flex-1">
+                                Desconectar
+                            </Button>
+                        </div>
+                        <div class="flex gap-2">
+                            <Button @click="sendCommand(robot.id, 'move')" :disabled="!robot.connected" size="sm" class="flex-1">Mover</Button>
+                            <Button @click="sendCommand(robot.id, 'stop')" :disabled="!robot.connected" variant="secondary" size="sm" class="flex-1">Detener</Button>
+                            <Button @click="sendCommand(robot.id, 'charge')" :disabled="!robot.connected" variant="outline" size="sm" class="flex-1">Cargar</Button>
+                        </div>
+                    </div>                      <div class="mt-4 pt-4 border-t border-border flex flex-col gap-2">
+                        <div class="mt-2 text-center">
+                            <img :src="'https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=' + encodeURIComponent(originUrl + '/r/' + robot.id)" alt="QR Code" class="w-24 h-24 mx-auto" />
+                            <Button as="a" :href="'https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=' + encodeURIComponent(originUrl + '/r/' + robot.id)" target="_blank" size="sm" class="mt-2"
+                            >Descargar</Button>
+                            <Button @click="window.open(originUrl + '/r/' + robot.id, '_blank')" variant="outline" size="sm" class="mt-2"
+                            >Test</Button>
+                        </div>
+                      </div>                </Card>
             </div>
         </div>
 
@@ -317,7 +439,113 @@ onUnmounted(() => {
             </div>
         </div>
 
+        <!-- TAB: STATS -->
+        <div v-show="activeTab === 'stats'">
+            <div class="flex justify-between items-center mb-6">
+                <h2 class="text-xl font-semibold text-foreground">Estadísticas del Sistema</h2>
+                <Button @click="fetchStats" variant="outline" size="sm" class="gap-2">
+                    <RefreshCw class="w-4 h-4" /> Recargar
+                </Button>
+            </div>
+            
+            <div class="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
+                <Card v-if="isPlatformAdmin">
+                    <CardHeader class="flex flex-row items-center justify-between pb-2 space-y-0">
+                        <div class="text-sm font-medium">Museos Registrados</div>
+                        <Building2 class="w-4 h-4 text-muted-foreground" />
+                    </CardHeader>
+                    <CardContent>
+                        <div class="text-2xl font-bold">{{ stats.totalMuseums || 0 }}</div>
+                        <p class="text-xs text-muted-foreground mt-1">Activos en la plataforma</p>
+                    </CardContent>
+                </Card>
+
+                <Card>
+                    <CardHeader class="flex flex-row items-center justify-between pb-2 space-y-0">
+                        <div class="text-sm font-medium">Total de Robots</div>
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-4 h-4 text-muted-foreground"><path d="M12 8V4H8"/><rect width="16" height="12" x="4" y="8" rx="2"/><path d="M2 14h2"/><path d="M20 14h2"/><path d="M15 13v2"/><path d="M9 13v2"/></svg>
+                    </CardHeader>
+                    <CardContent>
+                        <div class="text-2xl font-bold">{{ stats.totalRobots || 0 }}</div>
+                        <p class="text-xs text-muted-foreground mt-1">
+                            <span class="text-green-500 font-medium">{{ stats.activeRobots || 0 }} en operación</span>
+                        </p>
+                    </CardContent>
+                </Card>
+
+                <Card>
+                    <CardHeader class="flex flex-row items-center justify-between pb-2 space-y-0">
+                        <div class="text-sm font-medium">Total Visitantes</div>
+                        <Users class="w-4 h-4 text-muted-foreground" />
+                    </CardHeader>
+                    <CardContent>
+                        <div class="text-2xl font-bold">{{ stats.totalVisitors || 0 }}</div>
+                        <p class="text-xs text-muted-foreground mt-1">Interacciones registradas</p>
+                    </CardContent>
+                </Card>
+
+                <Card>
+                    <CardHeader class="flex flex-row items-center justify-between pb-2 space-y-0">
+                        <div class="text-sm font-medium">Tiempo Promedio</div>
+                        <Clock class="w-4 h-4 text-muted-foreground" />
+                    </CardHeader>
+                    <CardContent>
+                        <div class="text-2xl font-bold">{{ stats.avgSessionTime > 0 ? stats.avgSessionTime + ' min' : '0 min' }}</div>
+                        <p class="text-xs text-muted-foreground mt-1">Duración de visita x interacción</p>
+                    </CardContent>
+                </Card>
+            </div>
+            
+            <div class="mt-8">
+                <Card class="border shadow-none">
+                    <CardHeader>
+                        <h3 class="text-lg font-semibold">Resumen Rápido</h3>
+                    </CardHeader>
+                    <CardContent>
+                        <p class="text-muted-foreground text-sm">
+                            Este panel te permite monitorizar el estado general. Los datos provienen en tiempo real de las bases de datos de sesión.
+                            <template v-if="isPlatformAdmin">Como Super Administrador, ves las métricas globales para mejorar la escalabilidad del sistema y entender el retorno de inversión.</template>
+                            <template v-else>Como Administrador de Museo, puedes ver las métricas relativas a la interacción de los robots dentro de tu propio emplazamiento.</template>
+                        </p>
+                    </CardContent>
+                </Card>
+            </div>
+        </div>
+
         <!-- MODALS (Rendered outside normal flow) -->
+
+        <!-- EDIT ROBOT MODAL -->
+        <div v-if="showEditRobotModal"
+            class="fixed inset-0 bg-background/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+            <Card class="w-full max-w-md shadow-2xl relative border-border animate-in fade-in zoom-in duration-200">
+                <button @click="showEditRobotModal = false"
+                    class="absolute top-4 right-4 text-muted-foreground hover:text-foreground">
+                    <X class="w-5 h-5" />
+                </button>
+                <div class="p-6">
+                    <h2 class="text-2xl font-bold mb-6 flex items-center gap-2">
+                        <Settings class="w-6 h-6 text-primary" /> Editar Robot
+                    </h2>
+                    <form @submit.prevent="handleEditRobot" class="space-y-4">
+                        <div class="space-y-2">
+                            <Label for="edit_robot_name">Nombre / Identificador</Label>
+                            <Input id="edit_robot_name" v-model="robotForm.name" required placeholder="Ej: Robot Entrada Principal" />
+                        </div>
+                        <div class="space-y-2">
+                            <Label for="edit_robot_ip">IP / WebSockets</Label>
+                            <Input id="edit_robot_ip" v-model="robotForm.ip" required placeholder="Ej: 192.168.1.100" />
+                        </div>
+                        <Alert v-if="robotError" variant="destructive">
+                            {{ robotError }}
+                        </Alert>
+                        <Alert v-if="robotSuccess" class="border-green-500/50 text-green-600 bg-green-500/10">
+                            {{ robotSuccess }}
+                        </Alert>
+                        <Button type="submit" class="w-full" :disabled="!robotForm.name || !robotForm.ip">Guardar Cambios</Button>
+                    </form>
+                </div>
+            </Card>
+        </div>
 
         <!-- STAFF MODAL -->
         <div v-if="showStaffModal"
@@ -377,6 +605,47 @@ onUnmounted(() => {
                         <Button type="submit" class="w-full"
                             :disabled="!staffForm.name || !staffForm.email || !staffForm.role || (isPlatformAdmin && !staffForm.museum_id)">Crear
                             Cuenta</Button>
+                    </form>
+                </div>
+            </Card>
+        </div>
+
+        <!-- ROBOT MODAL -->
+        <div v-if="showRobotModal"
+            class="fixed inset-0 bg-background/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+            <Card class="w-full max-w-md shadow-2xl relative border-border animate-in fade-in zoom-in duration-200">
+                <button @click="showRobotModal = false"
+                    class="absolute top-4 right-4 text-muted-foreground hover:text-foreground">
+                    <X class="w-5 h-5" />
+                </button>
+                <div class="p-6">
+                    <h2 class="text-2xl font-bold mb-6 flex items-center gap-2">
+                        <Plus class="w-6 h-6 text-primary" /> Crear Robot
+                    </h2>
+                    <form @submit.prevent="handleCreateRobot" class="space-y-4">
+                        <div class="space-y-2">
+                            <Label for="robot_name">Nombre / Identificador</Label>
+                            <Input id="robot_name" v-model="robotForm.name" required
+                                placeholder="Ej: Robot Entrada Principal" />
+                        </div>
+                        <div class="space-y-2">
+                            <Label for="robot_museum">Museo Asignado</Label>
+                            <select id="robot_museum" v-model="robotForm.museum_id" required
+                                class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50">
+                                <option value="" disabled selected>Selecciona un museo</option>
+                                <option v-for="m in museums" :key="m.id" :value="m.id">
+                                    {{ m.name }}
+                                </option>
+                            </select>
+                        </div>
+                        <Alert v-if="robotError" variant="destructive">
+                            {{ robotError }}
+                        </Alert>
+                        <Alert v-if="robotSuccess"
+                            class="border-green-500/50 text-green-600 bg-green-500/10">
+                            {{ robotSuccess }}
+                        </Alert>
+                        <Button type="submit" class="w-full" :disabled="!robotForm.name || !robotForm.museum_id">Registrar Robot</Button>
                     </form>
                 </div>
             </Card>

@@ -1,11 +1,12 @@
+const path = require('path');
+const dotenv = require('dotenv');
+
+// Cargar variables de entorno desde la raíz del proyecto (debe ir antes de cualquier otro require)
+dotenv.config({ path: path.resolve(__dirname, '../../.env.local') });
+
 const express = require('express');
 const cors = require('cors');
-const dotenv = require('dotenv');
-const path = require('path');
 const apiRoutes = require('./routes/api');
-
-// Cargar variables de entorno
-dotenv.config();
 
 const app = express();
 const PORT = process.env.PORT || 3000;

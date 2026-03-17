@@ -29,6 +29,18 @@ export const authService = {
         return api.get('/admin/users')
     },
 
+    updateStaff(id, data) {
+        return api.patch(`/admin/users/${id}`, data)
+    },
+
+    toggleStaffActive(id) {
+        return api.patch(`/admin/users/${id}/active`)
+    },
+
+    deleteStaff(id) {
+        return api.delete(`/admin/users/${id}`)
+    },
+
     uploadAvatar(formData) {
         return api.uploadFormData('/auth/avatar', formData)
     },

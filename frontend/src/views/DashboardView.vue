@@ -10,7 +10,7 @@ import { Card, CardContent, CardHeader } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Alert } from '@/components/ui/alert'
-import { RefreshCw, Zap, MapPin, Plus, X, Building2, Users, BarChart3, Clock, Settings, Wifi } from 'lucide-vue-next'
+import { RefreshCw, Zap, MapPin, Plus, X, Building2, Users, BarChart3, Clock, Settings, Wifi, Search, Pencil, Eye, EyeOff, Trash2, ShieldAlert } from 'lucide-vue-next'
 
 const authStore = useAuthStore()
 const user = computed(() => authStore.user)
@@ -99,9 +99,32 @@ const sendCommand = async (id, command) => {
 const staff = ref([])
 const loadingStaff = ref(false)
 const showStaffModal = ref(false)
+const showEditStaffModal = ref(false)
+const showDeleteStaffModal = ref(false)
 const staffError = ref(null)
 const staffSuccess = ref(null)
 const staffForm = ref({ name: '', email: '', role: 'technician', museum_id: '' })
+const editStaffForm = ref({ id: '', name: '', email: '', role: '' })
+const deleteStaffTarget = ref(null)
+const staffSearch = ref('')
+const staffRoleFilter = ref('all')
+const staffStatusFilter = ref('all')
+const staffMuseumFilter = ref('all')
+
+const getStaffStatus = (member) => {
+    if (member.active === 0 && member.must_change_password === 1) return 'pending'
+    if (member.active === 1) return 'active'
+    return 'inactive'
+}
+
+const filteredStaff = computed(() => staff.value.filter(m => {
+    const q = staffSearch.value.toLowerCase()
+    const matchSearch = !q || m.name.toLowerCase().includes(q) || m.email.toLowerCase().includes(q)
+    const matchRole = staffRoleFilter.value === 'all' || m.role === staffRoleFilter.value
+    const matchStatus = staffStatusFilter.value === 'all' || getStaffStatus(m) === staffStatusFilter.value
+    const matchMuseum = staffMuseumFilter.value === 'all' || m.museum_id === staffMuseumFilter.value
+    return matchSearch && matchRole && matchStatus && matchMuseum
+}))
 
 const fetchStaff = async () => {
     loadingStaff.value = true
@@ -126,11 +149,60 @@ const handleCreateStaff = async () => {
     staffSuccess.value = null
     try {
         await authService.createStaff(staffForm.value.name, staffForm.value.email, staffForm.value.role, staffForm.value.museum_id)
-        staffSuccess.value = 'Personal creado. Se ha enviado un email con sus credenciales.'
+        staffSuccess.value = 'Invitación enviada. El usuario activará su cuenta en el primer inicio de sesión.'
         await fetchStaff()
         setTimeout(() => showStaffModal.value = false, 2000)
     } catch (err) {
         staffError.value = err.message || 'Error al crear personal'
+    }
+}
+
+const openEditStaffModal = (member) => {
+    editStaffForm.value = { id: member.id, name: member.name, email: member.email, role: member.role }
+    staffError.value = null
+    staffSuccess.value = null
+    showEditStaffModal.value = true
+}
+
+const handleEditStaff = async () => {
+    staffError.value = null
+    staffSuccess.value = null
+    try {
+        await authService.updateStaff(editStaffForm.value.id, {
+            name: editStaffForm.value.name,
+            email: editStaffForm.value.email,
+            role: editStaffForm.value.role
+        })
+        staffSuccess.value = 'Usuario actualizado correctamente.'
+        await fetchStaff()
+        setTimeout(() => showEditStaffModal.value = false, 1500)
+    } catch (err) {
+        staffError.value = err.message || 'Error al actualizar usuario'
+    }
+}
+
+const handleToggleActive = async (member) => {
+    try {
+        await authService.toggleStaffActive(member.id)
+        await fetchStaff()
+    } catch (err) {
+        console.error(err)
+    }
+}
+
+const openDeleteStaffModal = (member) => {
+    deleteStaffTarget.value = member
+    showDeleteStaffModal.value = true
+}
+
+const handleDeleteStaff = async () => {
+    try {
+        await authService.deleteStaff(deleteStaffTarget.value.id)
+        showDeleteStaffModal.value = false
+        deleteStaffTarget.value = null
+        await fetchStaff()
+    } catch (err) {
+        console.error(err)
     }
 }
 
@@ -368,43 +440,146 @@ onUnmounted(() => {
 
         <!-- TAB: STAFF -->
         <div v-show="activeTab === 'staff'">
+            <!-- Header -->
             <div class="flex justify-between items-center mb-6">
-                <h2 class="text-xl font-semibold text-foreground">Gestión de Personal</h2>
+                <div>
+                    <h2 class="text-xl font-bold text-foreground">Gestión de Personal</h2>
+                    <p class="text-sm text-muted-foreground mt-0.5">
+                        {{ staff.length }} miembro{{ staff.length !== 1 ? 's' : '' }} registrado{{ staff.length !== 1 ? 's' : '' }}
+                    </p>
+                </div>
                 <Button @click="openStaffModal" class="gap-2">
                     <Plus class="w-4 h-4" /> Añadir Personal
                 </Button>
             </div>
 
+            <!-- Toolbar -->
+            <div class="flex flex-col sm:flex-row gap-3 mb-4">
+                <div class="relative flex-1">
+                    <Search class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
+                    <Input v-model="staffSearch" placeholder="Buscar por nombre o email…" class="pl-9" />
+                </div>
+                <select v-model="staffRoleFilter"
+                    class="flex h-10 rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                    <option value="all">Todos los roles</option>
+                    <option value="museum_admin">Administrador</option>
+                    <option value="technician">Técnico</option>
+                </select>
+                <select v-model="staffStatusFilter"
+                    class="flex h-10 rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                    <option value="all">Todos los estados</option>
+                    <option value="active">Activo</option>
+                    <option value="pending">Pendiente</option>
+                    <option value="inactive">Inactivo</option>
+                </select>
+                <select v-if="isPlatformAdmin" v-model="staffMuseumFilter"
+                    class="flex h-10 rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                    <option value="all">Todos los museos</option>
+                    <option v-for="m in museums" :key="m.id" :value="m.id">{{ m.name }}</option>
+                </select>
+            </div>
+
+            <!-- Table -->
             <div class="border border-border rounded-xl overflow-hidden bg-card">
-                <table class="w-full text-sm text-left">
-                    <thead class="bg-secondary/50 text-muted-foreground uppercase text-xs">
+                <div v-if="loadingStaff" class="flex justify-center items-center h-32">
+                    <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+                </div>
+                <table v-else class="w-full text-sm text-left">
+                    <thead class="bg-muted/50 text-muted-foreground uppercase text-xs border-b border-border">
                         <tr>
-                            <th class="px-6 py-4 font-medium">Usuario</th>
-                            <th class="px-6 py-4 font-medium">Email</th>
-                            <th class="px-6 py-4 font-medium">Rol</th>
-                            <th v-if="isPlatformAdmin" class="px-6 py-4 font-medium">Museo</th>
-                            <th class="px-6 py-4 font-medium">Fecha de alta</th>
+                            <th class="px-6 py-3 font-medium">Usuario</th>
+                            <th class="px-6 py-3 font-medium">Rol</th>
+                            <th class="px-6 py-3 font-medium">Estado</th>
+                            <th v-if="isPlatformAdmin" class="px-6 py-3 font-medium">Museo</th>
+                            <th class="px-6 py-3 font-medium">Alta</th>
+                            <th class="px-6 py-3 font-medium text-right">Acciones</th>
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-border">
-                        <tr v-if="staff.length === 0">
-                            <td :colspan="isPlatformAdmin ? 5 : 4" class="px-6 py-8 text-center text-muted-foreground">
-                                No
-                                hay personal registrado</td>
+                        <tr v-if="filteredStaff.length === 0">
+                            <td :colspan="isPlatformAdmin ? 6 : 5" class="px-6 py-12 text-center text-muted-foreground">
+                                <Users class="w-8 h-8 mx-auto mb-2 opacity-30" />
+                                <p>No se encontraron resultados</p>
+                            </td>
                         </tr>
-                        <tr v-for="member in staff" :key="member.id" class="hover:bg-muted/50 transition-colors">
-                            <td class="px-6 py-4 font-medium text-foreground">{{ member.name }}</td>
-                            <td class="px-6 py-4 text-muted-foreground">{{ member.email }}</td>
+                        <tr v-for="member in filteredStaff" :key="member.id"
+                            class="hover:bg-muted/30 transition-colors"
+                            :class="{ 'opacity-50': getStaffStatus(member) === 'inactive' }">
+
+                            <!-- Avatar + name + email -->
                             <td class="px-6 py-4">
-                                <span class="px-2.5 py-1 rounded-full text-xs font-semibold uppercase tracking-wide"
-                                    :class="{ 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-400': member.role === 'platform_admin', 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400': member.role === 'museum_admin', 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400': member.role === 'technician', 'bg-slate-100 text-slate-800 dark:bg-slate-800 dark:text-slate-400': member.role === 'user' }">
-                                    {{ member.role }}
+                                <div class="flex items-center gap-3">
+                                    <div class="w-8 h-8 rounded-full bg-primary/10 text-primary flex items-center justify-center text-xs font-bold flex-shrink-0 uppercase">
+                                        {{ member.name.charAt(0) }}
+                                    </div>
+                                    <div>
+                                        <p class="font-medium text-foreground leading-tight">{{ member.name }}</p>
+                                        <p class="text-xs text-muted-foreground">{{ member.email }}</p>
+                                    </div>
+                                </div>
+                            </td>
+
+                            <!-- Role badge -->
+                            <td class="px-6 py-4">
+                                <span class="px-2.5 py-1 rounded-full text-xs font-semibold"
+                                    :class="{
+                                        'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400': member.role === 'platform_admin',
+                                        'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400': member.role === 'museum_admin',
+                                        'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400': member.role === 'technician',
+                                    }">
+                                    {{ member.role === 'platform_admin' ? 'Super Admin' : member.role === 'museum_admin' ? 'Administrador' : 'Técnico' }}
                                 </span>
                             </td>
-                            <td v-if="isPlatformAdmin" class="px-6 py-4 text-muted-foreground">{{ member.museum_name ||
-                                'Global' }}</td>
-                            <td class="px-6 py-4 text-muted-foreground">{{ new
-                                Date(member.created_at).toLocaleDateString() }}</td>
+
+                            <!-- Status badge -->
+                            <td class="px-6 py-4">
+                                <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold"
+                                    :class="{
+                                        'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400': getStaffStatus(member) === 'pending',
+                                        'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400': getStaffStatus(member) === 'active',
+                                        'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400': getStaffStatus(member) === 'inactive',
+                                    }">
+                                    <span class="w-1.5 h-1.5 rounded-full"
+                                        :class="{
+                                            'bg-amber-500': getStaffStatus(member) === 'pending',
+                                            'bg-green-500': getStaffStatus(member) === 'active',
+                                            'bg-slate-400': getStaffStatus(member) === 'inactive',
+                                        }"></span>
+                                    {{ getStaffStatus(member) === 'pending' ? 'Pendiente' : getStaffStatus(member) === 'active' ? 'Activo' : 'Inactivo' }}
+                                </span>
+                            </td>
+
+                            <!-- Museum -->
+                            <td v-if="isPlatformAdmin" class="px-6 py-4 text-xs text-muted-foreground">
+                                {{ member.museum_name || '—' }}
+                            </td>
+
+                            <!-- Date -->
+                            <td class="px-6 py-4 text-xs text-muted-foreground whitespace-nowrap">
+                                {{ new Date(member.created_at).toLocaleDateString('es-ES', { day: '2-digit', month: 'short', year: 'numeric' }) }}
+                            </td>
+
+                            <!-- Actions -->
+                            <td class="px-6 py-4">
+                                <div class="flex items-center justify-end gap-1">
+                                    <Button @click="openEditStaffModal(member)" variant="ghost" size="icon" class="h-8 w-8" title="Editar">
+                                        <Pencil class="w-3.5 h-3.5" />
+                                    </Button>
+                                    <Button v-if="getStaffStatus(member) !== 'pending'"
+                                        @click="handleToggleActive(member)"
+                                        variant="ghost" size="icon" class="h-8 w-8"
+                                        :title="member.active ? 'Desactivar cuenta' : 'Activar cuenta'">
+                                        <EyeOff v-if="member.active" class="w-3.5 h-3.5 text-muted-foreground" />
+                                        <Eye v-else class="w-3.5 h-3.5 text-primary" />
+                                    </Button>
+                                    <Button v-if="getStaffStatus(member) === 'pending'"
+                                        @click="openDeleteStaffModal(member)"
+                                        variant="ghost" size="icon" class="h-8 w-8 hover:text-destructive"
+                                        title="Eliminar cuenta pendiente">
+                                        <Trash2 class="w-3.5 h-3.5" />
+                                    </Button>
+                                </div>
+                            </td>
                         </tr>
                     </tbody>
                 </table>
@@ -547,7 +722,7 @@ onUnmounted(() => {
             </Card>
         </div>
 
-        <!-- STAFF MODAL -->
+        <!-- STAFF CREATE MODAL -->
         <div v-if="showStaffModal"
             class="fixed inset-0 bg-background/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
             <Card class="w-full max-w-md shadow-2xl relative border-border animate-in fade-in zoom-in duration-200">
@@ -556,56 +731,110 @@ onUnmounted(() => {
                     <X class="w-5 h-5" />
                 </button>
                 <div class="p-6">
-                    <h2 class="text-2xl font-bold mb-6 flex items-center gap-2">
-                        <Users class="w-6 h-6 text-primary" /> Crear Personal
+                    <h2 class="text-xl font-bold mb-1 flex items-center gap-2">
+                        <Users class="w-5 h-5 text-primary" /> Añadir Personal
                     </h2>
+                    <p class="text-sm text-muted-foreground mb-6">La cuenta quedará pendiente hasta el primer inicio de sesión.</p>
                     <form @submit.prevent="handleCreateStaff" class="space-y-4">
                         <div class="space-y-2">
-                            <Label for="name">Nombre</Label>
-                            <Input id="name" v-model="staffForm.name" required placeholder="ej: Juan Pérez" />
+                            <Label for="staff_name">Nombre</Label>
+                            <Input id="staff_name" v-model="staffForm.name" required placeholder="ej: Juan Pérez" />
                         </div>
                         <div class="space-y-2">
-                            <Label for="email">Correo Electrónico</Label>
-                            <Input id="email" type="email" v-model="staffForm.email" required
-                                placeholder="correo@ejemplo.com" />
+                            <Label for="staff_email">Correo Electrónico</Label>
+                            <Input id="staff_email" type="email" v-model="staffForm.email" required placeholder="correo@ejemplo.com" />
                         </div>
                         <div class="grid grid-cols-2 gap-4">
                             <div class="space-y-2">
-                                <Label for="role">Rol</Label>
-                                <select id="role" v-model="staffForm.role"
-                                    class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2">
+                                <Label for="staff_role">Rol</Label>
+                                <select id="staff_role" v-model="staffForm.role"
+                                    class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
                                     <option v-if="isPlatformAdmin" value="museum_admin">Administrador</option>
                                     <option value="technician">Técnico</option>
                                 </select>
                             </div>
                             <div class="space-y-2" v-if="isPlatformAdmin">
-                                <Label for="museum_id">Asignar Museo</Label>
-                                <select id="museum_id" v-model="staffForm.museum_id" required
-                                    class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2">
-                                    <option value="" disabled>Seleccionar...</option>
+                                <Label for="staff_museum">Museo</Label>
+                                <select id="staff_museum" v-model="staffForm.museum_id" required
+                                    class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                                    <option value="" disabled>Seleccionar…</option>
                                     <option v-for="m in museums" :key="m.id" :value="m.id">{{ m.name }}</option>
                                 </select>
                             </div>
                         </div>
-
-                        <div
-                            class="bg-secondary/50 p-3 rounded-lg text-sm text-muted-foreground mt-4 mb-4 border border-border">
-                            Se enviará un correo a <strong>{{ staffForm.email || '...' }}</strong> con una contraseña
-                            segura temporal obligando su cambio en el próximo inicio de sesión.
+                        <div class="bg-secondary/50 p-3 rounded-lg text-sm text-muted-foreground border border-border">
+                            Se enviará un correo a <strong>{{ staffForm.email || '…' }}</strong> con credenciales temporales.
                         </div>
-
-                        <Alert v-if="staffError" variant="destructive" class="mb-4">
-                            <p>{{ staffError }}</p>
-                        </Alert>
-                        <Alert v-if="staffSuccess" variant="success"
-                            class="mb-4 bg-green-500/10 text-green-600 border-green-500/20">
-                            <p>{{ staffSuccess }}</p>
-                        </Alert>
-
+                        <Alert v-if="staffError" variant="destructive"><p>{{ staffError }}</p></Alert>
+                        <Alert v-if="staffSuccess" class="bg-green-500/10 text-green-600 border-green-500/20"><p>{{ staffSuccess }}</p></Alert>
                         <Button type="submit" class="w-full"
-                            :disabled="!staffForm.name || !staffForm.email || !staffForm.role || (isPlatformAdmin && !staffForm.museum_id)">Crear
-                            Cuenta</Button>
+                            :disabled="!staffForm.name || !staffForm.email || !staffForm.role || (isPlatformAdmin && !staffForm.museum_id)">
+                            Enviar Invitación
+                        </Button>
                     </form>
+                </div>
+            </Card>
+        </div>
+
+        <!-- STAFF EDIT MODAL -->
+        <div v-if="showEditStaffModal"
+            class="fixed inset-0 bg-background/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+            <Card class="w-full max-w-md shadow-2xl relative border-border animate-in fade-in zoom-in duration-200">
+                <button @click="showEditStaffModal = false"
+                    class="absolute top-4 right-4 text-muted-foreground hover:text-foreground">
+                    <X class="w-5 h-5" />
+                </button>
+                <div class="p-6">
+                    <h2 class="text-xl font-bold mb-6 flex items-center gap-2">
+                        <Pencil class="w-5 h-5 text-primary" /> Editar Usuario
+                    </h2>
+                    <form @submit.prevent="handleEditStaff" class="space-y-4">
+                        <div class="space-y-2">
+                            <Label for="edit_staff_name">Nombre</Label>
+                            <Input id="edit_staff_name" v-model="editStaffForm.name" required placeholder="ej: Juan Pérez" />
+                        </div>
+                        <div class="space-y-2">
+                            <Label for="edit_staff_email">Correo Electrónico</Label>
+                            <Input id="edit_staff_email" type="email" v-model="editStaffForm.email" required placeholder="correo@ejemplo.com" />
+                        </div>
+                        <div class="space-y-2">
+                            <Label for="edit_staff_role">Rol</Label>
+                            <select id="edit_staff_role" v-model="editStaffForm.role"
+                                class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                                <option v-if="isPlatformAdmin" value="museum_admin">Administrador</option>
+                                <option value="technician">Técnico</option>
+                            </select>
+                        </div>
+                        <Alert v-if="staffError" variant="destructive"><p>{{ staffError }}</p></Alert>
+                        <Alert v-if="staffSuccess" class="bg-green-500/10 text-green-600 border-green-500/20"><p>{{ staffSuccess }}</p></Alert>
+                        <Button type="submit" class="w-full" :disabled="!editStaffForm.name || !editStaffForm.email">Guardar Cambios</Button>
+                    </form>
+                </div>
+            </Card>
+        </div>
+
+        <!-- STAFF DELETE CONFIRM MODAL -->
+        <div v-if="showDeleteStaffModal"
+            class="fixed inset-0 bg-background/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+            <Card class="w-full max-w-sm shadow-2xl border-border animate-in fade-in zoom-in duration-200">
+                <div class="p-6">
+                    <div class="flex items-center gap-3 mb-4">
+                        <div class="w-10 h-10 rounded-full bg-destructive/10 flex items-center justify-center flex-shrink-0">
+                            <ShieldAlert class="w-5 h-5 text-destructive" />
+                        </div>
+                        <div>
+                            <h2 class="font-bold text-foreground">Eliminar cuenta</h2>
+                            <p class="text-sm text-muted-foreground">Esta acción no se puede deshacer</p>
+                        </div>
+                    </div>
+                    <p class="text-sm text-muted-foreground mb-6">
+                        Se eliminará la cuenta de <strong class="text-foreground">{{ deleteStaffTarget?.name }}</strong>.
+                        Solo es posible eliminar cuentas que aún no han sido activadas.
+                    </p>
+                    <div class="flex gap-3">
+                        <Button variant="outline" class="flex-1" @click="showDeleteStaffModal = false">Cancelar</Button>
+                        <Button variant="destructive" class="flex-1" @click="handleDeleteStaff">Eliminar</Button>
+                    </div>
                 </div>
             </Card>
         </div>

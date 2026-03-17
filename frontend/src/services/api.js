@@ -44,6 +44,11 @@ export const api = {
             method: 'PUT',
             body: JSON.stringify(body),
         }),
+    patch: (endpoint, body) =>
+        request(endpoint, {
+            method: 'PATCH',
+            body: JSON.stringify(body),
+        }),
     delete: (endpoint) =>
         request(endpoint, { method: 'DELETE' }),
     uploadFormData: async (endpoint, formData) => {

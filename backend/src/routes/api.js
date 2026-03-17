@@ -25,6 +25,9 @@ router.delete('/auth/avatar', authMiddleware, authController.deleteAvatar);
 // adminMiddleware allows both admin and superadmin
 router.post('/admin/create-staff', authMiddleware, adminMiddleware, authController.createStaff);
 router.get('/admin/users', authMiddleware, adminMiddleware, authController.listUsers);
+router.patch('/admin/users/:id', authMiddleware, adminMiddleware, authController.updateStaff);
+router.patch('/admin/users/:id/active', authMiddleware, adminMiddleware, authController.toggleStaffActive);
+router.delete('/admin/users/:id', authMiddleware, adminMiddleware, authController.deleteStaff);
 
 // ─── SUPERADMIN-ONLY Routes ───────────────────────────────────
 router.post('/museums', authMiddleware, superAdminMiddleware, museumController.createMuseum);

@@ -58,7 +58,11 @@ const db = new sqlite3.Database(dbPath, async (err) => {
             CREATE TABLE IF NOT EXISTS visitors (
                 id TEXT PRIMARY KEY,
                 session_id TEXT UNIQUE NOT NULL,
-                created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+                robot_id TEXT,
+                name TEXT,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                ended_at DATETIME,
+                FOREIGN KEY(robot_id) REFERENCES robots(id)
             )
         `);
 
@@ -73,9 +77,18 @@ const db = new sqlite3.Database(dbPath, async (err) => {
                 position_y REAL DEFAULT 0,
                 position_theta REAL DEFAULT 0,
                 last_update DATETIME DEFAULT CURRENT_TIMESTAMP,
+                locked_until TEXT,
+                current_visitor_id TEXT,
                 FOREIGN KEY(museum_id) REFERENCES museums(id)
             )
-        `, async () => {
+        `);
+
+        // Indexes
+        db.run(`CREATE INDEX IF NOT EXISTS idx_users_email ON users(email)`);
+        db.run(`CREATE INDEX IF NOT EXISTS idx_users_museum_id ON users(museum_id)`);
+        db.run(`CREATE INDEX IF NOT EXISTS idx_robots_museum_id ON robots(museum_id)`);
+        db.run(`CREATE INDEX IF NOT EXISTS idx_visitors_robot_id ON visitors(robot_id)`);
+        db.run(`CREATE INDEX IF NOT EXISTS idx_visitors_session_id ON visitors(session_id)`, async () => {
             console.log('Schema ready. Seeding data...');
             await seedData();
         });

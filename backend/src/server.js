@@ -11,9 +11,18 @@ const apiRoutes = require('./routes/api');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+const ratelimit = require('express-rate-limit');
+const limiter = ratelimit({
+  windowMs: 15 * 60 * 1000, // 15 minutos
+  max: 100, // Limitar a 100 solicitudes por IP por ventana
+  message: { error: 'Demasiadas solicitudes, por favor intente nuevamente más tarde.' }
+});
+
 // Middleware
 app.use(cors());
 app.use(express.json());
+app.use(limiter);
+
 
 // Servir la carpeta uploads estáticamente
 app.use('/uploads', express.static(path.join(__dirname, '../uploads')));

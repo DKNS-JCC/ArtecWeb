@@ -106,7 +106,7 @@ exports.login = (req, res) => {
     const query = `SELECT * FROM users WHERE name = ? OR email = ? LIMIT 1`;
     db.get(query, [identifier.trim(), identifier.trim().toLowerCase()], async (err, user) => {
         if (err) return res.status(500).json({ error: 'Database error' });
-        if (!user) return res.status(401).json({ error: 'Invalid credentials' });
+        if (!user) return res.status(401).json({ error: 'Credenciales incorrectas' });
 
         if (!['platform_admin', 'museum_admin', 'technician'].includes(user.role)) {
             return res.status(403).json({ error: 'Access denied: Valid administrative role required' });
@@ -114,7 +114,7 @@ exports.login = (req, res) => {
 
         try {
             const match = await bcrypt.compare(password, user.password_hash);
-            if (!match) return res.status(401).json({ error: 'Invalid credentials' });
+            if (!match) return res.status(401).json({ error: 'Credenciales incorrectas' });
 
             // Block manually deactivated accounts (active=0 but already activated once)
             if (user.active === 0 && user.must_change_password === 0) {

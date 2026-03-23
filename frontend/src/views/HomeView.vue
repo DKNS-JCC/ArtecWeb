@@ -1,5 +1,11 @@
 <script setup>
 import { ref, onMounted, onUnmounted } from 'vue';
+import { useRouter } from 'vue-router';
+import { useAuthStore } from '@/stores/auth';
+import { Button } from '@/components/ui/button';
+
+const router = useRouter();
+const authStore = useAuthStore();
 
 const videoRef = ref(null);
 const containerRef = ref(null);
@@ -40,14 +46,10 @@ onUnmounted(() => window.removeEventListener('scroll', handleScroll));
                         Explora exposiciones, museos y galerías de arte con nuestro asistente.
                     </p>
 
-                    <div class="hero-actions">
-                        <a href="#usuario" class="btn-primary">
-                            Aprende a usarlo
-                            <svg class="btn-arrow" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                    d="M13 7l5 5m0 0l-5 5m5-5H6" />
-                            </svg>
-                        </a>
+                    <div class="mt-4">
+                        <p class="text-sm md:text-base text-muted-foreground bg-background/50 backdrop-blur-sm p-4 rounded-xl border border-border inline-block">
+                            Para iniciar tu visita, escanea el código QR ubicado en el robot.
+                        </p>
                     </div>
                 </div>
 

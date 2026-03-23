@@ -6,51 +6,95 @@ const crypto = require('crypto');
 const JWT_SECRET = process.env.JWT_SECRET || 'super-secret-artec-key';
 const SALT_ROUNDS = 10;
 
-// ──────── PUBLIC: Register (creates 'user' role only) ────────
-exports.register = async (req, res) => {
-    const { name, email, password } = req.body;
+// ──────── PUBLIC: Create Visitor Session ────────
+exports.createVisitor = (req, res) => {
+    const { robotId, name } = req.body;
 
-    if (!name || !email || !password) {
-        return res.status(400).json({ error: 'Name, email and password are required' });
+    if (!robotId) {
+        return res.status(400).json({ error: 'Se requiere el ID del robot leído del QR' });
     }
-    if (password.length < 6) {
-        return res.status(400).json({ error: 'Password must be at least 6 characters' });
-    }
+    
+    const visitorName = name ? name.trim() : 'Visitante';
 
-    try {
-        const passwordHash = await bcrypt.hash(password, SALT_ROUNDS);
+    db.get('SELECT id, name, museum_id, locked_until FROM robots WHERE id = ?', [robotId], (err, robot) => {
+        if (err) return res.status(500).json({ error: 'Error verificando el robot' });
+        if (!robot) return res.status(404).json({ error: 'Robot no válido o no encontrado' });
 
-        const newUserId = crypto.randomUUID();
+        const now = new Date();
+        if (robot.locked_until && new Date(robot.locked_until) > now) {
+            return res.status(403).json({ error: 'Este robot ya está siendo utilizado por otro visitante. Por favor, espera a que termine su visita.' });
+        }
 
-        db.run(
-            `INSERT INTO users (id, name, email, password_hash, role) VALUES (?, ?, ?, ?, 'user')`,
-            [newUserId, name.trim(), email.trim().toLowerCase(), passwordHash],
-            function (err) {
+        const visitorId = crypto.randomUUID();
+        const sessionId = crypto.randomUUID();
+        
+        // Bloquear robot por 10 minutos iniciales
+        const newLockTime = new Date(now.getTime() + 10 * 60000).toISOString();
+
+        db.run('UPDATE robots SET locked_until = ?, current_visitor_id = ? WHERE id = ?', [newLockTime, visitorId, robot.id], (updErr) => {
+            if (updErr) return res.status(500).json({ error: 'Error reservando el robot' });
+            
+            db.run(
+                `INSERT INTO visitors (id, session_id, robot_id, name) VALUES (?, ?, ?, ?)`,
+                [visitorId, sessionId, robot.id, visitorName],
+                function (err) {
                 if (err) {
-                    if (err.message.includes('UNIQUE constraint failed')) {
-                        const field = err.message.includes('name') ? 'name' : 'email';
-                        return res.status(409).json({ error: `That ${field} is already taken` });
-                    }
-                    return res.status(500).json({ error: 'Error registering user' });
+                    console.error('VISITOR ERROR:', err);
+                    return res.status(500).json({ error: 'Error creating visitor session' });
                 }
 
                 const token = jwt.sign(
-                    { id: newUserId, name: name.trim(), role: 'user', must_change_password: false },
+                    { 
+                        id: visitorId, 
+                        session_id: sessionId, 
+                        role: 'visitor',
+                        robot_id: robot.id,
+                        robot_name: robot.name,
+                        museum_id: robot.museum_id,
+                        name: visitorName
+                    },
                     JWT_SECRET,
-                    { expiresIn: '24h' }
+                    { expiresIn: '12h' } // Visitors get temporary access
                 );
 
                 res.status(201).json({
-                    message: 'Account created successfully',
+                    message: 'Visitor session created',
                     token,
-                    user: { id: newUserId, name: name.trim(), email: email.trim().toLowerCase(), role: 'user', avatar: null }
+                    visitor: { id: visitorId, session_id: sessionId, role: 'visitor', robot_id: robot.id, robot_name: robot.name, name: visitorName }
                 });
             }
         );
-    } catch (err) {
-        console.error('REGISTER ERROR:', err);
-        res.status(500).json({ error: 'Server error' });
-    }
+        });
+    });
+};
+
+exports.pingVisitor = (req, res) => {
+    const robotId = req.user.robot_id;
+    if (!robotId) return res.status(400).json({ error: 'No robot assigned' });
+    
+    // Extiende el bloqueo por otros 10 minutos
+    const newLockTime = new Date(new Date().getTime() + 10 * 60000).toISOString();
+    db.run('UPDATE robots SET locked_until = ? WHERE id = ?', [newLockTime, robotId], (err) => {
+        if (err) return res.status(500).json({ error: 'Database error' });
+        res.json({ message: 'Session extended' });
+    });
+};
+
+exports.endVisitor = (req, res) => {
+    const robotId = req.user.robot_id;
+    const visitorId = req.user.id;
+    if (!robotId) return res.status(400).json({ error: 'No robot assigned' });
+
+    // Libera el robot para otros
+    db.run('UPDATE robots SET locked_until = NULL, current_visitor_id = NULL WHERE id = ?', [robotId], (err) => {
+        if (err) return res.status(500).json({ error: 'Database error' });
+        
+        // Registrar fin de la sesión del visitante
+        db.run('UPDATE visitors SET ended_at = CURRENT_TIMESTAMP WHERE id = ?', [visitorId], (err2) => {
+            if (err2) console.error('Error updating visitor ended_at', err2);
+            res.json({ message: 'Session ended' });
+        });
+    });
 };
 
 exports.login = (req, res) => {
@@ -62,11 +106,20 @@ exports.login = (req, res) => {
     const query = `SELECT * FROM users WHERE name = ? OR email = ? LIMIT 1`;
     db.get(query, [identifier.trim(), identifier.trim().toLowerCase()], async (err, user) => {
         if (err) return res.status(500).json({ error: 'Database error' });
-        if (!user) return res.status(401).json({ error: 'Invalid credentials' });
+        if (!user) return res.status(401).json({ error: 'Credenciales incorrectas' });
+
+        if (!['platform_admin', 'museum_admin', 'technician'].includes(user.role)) {
+            return res.status(403).json({ error: 'Access denied: Valid administrative role required' });
+        }
 
         try {
             const match = await bcrypt.compare(password, user.password_hash);
-            if (!match) return res.status(401).json({ error: 'Invalid credentials' });
+            if (!match) return res.status(401).json({ error: 'Credenciales incorrectas' });
+
+            // Block manually deactivated accounts (active=0 but already activated once)
+            if (user.active === 0 && user.must_change_password === 0) {
+                return res.status(403).json({ error: 'Esta cuenta ha sido desactivada. Contacta con tu administrador.' });
+            }
 
             const mustChange = user.must_change_password === 1;
 
@@ -122,7 +175,7 @@ exports.changePassword = async (req, res) => {
         const newHash = await bcrypt.hash(new_password, SALT_ROUNDS);
 
         db.run(
-            `UPDATE users SET password_hash = ?, must_change_password = 0 WHERE id = ?`,
+            `UPDATE users SET password_hash = ?, must_change_password = 0, active = 1 WHERE id = ?`,
             [newHash, userId],
             (err) => {
                 if (err) return res.status(500).json({ error: 'Error updating password' });
@@ -187,7 +240,7 @@ exports.createStaff = async (req, res) => {
             const userId = crypto.randomUUID();
 
             db.run(
-                `INSERT INTO users (id, name, email, password_hash, role, must_change_password, museum_id, created_by) VALUES (?, ?, ?, ?, ?, 1, ?, ?)`,
+                `INSERT INTO users (id, name, email, password_hash, role, must_change_password, active, museum_id, created_by) VALUES (?, ?, ?, ?, ?, 1, 0, ?, ?)`,
                 [userId, name.trim(), email.trim().toLowerCase(), passwordHash, role, assignedMuseumId, created_by],
                 async function (err) {
                     if (err) {
@@ -211,6 +264,86 @@ exports.createStaff = async (req, res) => {
     } catch {
         res.status(500).json({ error: 'Server error' });
     }
+};
+
+exports.updateStaff = async (req, res) => {
+    const { id } = req.params;
+    const { name, email, role } = req.body;
+    const reqUserRole = req.user.role;
+    const reqMuseumId = req.user.museum_id;
+
+    db.get('SELECT * FROM users WHERE id = ?', [id], (err, targetUser) => {
+        if (err || !targetUser) return res.status(404).json({ error: 'Usuario no encontrado' });
+
+        if (reqUserRole === 'museum_admin' && targetUser.museum_id !== reqMuseumId) {
+            return res.status(403).json({ error: 'No autorizado' });
+        }
+        if (targetUser.role === 'platform_admin' && reqUserRole !== 'platform_admin') {
+            return res.status(403).json({ error: 'No autorizado' });
+        }
+
+        const updates = [];
+        const params = [];
+        if (name)  { updates.push('name = ?');  params.push(name.trim()); }
+        if (email) { updates.push('email = ?'); params.push(email.trim().toLowerCase()); }
+        if (role)  { updates.push('role = ?');  params.push(role); }
+        if (updates.length === 0) return res.status(400).json({ error: 'Nada que actualizar' });
+
+        params.push(id);
+        db.run(`UPDATE users SET ${updates.join(', ')} WHERE id = ?`, params, (err) => {
+            if (err) {
+                if (err.message.includes('UNIQUE')) return res.status(409).json({ error: 'El nombre o email ya está en uso' });
+                return res.status(500).json({ error: 'Error al actualizar usuario' });
+            }
+            res.json({ message: 'Usuario actualizado correctamente' });
+        });
+    });
+};
+
+exports.toggleStaffActive = (req, res) => {
+    const { id } = req.params;
+    const reqUserRole = req.user.role;
+    const reqMuseumId = req.user.museum_id;
+
+    db.get('SELECT * FROM users WHERE id = ?', [id], (err, targetUser) => {
+        if (err || !targetUser) return res.status(404).json({ error: 'Usuario no encontrado' });
+
+        if (reqUserRole === 'museum_admin' && targetUser.museum_id !== reqMuseumId) {
+            return res.status(403).json({ error: 'No autorizado' });
+        }
+        if (targetUser.role === 'platform_admin') {
+            return res.status(403).json({ error: 'No se puede modificar una cuenta de super administrador' });
+        }
+
+        const newActive = targetUser.active === 1 ? 0 : 1;
+        db.run('UPDATE users SET active = ? WHERE id = ?', [newActive, id], (err) => {
+            if (err) return res.status(500).json({ error: 'Error al actualizar estado' });
+            res.json({ message: 'Estado actualizado', active: newActive });
+        });
+    });
+};
+
+exports.deleteStaff = (req, res) => {
+    const { id } = req.params;
+    const reqUserRole = req.user.role;
+    const reqMuseumId = req.user.museum_id;
+
+    db.get('SELECT * FROM users WHERE id = ?', [id], (err, targetUser) => {
+        if (err || !targetUser) return res.status(404).json({ error: 'Usuario no encontrado' });
+
+        if (reqUserRole === 'museum_admin' && targetUser.museum_id !== reqMuseumId) {
+            return res.status(403).json({ error: 'No autorizado' });
+        }
+        // Only allow deleting accounts that have never been activated
+        if (!(targetUser.active === 0 && targetUser.must_change_password === 1)) {
+            return res.status(403).json({ error: 'Solo se pueden eliminar cuentas pendientes de activación' });
+        }
+
+        db.run('DELETE FROM users WHERE id = ?', [id], (err) => {
+            if (err) return res.status(500).json({ error: 'Error al eliminar usuario' });
+            res.json({ message: 'Usuario eliminado correctamente' });
+        });
+    });
 };
 
 exports.listUsers = (req, res) => {

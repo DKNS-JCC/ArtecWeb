@@ -5,8 +5,16 @@ export const authService = {
         return api.post('/auth/login', { identifier, password })
     },
 
-    register(name, email, password) {
-        return api.post('/auth/register', { name, email, password })
+    createVisitor(robotId, name) {
+        return api.post('/auth/visitor', { robotId, name })
+    },
+
+    pingVisitor() {
+        return api.post('/auth/visitor/ping')
+    },
+
+    endVisitor() {
+        return api.post('/auth/visitor/end')
     },
 
     changePassword(current_password, new_password) {
@@ -19,6 +27,18 @@ export const authService = {
 
     listUsers() {
         return api.get('/admin/users')
+    },
+
+    updateStaff(id, data) {
+        return api.patch(`/admin/users/${id}`, data)
+    },
+
+    toggleStaffActive(id) {
+        return api.patch(`/admin/users/${id}/active`)
+    },
+
+    deleteStaff(id) {
+        return api.delete(`/admin/users/${id}`)
     },
 
     uploadAvatar(formData) {

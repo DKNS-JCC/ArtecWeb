@@ -42,7 +42,7 @@ const db = new sqlite3.Database(dbPath, async (err) => {
                 name TEXT UNIQUE NOT NULL,
                 email TEXT UNIQUE NOT NULL,
                 password_hash TEXT NOT NULL,
-                role TEXT DEFAULT 'user' CHECK(role IN ('platform_admin', 'museum_admin', 'technician', 'user')),
+                role TEXT CHECK(role IN ('platform_admin', 'museum_admin', 'technician')),
                 active INTEGER DEFAULT 1,
                 must_change_password INTEGER DEFAULT 0,
                 avatar TEXT,
@@ -51,6 +51,14 @@ const db = new sqlite3.Database(dbPath, async (err) => {
                 created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
                 FOREIGN KEY(museum_id) REFERENCES museums(id),
                 FOREIGN KEY(created_by) REFERENCES users(id)
+            )
+        `);
+
+        db.run(`
+            CREATE TABLE IF NOT EXISTS visitors (
+                id TEXT PRIMARY KEY,
+                session_id TEXT UNIQUE NOT NULL,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP
             )
         `);
 

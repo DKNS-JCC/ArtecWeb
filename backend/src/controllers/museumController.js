@@ -1,4 +1,5 @@
 const db = require('../database');
+const crypto = require('crypto');
 
 // GET /api/museums - List all museums
 exports.listMuseums = (req, res) => {
@@ -16,15 +17,17 @@ exports.createMuseum = (req, res) => {
         return res.status(400).json({ error: 'Name and company are required' });
     }
 
+    const museumId = crypto.randomUUID();
+
     db.run(
-        `INSERT INTO museums (name, company) VALUES (?, ?)`,
-        [name.trim(), company.trim()],
+        `INSERT INTO museums (id, name, company) VALUES (?, ?, ?)`,
+        [museumId, name.trim(), company.trim()],
         function (err) {
             if (err) return res.status(500).json({ error: 'Error creating museum' });
 
             res.status(201).json({
                 message: 'Museum created successfully',
-                museum: { id: this.lastID, name, company }
+                museum: { id: museumId, name: name.trim(), company: company.trim() }
             });
         }
     );

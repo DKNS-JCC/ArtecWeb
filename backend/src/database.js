@@ -79,6 +79,13 @@ function initializeDatabase() {
                 FOREIGN KEY(museum_id) REFERENCES museums(id)
             )
         `);
+
+        // Indexes for frequently queried columns
+        db.run(`CREATE INDEX IF NOT EXISTS idx_users_email ON users(email)`);
+        db.run(`CREATE INDEX IF NOT EXISTS idx_users_museum_id ON users(museum_id)`);
+        db.run(`CREATE INDEX IF NOT EXISTS idx_robots_museum_id ON robots(museum_id)`);
+        db.run(`CREATE INDEX IF NOT EXISTS idx_visitors_robot_id ON visitors(robot_id)`);
+        db.run(`CREATE INDEX IF NOT EXISTS idx_visitors_session_id ON visitors(session_id)`);
     });
 }
 

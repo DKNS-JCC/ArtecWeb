@@ -144,11 +144,17 @@ router.get('/robots/:id', authMiddleware, adminMiddleware, (req, res) => {
     });
 });
 
+const IP_RE = /^(\d{1,3}\.){3}\d{1,3}$/;
+
 router.put('/robots/:id', authMiddleware, adminMiddleware, (req, res) => {
     const isSuperAdmin = req.user.role === 'platform_admin';
     const museumId = req.user.museum_id;
     const robotId = req.params.id;
     const { ip, name } = req.body;
+
+    if (ip !== undefined && ip !== '' && !IP_RE.test(ip)) {
+        return res.status(400).json({ error: 'Invalid IP address format' });
+    }
 
     let verifyQuery = `SELECT * FROM robots WHERE id = ?`;
     let verifyParams = [robotId];

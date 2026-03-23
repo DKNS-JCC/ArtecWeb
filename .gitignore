@@ -1,4 +1,7 @@
 .env*
+!.env.example
 node_modules
-/database/database.db
+/database/database.sqlite
 CONTEXT.md
+backend/uploads/avatars/*
+!backend/uploads/avatars/.gitkeep

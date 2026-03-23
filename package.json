@@ -1,4 +1,14 @@
 {
+  "name": "artecweb",
+  "private": true,
+  "scripts": {
+    "install:all": "npm install && npm --prefix backend install && npm --prefix frontend install",
+    "dev:backend": "npm --prefix backend run dev",
+    "dev:frontend": "npm --prefix frontend run dev",
+    "dev": "npm run dev:backend & npm run dev:frontend",
+    "build": "npm --prefix frontend run build",
+    "start": "npm --prefix backend run start"
+  },
   "dependencies": {
     "roslib": "^2.1.0"
   }

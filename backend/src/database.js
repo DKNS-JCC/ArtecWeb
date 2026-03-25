@@ -76,7 +76,37 @@ function initializeDatabase() {
                 last_update DATETIME DEFAULT CURRENT_TIMESTAMP,
                 locked_until TEXT,
                 current_visitor_id TEXT,
+                ip TEXT,
                 FOREIGN KEY(museum_id) REFERENCES museums(id)
+            )
+        `);
+
+        // 5. Create museum_places table (for future admin management + AI context)
+        db.run(`
+            CREATE TABLE IF NOT EXISTS museum_places (
+                id TEXT PRIMARY KEY,
+                museum_id TEXT NOT NULL,
+                name TEXT NOT NULL,
+                description TEXT,
+                category TEXT DEFAULT 'exhibit',
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY(museum_id) REFERENCES museums(id)
+            )
+        `);
+
+        // 6. Create chat_messages table (conversation context + analytics)
+        db.run(`
+            CREATE TABLE IF NOT EXISTS chat_messages (
+                id TEXT PRIMARY KEY,
+                visitor_id TEXT NOT NULL,
+                session_id TEXT NOT NULL,
+                robot_id TEXT NOT NULL,
+                role TEXT NOT NULL CHECK(role IN ('user', 'assistant')),
+                content TEXT NOT NULL,
+                intent TEXT,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY(visitor_id) REFERENCES visitors(id),
+                FOREIGN KEY(robot_id) REFERENCES robots(id)
             )
         `);
 
@@ -86,6 +116,9 @@ function initializeDatabase() {
         db.run(`CREATE INDEX IF NOT EXISTS idx_robots_museum_id ON robots(museum_id)`);
         db.run(`CREATE INDEX IF NOT EXISTS idx_visitors_robot_id ON visitors(robot_id)`);
         db.run(`CREATE INDEX IF NOT EXISTS idx_visitors_session_id ON visitors(session_id)`);
+        db.run(`CREATE INDEX IF NOT EXISTS idx_museum_places_museum ON museum_places(museum_id)`);
+        db.run(`CREATE INDEX IF NOT EXISTS idx_chat_messages_session ON chat_messages(session_id)`);
+        db.run(`CREATE INDEX IF NOT EXISTS idx_chat_messages_visitor ON chat_messages(visitor_id)`);
     });
 }
 

@@ -2,27 +2,51 @@
 import { ref, onMounted, onUnmounted, computed, nextTick } from 'vue';
 import { useRouter } from 'vue-router';
 import { useAuthStore } from '@/stores/auth';
+import { chatService } from '@/services/chatService';
 import { Send, LogOut, Bot, Clock } from 'lucide-vue-next';
 
 const router = useRouter();
 const authStore = useAuthStore();
 
+const STORAGE_KEY = 'artec_chat_messages';
+const MAX_MESSAGE_LENGTH = 500;
+
 const robotName = computed(() => authStore.user?.robot_name || 'Robot Guía');
 const visitorName = computed(() => authStore.user?.name || 'Amigo');
 const messageText = ref('');
 const chatContainer = ref(null);
+const isSending = ref(false);
 
-const messages = ref([
-    {
-        id: 1,
-        sender: 'robot',
-        text: `¡Hola ${visitorName.value}! Soy ${robotName.value}, tu guía robótico. ¿En qué te puedo ayudar?`,
-        time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-    }
-]);
+const welcomeMessage = {
+    id: 1,
+    sender: 'robot',
+    text: `¡Hola ${visitorName.value}! Soy ${robotName.value}, tu guía robótico. ¿En qué te puedo ayudar?`,
+    time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+};
+
+// Restore messages from sessionStorage or start fresh
+function loadMessages() {
+    try {
+        const saved = sessionStorage.getItem(STORAGE_KEY);
+        if (saved) {
+            const parsed = JSON.parse(saved);
+            if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+        }
+    } catch { /* ignore */ }
+    return [welcomeMessage];
+}
+
+function saveMessages() {
+    try {
+        const toSave = messages.value.filter(m => !m.isTyping);
+        sessionStorage.setItem(STORAGE_KEY, JSON.stringify(toSave));
+    } catch { /* ignore */ }
+}
+
+const messages = ref(loadMessages());
 
 // --- SESSION TIMER LOGIC (10 Minutes) ---
-const EXCLUSIVITY_TIME_SEC = 600; 
+const EXCLUSIVITY_TIME_SEC = 600;
 const timeLeft = ref(EXCLUSIVITY_TIME_SEC);
 let timerInterval = null;
 
@@ -53,6 +77,7 @@ const resetTimer = () => {
 
 const handleEndSession = async () => {
     if (timerInterval) clearInterval(timerInterval);
+    sessionStorage.removeItem(STORAGE_KEY);
     await authStore.endVisitor();
     router.push('/');
 };
@@ -65,38 +90,72 @@ const scrollToBottom = async () => {
     }
 };
 
-const sendMessage = () => {
-    if (!messageText.value.trim()) return;
+const sendMessage = async () => {
+    const text = messageText.value.trim();
+    if (!text || isSending.value) return;
+    if (text.length > MAX_MESSAGE_LENGTH) return;
 
-    // Reset the exclusivity timer
     resetTimer();
 
     // Add user message
     messages.value.push({
         id: Date.now(),
         sender: 'user',
-        text: messageText.value.trim(),
+        text,
         time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
     });
 
-    const userQ = messageText.value.trim();
     messageText.value = '';
     scrollToBottom();
 
-    // Fake robot reply
-    setTimeout(() => {
+    // Show typing indicator
+    isSending.value = true;
+    const typingId = Date.now() + 1;
+    messages.value.push({
+        id: typingId,
+        sender: 'robot',
+        text: null,
+        isTyping: true,
+        time: ''
+    });
+    scrollToBottom();
+
+    try {
+        const data = await chatService.sendMessage(text);
+
+        // Remove typing indicator
+        const idx = messages.value.findIndex(m => m.id === typingId);
+        if (idx !== -1) messages.value.splice(idx, 1);
+
+        // Add AI response
         messages.value.push({
-            id: Date.now() + 1,
+            id: Date.now() + 2,
             sender: 'robot',
-            text: `Interesante. Todavía estoy en modo simulación, pero pronto podré llevarte a donde pidas. (Has dicho: "${userQ}")`,
+            text: data.response,
+            intent: data.intent,
             time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
         });
+    } catch (err) {
+        // Remove typing indicator
+        const idx = messages.value.findIndex(m => m.id === typingId);
+        if (idx !== -1) messages.value.splice(idx, 1);
+
+        // Show error message
+        messages.value.push({
+            id: Date.now() + 2,
+            sender: 'robot',
+            text: 'Lo siento, tuve un problema procesando tu mensaje. ¿Puedes intentarlo de nuevo?',
+            isError: true,
+            time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+        });
+    } finally {
+        isSending.value = false;
+        saveMessages();
         scrollToBottom();
-    }, 1000);
+    }
 };
 
 onMounted(() => {
-    // If not a visitor, send them back (or allow standard testing)
     startTimer();
     scrollToBottom();
 });
@@ -148,13 +207,20 @@ onUnmounted(() => {
                 
                 <div class="relative max-w-[80%] rounded-2xl px-4 py-2.5 shadow-sm text-[0.95rem] leading-snug break-words"
                     :class="[
-                        msg.sender === 'user' 
-                            ? 'bg-[#007aff] text-white rounded-br-sm' 
-                            : 'bg-white dark:bg-[#262628] text-black dark:text-white rounded-bl-sm border border-black/5 dark:border-white/5'
+                        msg.sender === 'user'
+                            ? 'bg-[#007aff] text-white rounded-br-sm'
+                            : 'bg-white dark:bg-[#262628] text-black dark:text-white rounded-bl-sm border border-black/5 dark:border-white/5',
+                        msg.isError ? 'border-red-300 dark:border-red-500/30' : ''
                     ]">
-                    {{ msg.text }}
+                    <!-- Typing indicator -->
+                    <div v-if="msg.isTyping" class="flex space-x-1.5 px-1 py-1">
+                        <span class="w-2 h-2 bg-gray-400 dark:bg-gray-500 rounded-full animate-bounce" style="animation-delay: 0ms"></span>
+                        <span class="w-2 h-2 bg-gray-400 dark:bg-gray-500 rounded-full animate-bounce" style="animation-delay: 150ms"></span>
+                        <span class="w-2 h-2 bg-gray-400 dark:bg-gray-500 rounded-full animate-bounce" style="animation-delay: 300ms"></span>
+                    </div>
+                    <template v-else>{{ msg.text }}</template>
                 </div>
-                <span class="text-[0.65rem] text-muted-foreground mt-1 mx-1">{{ msg.time }}</span>
+                <span v-if="!msg.isTyping" class="text-[0.65rem] text-muted-foreground mt-1 mx-1">{{ msg.time }}</span>
             </div>
 
         </main>
@@ -165,16 +231,18 @@ onUnmounted(() => {
                 <textarea
                     v-model="messageText"
                     rows="1"
+                    :maxlength="MAX_MESSAGE_LENGTH"
+                    :disabled="isSending"
                     placeholder="Pregunta a tu guía..."
-                    class="flex-1 bg-transparent border-0 focus:ring-0 resize-none px-4 py-2.5 max-h-32 min-h-[44px] text-base placeholder:text-muted-foreground self-center outline-none scrollbar-hide text-black dark:text-white"
+                    class="flex-1 bg-transparent border-0 focus:ring-0 resize-none px-4 py-2.5 max-h-32 min-h-[44px] text-base placeholder:text-muted-foreground self-center outline-none scrollbar-hide text-black dark:text-white disabled:opacity-50"
                     @keydown.enter.prevent="sendMessage"
                 ></textarea>
-                
-                <button 
-                    type="submit" 
-                    :disabled="!messageText.trim()"
+
+                <button
+                    type="submit"
+                    :disabled="!messageText.trim() || isSending"
                     class="w-9 h-9 m-1 rounded-full flex flex-shrink-0 items-center justify-center transition-all"
-                    :class="messageText.trim() ? 'bg-[#007aff] text-white hover:scale-105 active:scale-95' : 'bg-gray-100 dark:bg-gray-800 text-gray-400 cursor-not-allowed'">
+                    :class="messageText.trim() && !isSending ? 'bg-[#007aff] text-white hover:scale-105 active:scale-95' : 'bg-gray-100 dark:bg-gray-800 text-gray-400 cursor-not-allowed'">
                     <Send class="w-4 h-4 ml-0.5" />
                 </button>
             </form>

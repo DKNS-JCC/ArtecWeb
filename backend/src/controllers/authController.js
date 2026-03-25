@@ -104,6 +104,20 @@ exports.pingVisitor = (req, res) => {
     });
 };
 
+exports.checkVisitorStatus = (req, res) => {
+    const robotId = req.user.robot_id;
+    const visitorId = req.user.id;
+    if (!robotId || !visitorId) return res.status(400).json({ active: false });
+
+    // Verificar si el visitante sigue activo en la base de datos
+    db.get('SELECT ended_at FROM visitors WHERE id = ?', [visitorId], (err, visitor) => {
+        if (err || !visitor || visitor.ended_at) {
+            return res.json({ active: false });
+        }
+        res.json({ active: true });
+    });
+};
+
 exports.endVisitor = (req, res) => {
     const robotId = req.user.robot_id;
     const visitorId = req.user.id;

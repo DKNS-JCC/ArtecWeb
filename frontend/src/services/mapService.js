@@ -3,16 +3,16 @@ import { api } from './api'
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:3000/api'
 
 export const mapService = {
-    getMap(museumId) {
-        return api.get(`/museums/${museumId}/map`)
+    getMap(robotId) {
+        return api.get(`/robots/${robotId}/map`)
     },
 
-    async uploadMap(museumId, formData) {
+    async uploadMap(robotId, formData) {
         const token = localStorage.getItem('artec_token')
         const headers = {}
         if (token) headers['Authorization'] = `Bearer ${token}`
 
-        const res = await fetch(`${API_BASE}/museums/${museumId}/map`, {
+        const res = await fetch(`${API_BASE}/robots/${robotId}/map`, {
             method: 'POST',
             body: formData,
             headers
@@ -23,23 +23,23 @@ export const mapService = {
         return data
     },
 
-    deleteMap(museumId) {
-        return api.delete(`/museums/${museumId}/map`)
+    deleteMap(robotId) {
+        return api.delete(`/robots/${robotId}/map`)
     },
 
-    getPlaces(museumId) {
-        return api.get(`/museums/${museumId}/places`)
+    getPlaces(robotId) {
+        return api.get(`/robots/${robotId}/places`)
     },
 
-    createPlace(museumId, place) {
-        return api.post(`/museums/${museumId}/places`, place)
+    createPlace(robotId, place) {
+        return api.post(`/robots/${robotId}/places`, place)
     },
 
-    updatePlace(museumId, placeId, data) {
-        return api.put(`/museums/${museumId}/places/${placeId}`, data)
+    updatePlace(robotId, placeId, data) {
+        return api.put(`/robots/${robotId}/places/${placeId}`, data)
     },
 
-    deletePlace(museumId, placeId) {
-        return api.delete(`/museums/${museumId}/places/${placeId}`)
+    deletePlace(robotId, placeId) {
+        return api.delete(`/robots/${robotId}/places/${placeId}`)
     }
 }

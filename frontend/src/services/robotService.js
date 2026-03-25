@@ -23,4 +23,8 @@ export const robotService = {
     update(id, data) {
         return api.put(`/robots/${id}`, data)
     },
+
+    forceEndSession(id) {
+        return api.post(`/robots/${id}/force-end`)
+    },
 }

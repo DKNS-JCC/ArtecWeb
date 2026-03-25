@@ -6,6 +6,8 @@ const crypto = require('crypto');
 const JWT_SECRET = process.env.JWT_SECRET || 'super-secret-artec-key';
 const SALT_ROUNDS = 10;
 
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
 // ──────── PUBLIC: Create Visitor Session ────────
 exports.createVisitor = (req, res) => {
     const { robotId, name } = req.body;
@@ -13,57 +15,79 @@ exports.createVisitor = (req, res) => {
     if (!robotId) {
         return res.status(400).json({ error: 'Se requiere el ID del robot leído del QR' });
     }
-    
+
     const visitorName = name ? name.trim() : 'Visitante';
+    const visitorId = crypto.randomUUID();
+    const sessionId = crypto.randomUUID();
+    const now = new Date();
+    const newLockTime = new Date(now.getTime() + 10 * 60000).toISOString();
 
-    db.get('SELECT id, name, museum_id, locked_until FROM robots WHERE id = ?', [robotId], (err, robot) => {
-        if (err) return res.status(500).json({ error: 'Error verificando el robot' });
-        if (!robot) return res.status(404).json({ error: 'Robot no válido o no encontrado' });
+    // Use IMMEDIATE transaction to prevent race conditions on robot locking
+    db.run('BEGIN IMMEDIATE', (beginErr) => {
+        if (beginErr) return res.status(500).json({ error: 'Error interno del servidor' });
 
-        const now = new Date();
-        if (robot.locked_until && new Date(robot.locked_until) > now) {
-            return res.status(403).json({ error: 'Este robot ya está siendo utilizado por otro visitante. Por favor, espera a que termine su visita.' });
-        }
-
-        const visitorId = crypto.randomUUID();
-        const sessionId = crypto.randomUUID();
-        
-        // Bloquear robot por 10 minutos iniciales
-        const newLockTime = new Date(now.getTime() + 10 * 60000).toISOString();
-
-        db.run('UPDATE robots SET locked_until = ?, current_visitor_id = ? WHERE id = ?', [newLockTime, visitorId, robot.id], (updErr) => {
-            if (updErr) return res.status(500).json({ error: 'Error reservando el robot' });
-            
-            db.run(
-                `INSERT INTO visitors (id, session_id, robot_id, name) VALUES (?, ?, ?, ?)`,
-                [visitorId, sessionId, robot.id, visitorName],
-                function (err) {
-                if (err) {
-                    console.error('VISITOR ERROR:', err);
-                    return res.status(500).json({ error: 'Error creating visitor session' });
-                }
-
-                const token = jwt.sign(
-                    { 
-                        id: visitorId, 
-                        session_id: sessionId, 
-                        role: 'visitor',
-                        robot_id: robot.id,
-                        robot_name: robot.name,
-                        museum_id: robot.museum_id,
-                        name: visitorName
-                    },
-                    JWT_SECRET,
-                    { expiresIn: '12h' } // Visitors get temporary access
-                );
-
-                res.status(201).json({
-                    message: 'Visitor session created',
-                    token,
-                    visitor: { id: visitorId, session_id: sessionId, role: 'visitor', robot_id: robot.id, robot_name: robot.name, name: visitorName }
+        db.get('SELECT id, name, museum_id, locked_until FROM robots WHERE id = ?', [robotId], (err, robot) => {
+            if (err || !robot) {
+                return db.run('ROLLBACK', () => {
+                    if (err) return res.status(500).json({ error: 'Error verificando el robot' });
+                    res.status(404).json({ error: 'Robot no válido o no encontrado' });
                 });
             }
-        );
+
+            if (robot.locked_until && new Date(robot.locked_until) > now) {
+                return db.run('ROLLBACK', () => {
+                    res.status(403).json({ error: 'Este robot ya está siendo utilizado por otro visitante. Por favor, espera a que termine su visita.' });
+                });
+            }
+
+            db.run('UPDATE robots SET locked_until = ?, current_visitor_id = ? WHERE id = ?', [newLockTime, visitorId, robot.id], (updErr) => {
+                if (updErr) {
+                    return db.run('ROLLBACK', () => {
+                        res.status(500).json({ error: 'Error reservando el robot' });
+                    });
+                }
+
+                db.run(
+                    `INSERT INTO visitors (id, session_id, robot_id, name) VALUES (?, ?, ?, ?)`,
+                    [visitorId, sessionId, robot.id, visitorName],
+                    function (insErr) {
+                        if (insErr) {
+                            return db.run('ROLLBACK', () => {
+                                console.error('VISITOR ERROR:', insErr);
+                                res.status(500).json({ error: 'Error creating visitor session' });
+                            });
+                        }
+
+                        db.run('COMMIT', (commitErr) => {
+                            if (commitErr) {
+                                return db.run('ROLLBACK', () => {
+                                    res.status(500).json({ error: 'Error interno del servidor' });
+                                });
+                            }
+
+                            const token = jwt.sign(
+                                {
+                                    id: visitorId,
+                                    session_id: sessionId,
+                                    role: 'visitor',
+                                    robot_id: robot.id,
+                                    robot_name: robot.name,
+                                    museum_id: robot.museum_id,
+                                    name: visitorName
+                                },
+                                JWT_SECRET,
+                                { expiresIn: '12h' }
+                            );
+
+                            res.status(201).json({
+                                message: 'Visitor session created',
+                                token,
+                                visitor: { id: visitorId, session_id: sessionId, role: 'visitor', robot_id: robot.id, robot_name: robot.name, name: visitorName }
+                            });
+                        });
+                    }
+                );
+            });
         });
     });
 };
@@ -203,6 +227,9 @@ exports.createStaff = async (req, res) => {
     if (!name || !email || !role) {
         return res.status(400).json({ error: 'Name, email and role are required' });
     }
+    if (!EMAIL_RE.test(email.trim())) {
+        return res.status(400).json({ error: 'Invalid email format' });
+    }
 
     // Role validation based on who is creating the user
     if (reqUserRole === 'platform_admin') {
@@ -225,7 +252,7 @@ exports.createStaff = async (req, res) => {
     const assignedMuseumId = reqUserRole === 'museum_admin' ? req.user.museum_id : museum_id;
 
     // Generate a secure temporary password (e.g. 8 chars, alphanumeric)
-    const tempPassword = Math.random().toString(36).slice(-8) + 'Aa1!';
+    const tempPassword = crypto.randomBytes(4).toString('hex') + 'Aa1!';
 
     try {
         const passwordHash = await bcrypt.hash(tempPassword, SALT_ROUNDS);
@@ -285,7 +312,12 @@ exports.updateStaff = async (req, res) => {
         const updates = [];
         const params = [];
         if (name)  { updates.push('name = ?');  params.push(name.trim()); }
-        if (email) { updates.push('email = ?'); params.push(email.trim().toLowerCase()); }
+        if (email) {
+            if (!EMAIL_RE.test(email.trim())) {
+                return res.status(400).json({ error: 'Invalid email format' });
+            }
+            updates.push('email = ?'); params.push(email.trim().toLowerCase());
+        }
         if (role)  { updates.push('role = ?');  params.push(role); }
         if (updates.length === 0) return res.status(400).json({ error: 'Nada que actualizar' });
 
@@ -382,8 +414,6 @@ exports.uploadAvatar = (req, res) => {
 
     // Ruta relativa para servir la imagen (ej: /uploads/avatars/nombre.jpg)
     const avatarUrl = `/uploads/avatars/${req.file.filename}`;
-
-    const db = require('../database');
 
     // Primero obtenemos el avatar anterior para borrarlo
     db.get('SELECT avatar FROM users WHERE id = ?', [userId], (err, row) => {

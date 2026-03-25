@@ -8,7 +8,16 @@ const museumController = require('../controllers/museumController');
 const { authMiddleware, adminMiddleware, superAdminMiddleware } = require('../middleware/authMiddleware');
 const upload = require('../config/uploadConfig');
 const rosService = require('../services/rosService'); // <-- RosService Service
+const chatController = require('../controllers/chatController');
+const { visitorMiddleware } = require('../middleware/visitorMiddleware');
+const rateLimit = require('express-rate-limit');
 
+// Chat-specific rate limiter (stricter: 15 msgs/min)
+const chatLimiter = rateLimit({
+    windowMs: 60 * 1000,
+    max: 15,
+    message: { error: 'Demasiados mensajes. Espera un momento antes de enviar otro.' }
+});
 
 // ─── PUBLIC Auth Routes ────────────────────────────────────────
 router.post('/auth/visitor', authController.createVisitor); // create visitor session
@@ -20,6 +29,9 @@ router.post('/auth/visitor/end', authMiddleware, authController.endVisitor);
 router.post('/auth/change-password', authMiddleware, authController.changePassword);
 router.post('/auth/avatar', authMiddleware, upload.single('avatar'), authController.uploadAvatar);
 router.delete('/auth/avatar', authMiddleware, authController.deleteAvatar);
+
+// ─── VISITOR CHAT Route ───────────────────────────────────────
+router.post('/chat/message', chatLimiter, authMiddleware, visitorMiddleware, chatController.handleMessage);
 
 // ─── ADMIN-ONLY Routes ────────────────────────────────────────
 // adminMiddleware allows both admin and superadmin
@@ -144,11 +156,17 @@ router.get('/robots/:id', authMiddleware, adminMiddleware, (req, res) => {
     });
 });
 
+const IP_RE = /^(\d{1,3}\.){3}\d{1,3}$/;
+
 router.put('/robots/:id', authMiddleware, adminMiddleware, (req, res) => {
     const isSuperAdmin = req.user.role === 'platform_admin';
     const museumId = req.user.museum_id;
     const robotId = req.params.id;
     const { ip, name } = req.body;
+
+    if (ip !== undefined && ip !== '' && !IP_RE.test(ip)) {
+        return res.status(400).json({ error: 'Invalid IP address format' });
+    }
 
     let verifyQuery = `SELECT * FROM robots WHERE id = ?`;
     let verifyParams = [robotId];

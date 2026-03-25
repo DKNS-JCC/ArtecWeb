@@ -10,7 +10,8 @@ import { Card, CardContent, CardHeader } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Alert } from '@/components/ui/alert'
-import { RefreshCw, Zap, MapPin, Plus, X, Building2, Users, BarChart3, Clock, Settings, Wifi, Search, Pencil, Eye, EyeOff, Trash2, ShieldAlert } from 'lucide-vue-next'
+import { RefreshCw, Zap, MapPin, Plus, X, Building2, Users, BarChart3, Clock, Settings, Wifi, Search, Pencil, Eye, EyeOff, Trash2, ShieldAlert, Map } from 'lucide-vue-next'
+import MapTab from '@/components/MapTab.vue'
 
 const authStore = useAuthStore()
 const user = computed(() => authStore.user)
@@ -317,6 +318,11 @@ onUnmounted(() => {
                 :class="activeTab === 'museums' ? 'border-primary text-foreground' : 'border-transparent text-muted-foreground hover:text-foreground'">
                 Gestión de Museos
             </button>
+            <button v-if="isMuseumAdmin || isPlatformAdmin" @click="activeTab = 'map'"
+                class="px-4 py-2 text-sm font-medium transition-colors border-b-2 flex items-center gap-2"
+                :class="activeTab === 'map' ? 'border-primary text-foreground' : 'border-transparent text-muted-foreground hover:text-foreground'">
+                <Map class="w-4 h-4" /> Mapa
+            </button>
             <button @click="activeTab = 'stats'"
                 class="px-4 py-2 text-sm font-medium transition-colors border-b-2 flex items-center gap-2"
                 :class="activeTab === 'stats' ? 'border-primary text-foreground' : 'border-transparent text-muted-foreground hover:text-foreground'">
@@ -612,6 +618,11 @@ onUnmounted(() => {
                     </div>
                 </Card>
             </div>
+        </div>
+
+        <!-- TAB: MAP -->
+        <div v-show="activeTab === 'map'">
+            <MapTab />
         </div>
 
         <!-- TAB: STATS -->

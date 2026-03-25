@@ -9,7 +9,9 @@ const { authMiddleware, adminMiddleware, superAdminMiddleware } = require('../mi
 const upload = require('../config/uploadConfig');
 const rosService = require('../services/rosService'); // <-- RosService Service
 const chatController = require('../controllers/chatController');
+const mapController = require('../controllers/mapController');
 const { visitorMiddleware } = require('../middleware/visitorMiddleware');
+const mapUpload = require('../config/mapUploadConfig');
 const rateLimit = require('express-rate-limit');
 
 // Chat-specific rate limiter (stricter: 15 msgs/min)
@@ -44,6 +46,15 @@ router.delete('/admin/users/:id', authMiddleware, adminMiddleware, authControlle
 // ─── SUPERADMIN-ONLY Routes ───────────────────────────────────
 router.post('/museums', authMiddleware, superAdminMiddleware, museumController.createMuseum);
 router.get('/museums', authMiddleware, superAdminMiddleware, museumController.listMuseums);
+
+// ─── MAP & PLACES Routes (admin only) ─────────────────────────
+router.post('/museums/:museum_id/map', authMiddleware, adminMiddleware, mapUpload.fields([{ name: 'image', maxCount: 1 }, { name: 'yaml', maxCount: 1 }]), mapController.uploadMap);
+router.get('/museums/:museum_id/map', authMiddleware, adminMiddleware, mapController.getMap);
+router.delete('/museums/:museum_id/map', authMiddleware, adminMiddleware, mapController.deleteMap);
+router.get('/museums/:museum_id/places', authMiddleware, adminMiddleware, mapController.getPlaces);
+router.post('/museums/:museum_id/places', authMiddleware, adminMiddleware, mapController.createPlace);
+router.put('/museums/:museum_id/places/:id', authMiddleware, adminMiddleware, mapController.updatePlace);
+router.delete('/museums/:museum_id/places/:id', authMiddleware, adminMiddleware, mapController.deletePlace);
 
 // ─── API Info ─────────────────────────────────────────────────
 router.get('/', (req, res) => {

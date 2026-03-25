@@ -81,11 +81,11 @@ function initializeDatabase() {
             )
         `);
 
-        // 5. Create museum_maps table (SLAM-exported map per museum)
+        // 5. Create robot_maps table (SLAM-exported map per robot)
         db.run(`
-            CREATE TABLE IF NOT EXISTS museum_maps (
+            CREATE TABLE IF NOT EXISTS robot_maps (
                 id TEXT PRIMARY KEY,
-                museum_id TEXT NOT NULL UNIQUE,
+                robot_id TEXT NOT NULL UNIQUE,
                 image_path TEXT NOT NULL,
                 resolution REAL NOT NULL DEFAULT 0.05,
                 origin_x REAL NOT NULL DEFAULT 0,
@@ -94,22 +94,22 @@ function initializeDatabase() {
                 width INTEGER NOT NULL DEFAULT 0,
                 height INTEGER NOT NULL DEFAULT 0,
                 uploaded_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-                FOREIGN KEY(museum_id) REFERENCES museums(id)
+                FOREIGN KEY(robot_id) REFERENCES robots(id)
             )
         `);
 
-        // 6. Create museum_places table (zones placed on the map)
+        // 6. Create robot_places table (zones placed on the map)
         db.run(`
-            CREATE TABLE IF NOT EXISTS museum_places (
+            CREATE TABLE IF NOT EXISTS robot_places (
                 id TEXT PRIMARY KEY,
-                museum_id TEXT NOT NULL,
+                robot_id TEXT NOT NULL,
                 name TEXT NOT NULL,
                 description TEXT,
                 category TEXT DEFAULT 'exhibit',
                 map_x REAL,
                 map_y REAL,
                 created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-                FOREIGN KEY(museum_id) REFERENCES museums(id)
+                FOREIGN KEY(robot_id) REFERENCES robots(id)
             )
         `);
 
@@ -135,8 +135,8 @@ function initializeDatabase() {
         db.run(`CREATE INDEX IF NOT EXISTS idx_robots_museum_id ON robots(museum_id)`);
         db.run(`CREATE INDEX IF NOT EXISTS idx_visitors_robot_id ON visitors(robot_id)`);
         db.run(`CREATE INDEX IF NOT EXISTS idx_visitors_session_id ON visitors(session_id)`);
-        db.run(`CREATE INDEX IF NOT EXISTS idx_museum_maps_museum ON museum_maps(museum_id)`);
-        db.run(`CREATE INDEX IF NOT EXISTS idx_museum_places_museum ON museum_places(museum_id)`);
+        db.run(`CREATE INDEX IF NOT EXISTS idx_robot_maps_robot ON robot_maps(robot_id)`);
+        db.run(`CREATE INDEX IF NOT EXISTS idx_robot_places_robot ON robot_places(robot_id)`);
         db.run(`CREATE INDEX IF NOT EXISTS idx_chat_messages_session ON chat_messages(session_id)`);
         db.run(`CREATE INDEX IF NOT EXISTS idx_chat_messages_visitor ON chat_messages(visitor_id)`);
     });

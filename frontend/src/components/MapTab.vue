@@ -10,7 +10,30 @@ import { Card, CardContent, CardHeader } from '@/components/ui/card'
 import { Upload, Trash2, Plus, MapPin, X, Move, ZoomIn, ZoomOut, Crosshair, Pencil } from 'lucide-vue-next'
 
 const authStore = useAuthStore()
-const museumId = computed(() => authStore.user?.museum_id)
+
+const props = defineProps({
+    robots: {
+        type: Array,
+        default: () => []
+    }
+})
+
+const selectedRobotId = ref('')
+
+watch(() => props.robots, (newVal) => {
+    if (newVal.length > 0 && !selectedRobotId.value) {
+        selectedRobotId.value = newVal[0].id
+    }
+}, { immediate: true })
+
+watch(selectedRobotId, (newVal) => {
+    if (newVal) {
+        fetchData()
+    } else {
+        mapData.value = null
+        places.value = []
+    }
+})
 
 const API_ROOT = (import.meta.env.VITE_API_URL || 'http://localhost:3000/api').replace('/api', '')
 
@@ -64,19 +87,23 @@ const CATEGORY_COLORS = {
 
 // ─── DATA FETCHING ───────────────────────────────────────────
 async function fetchData() {
-    if (!museumId.value) return
+    if (!selectedRobotId.value) return
     loading.value = true
     error.value = null
     try {
         const [mapResult, placesResult] = await Promise.allSettled([
-            mapService.getMap(museumId.value),
-            mapService.getPlaces(museumId.value)
+            mapService.getMap(selectedRobotId.value),
+            mapService.getPlaces(selectedRobotId.value)
         ])
         if (mapResult.status === 'fulfilled') {
             mapData.value = mapResult.value
+        } else {
+             mapData.value = null
         }
         if (placesResult.status === 'fulfilled') {
             places.value = placesResult.value
+        } else {
+             places.value = []
         }
     } catch (err) {
         error.value = err.message
@@ -375,7 +402,7 @@ async function handleUpload() {
         const yamlFile = yamlInput.value?.files?.[0]
         if (yamlFile) formData.append('yaml', yamlFile)
 
-        await mapService.uploadMap(museumId.value, formData)
+        await mapService.uploadMap(selectedRobotId.value, formData)
         success.value = 'Mapa subido correctamente'
         fileInput.value.value = ''
         if (yamlInput.value) yamlInput.value.value = ''
@@ -391,7 +418,7 @@ async function handleUpload() {
 async function handleDeleteMap() {
     if (!confirm('¿Eliminar el mapa? Los lugares no se eliminarán.')) return
     try {
-        await mapService.deleteMap(museumId.value)
+        await mapService.deleteMap(selectedRobotId.value)
         mapData.value = null
         mapImage.value = null
         success.value = 'Mapa eliminado'
@@ -409,7 +436,7 @@ async function handleCreatePlace() {
     }
     error.value = null
     try {
-        await mapService.createPlace(museumId.value, {
+        await mapService.createPlace(selectedRobotId.value, {
             name: placeForm.value.name,
             description: placeForm.value.description,
             category: placeForm.value.category,
@@ -430,7 +457,7 @@ async function handleUpdatePlace() {
     if (!editForm.value.name.trim()) return
     error.value = null
     try {
-        await mapService.updatePlace(museumId.value, editingPlace.value.id, {
+        await mapService.updatePlace(selectedRobotId.value, editingPlace.value.id, {
             name: editForm.value.name,
             description: editForm.value.description,
             category: editForm.value.category,
@@ -448,7 +475,7 @@ async function handleUpdatePlace() {
 async function handleDeletePlace(id) {
     if (!confirm('¿Eliminar esta zona?')) return
     try {
-        await mapService.deletePlace(museumId.value, id)
+        await mapService.deletePlace(selectedRobotId.value, id)
         showEditForm.value = false
         editingPlace.value = null
         await refreshPlaces()
@@ -458,7 +485,7 @@ async function handleDeletePlace(id) {
 }
 
 async function refreshPlaces() {
-    places.value = await mapService.getPlaces(museumId.value)
+    places.value = await mapService.getPlaces(selectedRobotId.value)
     draw()
 }
 
@@ -496,8 +523,25 @@ watch(places, () => draw(), { deep: true })
         <Alert v-if="error" variant="destructive" class="mb-4">{{ error }}</Alert>
         <Alert v-if="success" variant="success" class="mb-4">{{ success }}</Alert>
 
+        <Card>
+            <CardContent class="p-4 flex flex-col md:flex-row items-center justify-between gap-4">
+                <div>
+                    <h3 class="font-semibold text-foreground">Seleccionar Robot</h3>
+                    <p class="text-sm text-muted-foreground mr-2">Elige el robot para gestionar su mapa</p>
+                </div>
+                <div class="w-full md:w-64 shrink-0">
+                    <select v-model="selectedRobotId" class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                        <option value="" disabled>Selecciona un robot...</option>
+                        <option v-for="robot in robots" :key="robot.id" :value="robot.id">
+                            {{ robot.name }}
+                        </option>
+                    </select>
+                </div>
+            </CardContent>
+        </Card>
+
         <!-- No map uploaded yet -->
-        <Card v-if="!loading && !mapData">
+        <Card v-if="!loading && !mapData && selectedRobotId">
             <CardHeader>
                 <h3 class="text-lg font-semibold text-foreground">Subir mapa del museo</h3>
                 <p class="text-sm text-muted-foreground mt-1">

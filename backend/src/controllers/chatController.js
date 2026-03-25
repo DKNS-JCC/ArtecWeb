@@ -44,8 +44,8 @@ exports.handleMessage = async (req, res) => {
         // Load museum context
         const museum = await dbGet('SELECT name FROM museums WHERE id = ?', [museum_id]);
         const places = await dbAll(
-            'SELECT id, name, description FROM museum_places WHERE museum_id = ?',
-            [museum_id]
+            'SELECT id, name, description FROM robot_places WHERE robot_id = ?',
+            [robot_id]
         );
 
         // Load conversation history from DB (server-side, prevents forgery)

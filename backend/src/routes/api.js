@@ -27,6 +27,7 @@ router.post('/auth/login', authController.login);         // username or email
 
 // ─── PROTECTED Auth Routes (any logged-in user or visitor) ───────────────
 router.post('/auth/visitor/ping', authMiddleware, authController.pingVisitor);
+router.get('/auth/visitor/status', authMiddleware, authController.checkVisitorStatus);
 router.post('/auth/visitor/end', authMiddleware, authController.endVisitor);
 router.post('/auth/change-password', authMiddleware, authController.changePassword);
 router.post('/auth/avatar', authMiddleware, upload.single('avatar'), authController.uploadAvatar);
@@ -48,13 +49,13 @@ router.post('/museums', authMiddleware, superAdminMiddleware, museumController.c
 router.get('/museums', authMiddleware, superAdminMiddleware, museumController.listMuseums);
 
 // ─── MAP & PLACES Routes (admin only) ─────────────────────────
-router.post('/museums/:museum_id/map', authMiddleware, adminMiddleware, mapUpload.fields([{ name: 'image', maxCount: 1 }, { name: 'yaml', maxCount: 1 }]), mapController.uploadMap);
-router.get('/museums/:museum_id/map', authMiddleware, adminMiddleware, mapController.getMap);
-router.delete('/museums/:museum_id/map', authMiddleware, adminMiddleware, mapController.deleteMap);
-router.get('/museums/:museum_id/places', authMiddleware, adminMiddleware, mapController.getPlaces);
-router.post('/museums/:museum_id/places', authMiddleware, adminMiddleware, mapController.createPlace);
-router.put('/museums/:museum_id/places/:id', authMiddleware, adminMiddleware, mapController.updatePlace);
-router.delete('/museums/:museum_id/places/:id', authMiddleware, adminMiddleware, mapController.deletePlace);
+router.post('/robots/:robot_id/map', authMiddleware, adminMiddleware, mapUpload.fields([{ name: 'image', maxCount: 1 }, { name: 'yaml', maxCount: 1 }]), mapController.uploadMap);
+router.get('/robots/:robot_id/map', authMiddleware, adminMiddleware, mapController.getMap);
+router.delete('/robots/:robot_id/map', authMiddleware, adminMiddleware, mapController.deleteMap);
+router.get('/robots/:robot_id/places', authMiddleware, adminMiddleware, mapController.getPlaces);
+router.post('/robots/:robot_id/places', authMiddleware, adminMiddleware, mapController.createPlace);
+router.put('/robots/:robot_id/places/:id', authMiddleware, adminMiddleware, mapController.updatePlace);
+router.delete('/robots/:robot_id/places/:id', authMiddleware, adminMiddleware, mapController.deletePlace);
 
 // ─── API Info ─────────────────────────────────────────────────
 router.get('/', (req, res) => {
@@ -277,6 +278,49 @@ router.post('/robots/:id/command', authMiddleware, adminMiddleware, (req, res) =
         db.run(updateQuery, [status, px, py, pt, robotId], function (err) {
             if (err) return res.status(500).json({ error: 'Database error updating robot' });
             res.json({ message: `Command ${command} sent successfully` });
+        });
+    });
+});
+
+router.post('/robots/:id/force-end', authMiddleware, adminMiddleware, (req, res) => {
+    const isSuperAdmin = req.user.role === 'platform_admin';
+    const museumId = req.user.museum_id;
+    const robotId = req.params.id;
+
+    // Verify ownership first
+    let verifyQuery = `SELECT * FROM robots WHERE id = ?`;
+    let verifyParams = [robotId];
+    if (!isSuperAdmin) {
+        verifyQuery += ` AND museum_id = ?`;
+        verifyParams.push(museumId);
+    }
+
+    db.get(verifyQuery, verifyParams, (err, robot) => {
+        if (err) return res.status(500).json({ error: 'Database error' });
+        if (!robot) return res.status(404).json({ error: 'Robot not found or unauthorized' });
+
+        if (!robot.current_visitor_id) {
+            return res.json({ message: 'No active session to end' });
+        }
+
+        const visitorId = robot.current_visitor_id;
+
+        // Libera el robot y marca el fin de la sesión del visitante en transaccional
+        db.run('BEGIN IMMEDIATE', (beginErr) => {
+            if (beginErr) return res.status(500).json({ error: 'Server error' });
+
+            db.run('UPDATE robots SET locked_until = NULL, current_visitor_id = NULL WHERE id = ?', [robotId], (updErr) => {
+                if (updErr) return db.run('ROLLBACK', () => res.status(500).json({ error: 'Database error handling robot' }));
+
+                db.run('UPDATE visitors SET ended_at = CURRENT_TIMESTAMP WHERE id = ?', [visitorId], (visErr) => {
+                    if (visErr) console.error('Error updating visitor ended_at', visErr);
+
+                    db.run('COMMIT', (commitErr) => {
+                        if (commitErr) return db.run('ROLLBACK', () => res.status(500).json({ error: 'Server error' }));
+                        res.json({ message: 'Visita finalizada exitosamente' });
+                    });
+                });
+            });
         });
     });
 });

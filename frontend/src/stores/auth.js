@@ -58,6 +58,15 @@ export const useAuthStore = defineStore('auth', () => {
         return await authService.pingVisitor()
     }
 
+    async function checkVisitorStatus() {
+        if (!isAuthenticated.value) return { active: false };
+        try {
+            return await authService.checkVisitorStatus()
+        } catch {
+            return { active: false }
+        }
+    }
+
     async function endVisitor() {
         if (!isAuthenticated.value) return;
         try {
@@ -101,6 +110,7 @@ export const useAuthStore = defineStore('auth', () => {
         login,
         createVisitor,
         pingVisitor,
+        checkVisitorStatus,
         endVisitor,
         changePassword,
         updateUserAvatar,

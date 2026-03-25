@@ -16,6 +16,7 @@ const visitorName = computed(() => authStore.user?.name || 'Amigo');
 const messageText = ref('');
 const chatContainer = ref(null);
 const isSending = ref(false);
+const showForcedEndModal = ref(false);
 
 const welcomeMessage = {
     id: 1,
@@ -60,13 +61,31 @@ const isTimeExpiring = computed(() => timeLeft.value < 60);
 
 const startTimer = () => {
     if (timerInterval) clearInterval(timerInterval);
-    timerInterval = setInterval(() => {
+    timerInterval = setInterval(async () => {
         if (timeLeft.value > 0) {
             timeLeft.value--;
+            
+            // Poll status every 3 seconds
+            if (timeLeft.value % 3 === 0) {
+                const status = await authStore.checkVisitorStatus();
+                if (!status.active) {
+                    handleForcedEndSession();
+                }
+            }
         } else {
             handleEndSession();
         }
     }, 1000);
+};
+
+const handleForcedEndSession = () => {
+    if (timerInterval) clearInterval(timerInterval);
+    showForcedEndModal.value = true;
+    sessionStorage.removeItem(STORAGE_KEY);
+    authStore.logout();
+    setTimeout(() => {
+        router.push('/');
+    }, 4000);
 };
 
 const resetTimer = () => {
@@ -247,6 +266,18 @@ onUnmounted(() => {
                 </button>
             </form>
         </footer>
+
+        <!-- FORCED END MODAL -->
+        <div v-if="showForcedEndModal" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-[200] flex items-center justify-center p-4">
+            <div class="bg-white dark:bg-[#1c1c1e] w-full max-w-sm rounded-[32px] p-8 text-center shadow-2xl animate-in zoom-in-95 duration-300">
+                <div class="w-16 h-16 bg-red-100 dark:bg-red-900/30 text-red-500 rounded-full flex items-center justify-center mx-auto mb-4 relative overflow-hidden">
+                    <LogOut class="w-8 h-8 relative z-10" />
+                </div>
+                <h2 class="text-xl font-bold mb-2 text-foreground">Visita Finalizada</h2>
+                <p class="text-sm text-muted-foreground mb-6">Tu sesión ha sido terminada por un administrador del museo.</p>
+                <div class="text-[0.65rem] uppercase tracking-widest text-muted-foreground font-semibold">Redirigiendo al inicio...</div>
+            </div>
+        </div>
     </div>
 </template>
 

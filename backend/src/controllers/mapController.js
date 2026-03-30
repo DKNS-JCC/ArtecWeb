@@ -23,9 +23,6 @@ function dbRun(sql, params) {
 
 /**
  * Parses a ROS map_saver YAML file to extract resolution and origin.
- * Expected format:
- *   resolution: 0.050000
- *   origin: [-12.200000, -12.200000, 0.000000]
  */
 function parseMapYaml(yamlContent) {
     const meta = { resolution: 0.05, origin_x: 0, origin_y: 0, origin_theta: 0 };
@@ -52,9 +49,9 @@ function parsePgm(buffer) {
     function skipWhitespaceAndComments() {
         while (offset < buffer.length) {
             const ch = buffer[offset];
-            if (ch === 0x23) { // '#' comment
+            if (ch === 0x23) {
                 while (offset < buffer.length && buffer[offset] !== 0x0A) offset++;
-                offset++; // skip newline
+                offset++;
             } else if (ch === 0x20 || ch === 0x09 || ch === 0x0A || ch === 0x0D) {
                 offset++;
             } else {
@@ -81,14 +78,11 @@ function parsePgm(buffer) {
     const width = parseInt(readToken(), 10);
     const height = parseInt(readToken(), 10);
     const maxVal = parseInt(readToken(), 10);
-
-    // After maxval there is exactly one whitespace byte before pixel data
     offset++;
 
     const bytesPerPixel = maxVal > 255 ? 2 : 1;
     const data = buffer.subarray(offset, offset + width * height * bytesPerPixel);
 
-    // Normalize 16-bit to 8-bit if needed
     if (bytesPerPixel === 2) {
         const normalized = Buffer.alloc(width * height);
         for (let i = 0; i < width * height; i++) {
@@ -100,19 +94,23 @@ function parsePgm(buffer) {
     return { width, height, data };
 }
 
+// ─── MAP CRUD ─────────────────────────────────────────────────
+
 /**
- * POST /api/robots/:robot_id/map
- * Upload map image + optional YAML metadata.
- * Expects multipart with fields: "image" (PNG/JPG/PGM) and optionally "yaml" (YAML).
+ * POST /api/museums/:museum_id/maps
+ * Upload a new map for a museum. Requires 'name' in body.
  */
 exports.uploadMap = async (req, res) => {
-    const { robot_id } = req.params;
+    const { museum_id } = req.params;
+    const { name } = req.body;
     const isSuperAdmin = req.user.role === 'platform_admin';
 
-    // Verify robot access
-    const robot = await dbGet('SELECT museum_id FROM robots WHERE id = ?', [robot_id]);
-    if (!robot || (!isSuperAdmin && req.user.museum_id !== robot.museum_id)) {
-        return res.status(403).json({ error: 'No tienes acceso a este robot' });
+    if (!isSuperAdmin && req.user.museum_id !== museum_id) {
+        return res.status(403).json({ error: 'No tienes acceso a este museo' });
+    }
+
+    if (!name || !name.trim()) {
+        return res.status(400).json({ error: 'El nombre del mapa es obligatorio' });
     }
 
     const imageFile = req.files?.image?.[0];
@@ -127,16 +125,14 @@ exports.uploadMap = async (req, res) => {
         if (yamlFile) {
             const yamlContent = fs.readFileSync(yamlFile.path, 'utf-8');
             meta = parseMapYaml(yamlContent);
-            // Remove YAML file after parsing (we store metadata in DB)
             fs.unlinkSync(yamlFile.path);
         }
 
-        // Parse manual metadata from body (overrides YAML if provided)
         if (req.body.resolution) meta.resolution = parseFloat(req.body.resolution);
         if (req.body.origin_x) meta.origin_x = parseFloat(req.body.origin_x);
         if (req.body.origin_y) meta.origin_y = parseFloat(req.body.origin_y);
 
-        // Convert PGM to PNG (browsers cannot display PGM) and extract dimensions
+        // Convert PGM to PNG if needed
         let finalFilename = imageFile.filename;
         const ext = path.extname(imageFile.filename).toLowerCase();
         if (ext === '.pgm') {
@@ -155,29 +151,16 @@ exports.uploadMap = async (req, res) => {
         const imgMeta = await sharp(finalPath).metadata();
         const width = imgMeta.width || 0;
         const height = imgMeta.height || 0;
-
         const imagePath = `/uploads/maps/${finalFilename}`;
 
-        // Delete old map image if one exists
-        const existing = await dbGet('SELECT image_path FROM robot_maps WHERE robot_id = ?', [robot_id]);
-        if (existing) {
-            const oldPath = path.join(__dirname, '../../', existing.image_path);
-            if (fs.existsSync(oldPath)) fs.unlinkSync(oldPath);
+        const id = crypto.randomUUID();
+        await dbRun(
+            `INSERT INTO maps (id, museum_id, name, image_path, resolution, origin_x, origin_y, origin_theta, width, height) VALUES (?,?,?,?,?,?,?,?,?,?)`,
+            [id, museum_id, name.trim(), imagePath, meta.resolution, meta.origin_x, meta.origin_y, meta.origin_theta, width, height]
+        );
 
-            await dbRun(
-                `UPDATE robot_maps SET image_path = ?, resolution = ?, origin_x = ?, origin_y = ?, origin_theta = ?, width = ?, height = ?, uploaded_at = CURRENT_TIMESTAMP WHERE robot_id = ?`,
-                [imagePath, meta.resolution, meta.origin_x, meta.origin_y, meta.origin_theta, width, height, robot_id]
-            );
-        } else {
-            const id = crypto.randomUUID();
-            await dbRun(
-                `INSERT INTO robot_maps (id, robot_id, image_path, resolution, origin_x, origin_y, origin_theta, width, height) VALUES (?,?,?,?,?,?,?,?,?)`,
-                [id, robot_id, imagePath, meta.resolution, meta.origin_x, meta.origin_y, meta.origin_theta, width, height]
-            );
-        }
-
-        const map = await dbGet('SELECT * FROM robot_maps WHERE robot_id = ?', [robot_id]);
-        res.json({ message: 'Mapa subido correctamente', map });
+        const map = await dbGet('SELECT * FROM maps WHERE id = ?', [id]);
+        res.status(201).json({ message: 'Mapa subido correctamente', map });
     } catch (err) {
         console.error('[Map] Upload error:', err);
         res.status(500).json({ error: 'Error al subir el mapa' });
@@ -185,22 +168,41 @@ exports.uploadMap = async (req, res) => {
 };
 
 /**
- * GET /api/robots/:robot_id/map
- * Returns map metadata + image URL for the robot.
+ * GET /api/museums/:museum_id/maps
+ * List all maps for a museum.
  */
-exports.getMap = async (req, res) => {
-    const { robot_id } = req.params;
+exports.listMaps = async (req, res) => {
+    const { museum_id } = req.params;
     const isSuperAdmin = req.user.role === 'platform_admin';
 
-    const robot = await dbGet('SELECT museum_id FROM robots WHERE id = ?', [robot_id]);
-    if (!robot || (!isSuperAdmin && req.user.museum_id !== robot.museum_id)) {
-        return res.status(403).json({ error: 'No tienes acceso a este robot' });
+    if (!isSuperAdmin && req.user.museum_id !== museum_id) {
+        return res.status(403).json({ error: 'No tienes acceso a este museo' });
     }
 
     try {
-        const map = await dbGet('SELECT * FROM robot_maps WHERE robot_id = ?', [robot_id]);
-        if (!map) {
-            return res.status(404).json({ error: 'No hay mapa registrado para este robot' });
+        const maps = await dbAll(
+            'SELECT * FROM maps WHERE museum_id = ? ORDER BY uploaded_at DESC',
+            [museum_id]
+        );
+        res.json(maps);
+    } catch (err) {
+        res.status(500).json({ error: 'Error al obtener los mapas' });
+    }
+};
+
+/**
+ * GET /api/maps/:map_id
+ * Get a specific map by ID.
+ */
+exports.getMap = async (req, res) => {
+    const { map_id } = req.params;
+    const isSuperAdmin = req.user.role === 'platform_admin';
+
+    try {
+        const map = await dbGet('SELECT * FROM maps WHERE id = ?', [map_id]);
+        if (!map) return res.status(404).json({ error: 'Mapa no encontrado' });
+        if (!isSuperAdmin && req.user.museum_id !== map.museum_id) {
+            return res.status(403).json({ error: 'No tienes acceso a este mapa' });
         }
         res.json(map);
     } catch (err) {
@@ -209,101 +211,108 @@ exports.getMap = async (req, res) => {
 };
 
 /**
- * DELETE /api/robots/:robot_id/map
+ * DELETE /api/maps/:map_id
+ * Delete a map, unassign it from robots, and remove its zones.
  */
 exports.deleteMap = async (req, res) => {
-    const { robot_id } = req.params;
+    const { map_id } = req.params;
     const isSuperAdmin = req.user.role === 'platform_admin';
 
-    const robot = await dbGet('SELECT museum_id FROM robots WHERE id = ?', [robot_id]);
-    if (!robot || (!isSuperAdmin && req.user.museum_id !== robot.museum_id)) {
-        return res.status(403).json({ error: 'No tienes acceso a este robot' });
-    }
-
     try {
-        const existing = await dbGet('SELECT image_path FROM robot_maps WHERE robot_id = ?', [robot_id]);
-        if (existing) {
-            const oldPath = path.join(__dirname, '../../', existing.image_path);
-            if (fs.existsSync(oldPath)) fs.unlinkSync(oldPath);
-            await dbRun('DELETE FROM robot_maps WHERE robot_id = ?', [robot_id]);
+        const map = await dbGet('SELECT * FROM maps WHERE id = ?', [map_id]);
+        if (!map) return res.status(404).json({ error: 'Mapa no encontrado' });
+        if (!isSuperAdmin && req.user.museum_id !== map.museum_id) {
+            return res.status(403).json({ error: 'No tienes acceso a este mapa' });
         }
+
+        // Unassign from any robots using this map
+        await dbRun('UPDATE robots SET map_id = NULL WHERE map_id = ?', [map_id]);
+
+        // Delete image file
+        const filePath = path.join(__dirname, '../../', map.image_path);
+        if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
+
+        // Delete zones (FK constraint)
+        await dbRun('DELETE FROM zones WHERE map_id = ?', [map_id]);
+        await dbRun('DELETE FROM maps WHERE id = ?', [map_id]);
+
         res.json({ message: 'Mapa eliminado' });
     } catch (err) {
         res.status(500).json({ error: 'Error al eliminar el mapa' });
     }
 };
 
-// ─── PLACES / ZONES CRUD ─────────────────────────────────────
+// ─── ZONES CRUD ───────────────────────────────────────────────
 
 /**
- * GET /api/robots/:robot_id/places
+ * GET /api/maps/:map_id/zones
  */
-exports.getPlaces = async (req, res) => {
-    const { robot_id } = req.params;
+exports.getZones = async (req, res) => {
+    const { map_id } = req.params;
     const isSuperAdmin = req.user.role === 'platform_admin';
 
-    const robot = await dbGet('SELECT museum_id FROM robots WHERE id = ?', [robot_id]);
-    if (!robot || (!isSuperAdmin && req.user.museum_id !== robot.museum_id)) {
-        return res.status(403).json({ error: 'No tienes acceso a este robot' });
-    }
-
     try {
-        const places = await dbAll('SELECT * FROM robot_places WHERE robot_id = ? ORDER BY created_at DESC', [robot_id]);
-        res.json(places);
+        const map = await dbGet('SELECT museum_id FROM maps WHERE id = ?', [map_id]);
+        if (!map) return res.status(404).json({ error: 'Mapa no encontrado' });
+        if (!isSuperAdmin && req.user.museum_id !== map.museum_id) {
+            return res.status(403).json({ error: 'No tienes acceso' });
+        }
+        const zones = await dbAll('SELECT * FROM zones WHERE map_id = ? ORDER BY created_at DESC', [map_id]);
+        res.json(zones);
     } catch (err) {
-        res.status(500).json({ error: 'Error al obtener los lugares' });
+        res.status(500).json({ error: 'Error al obtener las zonas' });
     }
 };
 
 /**
- * POST /api/robots/:robot_id/places
+ * POST /api/maps/:map_id/zones
  */
-exports.createPlace = async (req, res) => {
-    const { robot_id } = req.params;
+exports.createZone = async (req, res) => {
+    const { map_id } = req.params;
     const { name, description, category, map_x, map_y } = req.body;
     const isSuperAdmin = req.user.role === 'platform_admin';
 
-    const robot = await dbGet('SELECT museum_id FROM robots WHERE id = ?', [robot_id]);
-    if (!robot || (!isSuperAdmin && req.user.museum_id !== robot.museum_id)) {
-        return res.status(403).json({ error: 'No tienes acceso a este robot' });
-    }
-
-    if (!name) {
-        return res.status(400).json({ error: 'El nombre es obligatorio' });
-    }
-
     try {
+        const map = await dbGet('SELECT museum_id FROM maps WHERE id = ?', [map_id]);
+        if (!map) return res.status(404).json({ error: 'Mapa no encontrado' });
+        if (!isSuperAdmin && req.user.museum_id !== map.museum_id) {
+            return res.status(403).json({ error: 'No tienes acceso' });
+        }
+
+        if (!name) return res.status(400).json({ error: 'El nombre es obligatorio' });
+
         const id = crypto.randomUUID();
         await dbRun(
-            'INSERT INTO robot_places (id, robot_id, name, description, category, map_x, map_y) VALUES (?,?,?,?,?,?,?)',
-            [id, robot_id, name, description || null, category || 'exhibit', map_x ?? null, map_y ?? null]
+            'INSERT INTO zones (id, map_id, name, description, category, map_x, map_y) VALUES (?,?,?,?,?,?,?)',
+            [id, map_id, name, description || null, category || 'exhibit', map_x ?? null, map_y ?? null]
         );
-        const place = await dbGet('SELECT * FROM robot_places WHERE id = ?', [id]);
-        res.status(201).json(place);
+        const zone = await dbGet('SELECT * FROM zones WHERE id = ?', [id]);
+        res.status(201).json(zone);
     } catch (err) {
-        res.status(500).json({ error: 'Error al crear el lugar' });
+        res.status(500).json({ error: 'Error al crear la zona' });
     }
 };
 
 /**
- * PUT /api/robots/:robot_id/places/:id
+ * PUT /api/maps/:map_id/zones/:id
  */
-exports.updatePlace = async (req, res) => {
-    const { robot_id, id } = req.params;
+exports.updateZone = async (req, res) => {
+    const { map_id, id } = req.params;
     const { name, description, category, map_x, map_y } = req.body;
     const isSuperAdmin = req.user.role === 'platform_admin';
 
-    const robot = await dbGet('SELECT museum_id FROM robots WHERE id = ?', [robot_id]);
-    if (!robot || (!isSuperAdmin && req.user.museum_id !== robot.museum_id)) {
-        return res.status(403).json({ error: 'No tienes acceso a este robot' });
-    }
-
     try {
-        const existing = await dbGet('SELECT * FROM robot_places WHERE id = ? AND robot_id = ?', [id, robot_id]);
-        if (!existing) return res.status(404).json({ error: 'Lugar no encontrado' });
+        const map = await dbGet('SELECT museum_id FROM maps WHERE id = ?', [map_id]);
+        if (!map) return res.status(404).json({ error: 'Mapa no encontrado' });
+        if (!isSuperAdmin && req.user.museum_id !== map.museum_id) {
+            return res.status(403).json({ error: 'No tienes acceso' });
+        }
+
+        const existing = await dbGet('SELECT * FROM zones WHERE id = ? AND map_id = ?', [id, map_id]);
+        if (!existing) return res.status(404).json({ error: 'Zona no encontrada' });
 
         await dbRun(
-            'UPDATE robot_places SET name = ?, description = ?, category = ?, map_x = ?, map_y = ? WHERE id = ?',
+            'UPDATE zones SET name = ?, description = ?, category = ?, map_x = ?, map_y = ? WHERE id = ?',
             [
                 name ?? existing.name,
                 description ?? existing.description,
@@ -313,32 +322,33 @@ exports.updatePlace = async (req, res) => {
                 id
             ]
         );
-        const updated = await dbGet('SELECT * FROM robot_places WHERE id = ?', [id]);
+        const updated = await dbGet('SELECT * FROM zones WHERE id = ?', [id]);
         res.json(updated);
     } catch (err) {
-        res.status(500).json({ error: 'Error al actualizar el lugar' });
+        res.status(500).json({ error: 'Error al actualizar la zona' });
     }
 };
 
 /**
- * DELETE /api/robots/:robot_id/places/:id
+ * DELETE /api/maps/:map_id/zones/:id
  */
-exports.deletePlace = async (req, res) => {
-    const { robot_id, id } = req.params;
+exports.deleteZone = async (req, res) => {
+    const { map_id, id } = req.params;
     const isSuperAdmin = req.user.role === 'platform_admin';
 
-    const robot = await dbGet('SELECT museum_id FROM robots WHERE id = ?', [robot_id]);
-    if (!robot || (!isSuperAdmin && req.user.museum_id !== robot.museum_id)) {
-        return res.status(403).json({ error: 'No tienes acceso a este robot' });
-    }
-
     try {
-        const existing = await dbGet('SELECT * FROM robot_places WHERE id = ? AND robot_id = ?', [id, robot_id]);
-        if (!existing) return res.status(404).json({ error: 'Lugar no encontrado' });
+        const map = await dbGet('SELECT museum_id FROM maps WHERE id = ?', [map_id]);
+        if (!map) return res.status(404).json({ error: 'Mapa no encontrado' });
+        if (!isSuperAdmin && req.user.museum_id !== map.museum_id) {
+            return res.status(403).json({ error: 'No tienes acceso' });
+        }
 
-        await dbRun('DELETE FROM robot_places WHERE id = ?', [id]);
-        res.json({ message: 'Lugar eliminado' });
+        const existing = await dbGet('SELECT * FROM zones WHERE id = ? AND map_id = ?', [id, map_id]);
+        if (!existing) return res.status(404).json({ error: 'Zona no encontrada' });
+
+        await dbRun('DELETE FROM zones WHERE id = ?', [id]);
+        res.json({ message: 'Zona eliminada' });
     } catch (err) {
-        res.status(500).json({ error: 'Error al eliminar el lugar' });
+        res.status(500).json({ error: 'Error al eliminar la zona' });
     }
 };

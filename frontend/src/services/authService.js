@@ -13,6 +13,10 @@ export const authService = {
         return api.post('/auth/visitor/ping')
     },
 
+    checkVisitorStatus() {
+        return api.get('/auth/visitor/status')
+    },
+
     endVisitor() {
         return api.post('/auth/visitor/end')
     },

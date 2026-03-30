@@ -5,6 +5,9 @@ import { fileURLToPath, URL } from 'node:url'
 
 export default defineConfig({
   base: process.env.VITE_BASE || '/',
+  server: {
+    host: '0.0.0.0',
+  },
   plugins: [
     vue(),
     tailwindcss(),

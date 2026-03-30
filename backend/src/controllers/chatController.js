@@ -43,10 +43,11 @@ exports.handleMessage = async (req, res) => {
     try {
         // Load museum context
         const museum = await dbGet('SELECT name FROM museums WHERE id = ?', [museum_id]);
-        const places = await dbAll(
-            'SELECT id, name, description FROM museum_places WHERE museum_id = ?',
-            [museum_id]
-        );
+        // Load zones from the map assigned to the robot (if any)
+        const robot = await dbGet('SELECT map_id FROM robots WHERE id = ?', [robot_id]);
+        const places = robot?.map_id
+            ? await dbAll('SELECT id, name, description FROM zones WHERE map_id = ?', [robot.map_id])
+            : [];
 
         // Load conversation history from DB (server-side, prevents forgery)
         const recentMessages = await dbAll(

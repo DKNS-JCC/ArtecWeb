@@ -1,7 +1,6 @@
 const sqlite3 = require('sqlite3').verbose();
 const path = require('path');
 const fs = require('fs');
-const bcrypt = require('bcrypt');
 
 const dbDir = path.resolve(__dirname, '../../database');
 if (!fs.existsSync(dbDir)) {
@@ -20,7 +19,7 @@ const db = new sqlite3.Database(dbPath, (err) => {
 
 function initializeDatabase() {
     db.serialize(() => {
-        // 1. Create museums table
+        // 1. Museums
         db.run(`
             CREATE TABLE IF NOT EXISTS museums (
                 id TEXT PRIMARY KEY,
@@ -30,7 +29,7 @@ function initializeDatabase() {
             )
         `);
 
-        // 2. Create users table (Only admins and technicians)
+        // 2. Users (staff/admins)
         db.run(`
             CREATE TABLE IF NOT EXISTS users (
                 id TEXT PRIMARY KEY,
@@ -49,7 +48,48 @@ function initializeDatabase() {
             )
         `);
 
-        // 3. Create visitors table (Temporary access tied to a robot)
+        // 3. Maps — belong to a museum (not a robot)
+        //    A museum can have many maps (floors, sections, etc.)
+        db.run(`
+            CREATE TABLE IF NOT EXISTS maps (
+                id TEXT PRIMARY KEY,
+                museum_id TEXT NOT NULL,
+                name TEXT NOT NULL,
+                image_path TEXT NOT NULL,
+                resolution REAL NOT NULL DEFAULT 0.05,
+                origin_x REAL NOT NULL DEFAULT 0,
+                origin_y REAL NOT NULL DEFAULT 0,
+                origin_theta REAL NOT NULL DEFAULT 0,
+                width INTEGER NOT NULL DEFAULT 0,
+                height INTEGER NOT NULL DEFAULT 0,
+                uploaded_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY(museum_id) REFERENCES museums(id)
+            )
+        `);
+
+        // 4. Robots — belong to a museum, optionally assigned one map
+        //    Multiple robots can share the same map
+        db.run(`
+            CREATE TABLE IF NOT EXISTS robots (
+                id TEXT PRIMARY KEY,
+                museum_id TEXT,
+                map_id TEXT,
+                name TEXT NOT NULL,
+                status TEXT DEFAULT 'idle',
+                battery INTEGER DEFAULT 100,
+                position_x REAL DEFAULT 0,
+                position_y REAL DEFAULT 0,
+                position_theta REAL DEFAULT 0,
+                last_update DATETIME DEFAULT CURRENT_TIMESTAMP,
+                locked_until TEXT,
+                current_visitor_id TEXT,
+                ip TEXT,
+                FOREIGN KEY(museum_id) REFERENCES museums(id),
+                FOREIGN KEY(map_id) REFERENCES maps(id)
+            )
+        `);
+
+        // 5. Visitors (temporary QR sessions tied to a robot)
         db.run(`
             CREATE TABLE IF NOT EXISTS visitors (
                 id TEXT PRIMARY KEY,
@@ -62,39 +102,23 @@ function initializeDatabase() {
             )
         `);
 
-        // 4. Create robots table
+        // 6. Zones — belong to a map (not a robot)
+        //    Zones are unique per map; different maps have independent zones
         db.run(`
-            CREATE TABLE IF NOT EXISTS robots (
+            CREATE TABLE IF NOT EXISTS zones (
                 id TEXT PRIMARY KEY,
-                museum_id TEXT,
-                name TEXT NOT NULL,
-                status TEXT DEFAULT 'idle',
-                battery INTEGER DEFAULT 100,
-                position_x REAL DEFAULT 0,
-                position_y REAL DEFAULT 0,
-                position_theta REAL DEFAULT 0,
-                last_update DATETIME DEFAULT CURRENT_TIMESTAMP,
-                locked_until TEXT,
-                current_visitor_id TEXT,
-                ip TEXT,
-                FOREIGN KEY(museum_id) REFERENCES museums(id)
-            )
-        `);
-
-        // 5. Create museum_places table (for future admin management + AI context)
-        db.run(`
-            CREATE TABLE IF NOT EXISTS museum_places (
-                id TEXT PRIMARY KEY,
-                museum_id TEXT NOT NULL,
+                map_id TEXT NOT NULL,
                 name TEXT NOT NULL,
                 description TEXT,
                 category TEXT DEFAULT 'exhibit',
+                map_x REAL,
+                map_y REAL,
                 created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-                FOREIGN KEY(museum_id) REFERENCES museums(id)
+                FOREIGN KEY(map_id) REFERENCES maps(id)
             )
         `);
 
-        // 6. Create chat_messages table (conversation context + analytics)
+        // 7. Chat messages (conversation history + analytics)
         db.run(`
             CREATE TABLE IF NOT EXISTS chat_messages (
                 id TEXT PRIMARY KEY,
@@ -110,13 +134,15 @@ function initializeDatabase() {
             )
         `);
 
-        // Indexes for frequently queried columns
+        // Indexes
         db.run(`CREATE INDEX IF NOT EXISTS idx_users_email ON users(email)`);
         db.run(`CREATE INDEX IF NOT EXISTS idx_users_museum_id ON users(museum_id)`);
+        db.run(`CREATE INDEX IF NOT EXISTS idx_maps_museum_id ON maps(museum_id)`);
         db.run(`CREATE INDEX IF NOT EXISTS idx_robots_museum_id ON robots(museum_id)`);
+        db.run(`CREATE INDEX IF NOT EXISTS idx_robots_map_id ON robots(map_id)`);
+        db.run(`CREATE INDEX IF NOT EXISTS idx_zones_map_id ON zones(map_id)`);
         db.run(`CREATE INDEX IF NOT EXISTS idx_visitors_robot_id ON visitors(robot_id)`);
         db.run(`CREATE INDEX IF NOT EXISTS idx_visitors_session_id ON visitors(session_id)`);
-        db.run(`CREATE INDEX IF NOT EXISTS idx_museum_places_museum ON museum_places(museum_id)`);
         db.run(`CREATE INDEX IF NOT EXISTS idx_chat_messages_session ON chat_messages(session_id)`);
         db.run(`CREATE INDEX IF NOT EXISTS idx_chat_messages_visitor ON chat_messages(visitor_id)`);
     });

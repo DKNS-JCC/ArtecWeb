@@ -9,7 +9,9 @@ const { authMiddleware, adminMiddleware, superAdminMiddleware } = require('../mi
 const upload = require('../config/uploadConfig');
 const rosService = require('../services/rosService'); // <-- RosService Service
 const chatController = require('../controllers/chatController');
+const mapController = require('../controllers/mapController');
 const { visitorMiddleware } = require('../middleware/visitorMiddleware');
+const mapUpload = require('../config/mapUploadConfig');
 const rateLimit = require('express-rate-limit');
 
 // Chat-specific rate limiter (stricter: 15 msgs/min)
@@ -25,6 +27,7 @@ router.post('/auth/login', authController.login);         // username or email
 
 // ─── PROTECTED Auth Routes (any logged-in user or visitor) ───────────────
 router.post('/auth/visitor/ping', authMiddleware, authController.pingVisitor);
+router.get('/auth/visitor/status', authMiddleware, authController.checkVisitorStatus);
 router.post('/auth/visitor/end', authMiddleware, authController.endVisitor);
 router.post('/auth/change-password', authMiddleware, authController.changePassword);
 router.post('/auth/avatar', authMiddleware, upload.single('avatar'), authController.uploadAvatar);
@@ -44,6 +47,20 @@ router.delete('/admin/users/:id', authMiddleware, adminMiddleware, authControlle
 // ─── SUPERADMIN-ONLY Routes ───────────────────────────────────
 router.post('/museums', authMiddleware, superAdminMiddleware, museumController.createMuseum);
 router.get('/museums', authMiddleware, superAdminMiddleware, museumController.listMuseums);
+
+// ─── MAP Routes (admin only) ──────────────────────────────────
+// Maps belong to museums; multiple robots can share a map
+router.post('/museums/:museum_id/maps', authMiddleware, adminMiddleware, mapUpload.fields([{ name: 'image', maxCount: 1 }, { name: 'yaml', maxCount: 1 }]), mapController.uploadMap);
+router.get('/museums/:museum_id/maps', authMiddleware, adminMiddleware, mapController.listMaps);
+router.get('/maps/:map_id', authMiddleware, adminMiddleware, mapController.getMap);
+router.delete('/maps/:map_id', authMiddleware, adminMiddleware, mapController.deleteMap);
+
+// ─── ZONE Routes (admin only) ─────────────────────────────────
+// Zones belong to maps, not robots
+router.get('/maps/:map_id/zones', authMiddleware, adminMiddleware, mapController.getZones);
+router.post('/maps/:map_id/zones', authMiddleware, adminMiddleware, mapController.createZone);
+router.put('/maps/:map_id/zones/:id', authMiddleware, adminMiddleware, mapController.updateZone);
+router.delete('/maps/:map_id/zones/:id', authMiddleware, adminMiddleware, mapController.deleteZone);
 
 // ─── API Info ─────────────────────────────────────────────────
 router.get('/', (req, res) => {
@@ -105,7 +122,6 @@ router.get('/robots', authMiddleware, adminMiddleware, (req, res) => {
             const isLocked = r.locked_until && new Date(r.locked_until) > now;
             return {
                 id: r.id,
-                names: r.name, // Keep property mapping consistent with old frontend if needed, wait old frontend used 'name'
                 name: r.name,
                 ip: r.ip,
                 connected: rosService.getConnectionState(r.id),
@@ -114,6 +130,7 @@ router.get('/robots', authMiddleware, adminMiddleware, (req, res) => {
                 position: { x: r.position_x, y: r.position_y, theta: r.position_theta },
                 last_update: r.last_update,
                 museum_id: r.museum_id,
+                map_id: r.map_id,
                 is_occupied: isLocked,
                 locked_until: r.locked_until,
                 visitor_name: isLocked ? (r.visitor_name || 'Visitante Anónimo') : null
@@ -150,7 +167,8 @@ router.get('/robots/:id', authMiddleware, adminMiddleware, (req, res) => {
             battery: robot.battery,
             position: { x: robot.position_x, y: robot.position_y, theta: robot.position_theta },
             last_update: robot.last_update,
-            museum_id: robot.museum_id
+            museum_id: robot.museum_id,
+            map_id: robot.map_id
         };
         res.json(formattedRobot);
     });
@@ -162,7 +180,7 @@ router.put('/robots/:id', authMiddleware, adminMiddleware, (req, res) => {
     const isSuperAdmin = req.user.role === 'platform_admin';
     const museumId = req.user.museum_id;
     const robotId = req.params.id;
-    const { ip, name } = req.body;
+    const { ip, name, map_id } = req.body;
 
     if (ip !== undefined && ip !== '' && !IP_RE.test(ip)) {
         return res.status(400).json({ error: 'Invalid IP address format' });
@@ -175,22 +193,33 @@ router.put('/robots/:id', authMiddleware, adminMiddleware, (req, res) => {
         verifyParams.push(museumId);
     }
 
-    db.get(verifyQuery, verifyParams, (err, robot) => {
+    db.get(verifyQuery, verifyParams, async (err, robot) => {
         if (err) return res.status(500).json({ error: 'Database error' });
         if (!robot) return res.status(404).json({ error: 'Robot not found or unauthorized' });
 
+        // If assigning a map, verify it belongs to the same museum
+        if (map_id !== undefined && map_id !== null) {
+            const mapRow = await new Promise(resolve => {
+                db.get('SELECT museum_id FROM maps WHERE id = ?', [map_id], (e, row) => resolve(row || null));
+            });
+            if (!mapRow) return res.status(404).json({ error: 'Mapa no encontrado' });
+            if (!isSuperAdmin && mapRow.museum_id !== museumId) {
+                return res.status(403).json({ error: 'El mapa no pertenece a tu museo' });
+            }
+        }
+
         const updatedIp = ip !== undefined ? ip : robot.ip;
         const updatedName = name !== undefined ? name : robot.name;
+        const updatedMapId = map_id !== undefined ? map_id : robot.map_id;
 
-        db.run(`UPDATE robots SET ip = ?, name = ? WHERE id = ?`, [updatedIp, updatedName, robotId], (err) => {
+        db.run(`UPDATE robots SET ip = ?, name = ?, map_id = ? WHERE id = ?`, [updatedIp, updatedName, updatedMapId, robotId], (err) => {
             if (err) return res.status(500).json({ error: 'Error updating robot' });
-            
-            // Reconnect if IP changed and it was already connected? Could disconnect it first.
+
             if (ip && ip !== robot.ip && rosService.getConnectionState(robotId)) {
                 rosService.disconnect(robotId);
                 rosService.connect(robotId, ip);
             }
-            
+
             res.json({ message: 'Robot updated successfully' });
         });
     });
@@ -266,6 +295,49 @@ router.post('/robots/:id/command', authMiddleware, adminMiddleware, (req, res) =
         db.run(updateQuery, [status, px, py, pt, robotId], function (err) {
             if (err) return res.status(500).json({ error: 'Database error updating robot' });
             res.json({ message: `Command ${command} sent successfully` });
+        });
+    });
+});
+
+router.post('/robots/:id/force-end', authMiddleware, adminMiddleware, (req, res) => {
+    const isSuperAdmin = req.user.role === 'platform_admin';
+    const museumId = req.user.museum_id;
+    const robotId = req.params.id;
+
+    // Verify ownership first
+    let verifyQuery = `SELECT * FROM robots WHERE id = ?`;
+    let verifyParams = [robotId];
+    if (!isSuperAdmin) {
+        verifyQuery += ` AND museum_id = ?`;
+        verifyParams.push(museumId);
+    }
+
+    db.get(verifyQuery, verifyParams, (err, robot) => {
+        if (err) return res.status(500).json({ error: 'Database error' });
+        if (!robot) return res.status(404).json({ error: 'Robot not found or unauthorized' });
+
+        if (!robot.current_visitor_id) {
+            return res.json({ message: 'No active session to end' });
+        }
+
+        const visitorId = robot.current_visitor_id;
+
+        // Libera el robot y marca el fin de la sesión del visitante en transaccional
+        db.run('BEGIN IMMEDIATE', (beginErr) => {
+            if (beginErr) return res.status(500).json({ error: 'Server error' });
+
+            db.run('UPDATE robots SET locked_until = NULL, current_visitor_id = NULL WHERE id = ?', [robotId], (updErr) => {
+                if (updErr) return db.run('ROLLBACK', () => res.status(500).json({ error: 'Database error handling robot' }));
+
+                db.run('UPDATE visitors SET ended_at = CURRENT_TIMESTAMP WHERE id = ?', [visitorId], (visErr) => {
+                    if (visErr) console.error('Error updating visitor ended_at', visErr);
+
+                    db.run('COMMIT', (commitErr) => {
+                        if (commitErr) return db.run('ROLLBACK', () => res.status(500).json({ error: 'Server error' }));
+                        res.json({ message: 'Visita finalizada exitosamente' });
+                    });
+                });
+            });
         });
     });
 });

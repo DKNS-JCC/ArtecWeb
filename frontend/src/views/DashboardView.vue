@@ -10,7 +10,8 @@ import { Card, CardContent, CardHeader } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Alert } from '@/components/ui/alert'
-import { RefreshCw, Zap, MapPin, Plus, X, Building2, Users, BarChart3, Clock, Settings, Wifi, Search, Pencil, Eye, EyeOff, Trash2, ShieldAlert } from 'lucide-vue-next'
+import { RefreshCw, Zap, MapPin, Plus, X, Building2, Users, BarChart3, Clock, Settings, Wifi, Search, Pencil, Eye, EyeOff, Trash2, ShieldAlert, Map } from 'lucide-vue-next'
+import MapTab from '@/components/MapTab.vue'
 
 const authStore = useAuthStore()
 const user = computed(() => authStore.user)
@@ -93,6 +94,16 @@ const sendCommand = async (id, command) => {
         await robotService.sendCommand(id, command, payload)
         await fetchRobots()
     } catch (err) { }
+}
+
+const handleEndVisit = async (id) => {
+    if (!confirm('¿Seguro que quieres forzar la finalización de la visita actual de este robot?')) return
+    try {
+        await robotService.forceEndSession(id)
+        await fetchRobots()
+    } catch (err) {
+        console.error("Error terminando la visita", err)
+    }
 }
 
 // ---------------- STAFF ----------------
@@ -317,6 +328,11 @@ onUnmounted(() => {
                 :class="activeTab === 'museums' ? 'border-primary text-foreground' : 'border-transparent text-muted-foreground hover:text-foreground'">
                 Gestión de Museos
             </button>
+            <button v-if="isMuseumAdmin || isPlatformAdmin" @click="activeTab = 'map'"
+                class="px-4 py-2 text-sm font-medium transition-colors border-b-2 flex items-center gap-2"
+                :class="activeTab === 'map' ? 'border-primary text-foreground' : 'border-transparent text-muted-foreground hover:text-foreground'">
+                <Map class="w-4 h-4" /> Mapa
+            </button>
             <button @click="activeTab = 'stats'"
                 class="px-4 py-2 text-sm font-medium transition-colors border-b-2 flex items-center gap-2"
                 :class="activeTab === 'stats' ? 'border-primary text-foreground' : 'border-transparent text-muted-foreground hover:text-foreground'">
@@ -390,9 +406,14 @@ onUnmounted(() => {
                             <span class="text-muted-foreground flex items-center gap-1">
                                 <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-4 h-4"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg> Ocupación
                             </span>
-                            <span v-if="robot.is_occupied" class="bg-primary/10 text-primary px-2 py-0.5 rounded text-xs font-semibold">
-                                Ocupado por: {{ robot.visitor_name }}
-                            </span>
+                            <div v-if="robot.is_occupied" class="flex items-center gap-2">
+                                <span class="bg-primary/10 text-primary px-2 py-0.5 rounded text-xs font-semibold">
+                                    Por: {{ robot.visitor_name }}
+                                </span>
+                                <Button @click="handleEndVisit(robot.id)" variant="destructive" size="icon" class="h-6 w-6 scale-90" title="Finalizar Visita Forzosamente">
+                                    <X class="w-3.5 h-3.5" />
+                                </Button>
+                            </div>
                             <span v-else class="text-muted-foreground text-xs">
                                 Libre
                             </span>
@@ -612,6 +633,11 @@ onUnmounted(() => {
                     </div>
                 </Card>
             </div>
+        </div>
+
+        <!-- TAB: MAP -->
+        <div v-show="activeTab === 'map'">
+            <MapTab :robots="robots" />
         </div>
 
         <!-- TAB: STATS -->

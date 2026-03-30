@@ -41,6 +41,6 @@ app.use((req, res) => {
 });
 
 // Start Server
-app.listen(PORT, () => {
+app.listen(PORT, "0.0.0.0", () => {
   console.log(`Preparen sus roombas que el backend esta on fire`);
 });

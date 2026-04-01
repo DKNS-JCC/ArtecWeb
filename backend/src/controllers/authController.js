@@ -9,14 +9,17 @@ const SALT_ROUNDS = 10;
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 // ──────── PUBLIC: Create Visitor Session ────────
+const VALID_EXPERTISE_LEVELS = ['nino', 'general', 'estudiante', 'experto'];
+
 exports.createVisitor = (req, res) => {
-    const { robotId, name } = req.body;
+    const { robotId, name, expertiseLevel } = req.body;
 
     if (!robotId) {
         return res.status(400).json({ error: 'Se requiere el ID del robot leído del QR' });
     }
 
     const visitorName = name ? name.trim() : 'Visitante';
+    const visitorExpertise = VALID_EXPERTISE_LEVELS.includes(expertiseLevel) ? expertiseLevel : 'general';
     const visitorId = crypto.randomUUID();
     const sessionId = crypto.randomUUID();
     const now = new Date();
@@ -48,8 +51,8 @@ exports.createVisitor = (req, res) => {
                 }
 
                 db.run(
-                    `INSERT INTO visitors (id, session_id, robot_id, name) VALUES (?, ?, ?, ?)`,
-                    [visitorId, sessionId, robot.id, visitorName],
+                    `INSERT INTO visitors (id, session_id, robot_id, name, expertise_level) VALUES (?, ?, ?, ?, ?)`,
+                    [visitorId, sessionId, robot.id, visitorName, visitorExpertise],
                     function (insErr) {
                         if (insErr) {
                             return db.run('ROLLBACK', () => {
@@ -73,7 +76,8 @@ exports.createVisitor = (req, res) => {
                                     robot_id: robot.id,
                                     robot_name: robot.name,
                                     museum_id: robot.museum_id,
-                                    name: visitorName
+                                    name: visitorName,
+                                    expertise_level: visitorExpertise
                                 },
                                 JWT_SECRET,
                                 { expiresIn: '12h' }
@@ -82,7 +86,7 @@ exports.createVisitor = (req, res) => {
                             res.status(201).json({
                                 message: 'Visitor session created',
                                 token,
-                                visitor: { id: visitorId, session_id: sessionId, role: 'visitor', robot_id: robot.id, robot_name: robot.name, name: visitorName }
+                                visitor: { id: visitorId, session_id: sessionId, role: 'visitor', robot_id: robot.id, robot_name: robot.name, name: visitorName, expertise_level: visitorExpertise }
                             });
                         });
                     }

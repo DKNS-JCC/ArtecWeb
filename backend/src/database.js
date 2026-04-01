@@ -7,7 +7,7 @@ if (!fs.existsSync(dbDir)) {
     fs.mkdirSync(dbDir, { recursive: true });
 }
 
-const dbPath = path.join(dbDir, 'database.sqlite');
+const dbPath = process.env.DB_PATH || path.join(dbDir, 'database.sqlite');
 
 const db = new sqlite3.Database(dbPath, (err) => {
     if (err) {
@@ -96,11 +96,16 @@ function initializeDatabase() {
                 session_id TEXT UNIQUE NOT NULL,
                 robot_id TEXT,
                 name TEXT,
+                expertise_level TEXT DEFAULT 'general',
                 created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
                 ended_at DATETIME,
                 FOREIGN KEY(robot_id) REFERENCES robots(id)
             )
         `);
+        // Migration: add expertise_level to existing databases that lack it
+        db.run(`ALTER TABLE visitors ADD COLUMN expertise_level TEXT DEFAULT 'general'`, () => {
+            // Silently ignore SQLITE_ERROR if column already exists
+        });
 
         // 6. Zones — belong to a map (not a robot)
         //    Zones are unique per map; different maps have independent zones
@@ -131,6 +136,19 @@ function initializeDatabase() {
                 created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
                 FOREIGN KEY(visitor_id) REFERENCES visitors(id),
                 FOREIGN KEY(robot_id) REFERENCES robots(id)
+            )
+        `);
+
+        // 8. Password reset tokens (single-use, 1h expiry)
+        db.run(`
+            CREATE TABLE IF NOT EXISTS password_reset_tokens (
+                id TEXT PRIMARY KEY,
+                user_id TEXT NOT NULL,
+                token_hash TEXT NOT NULL,
+                expires_at DATETIME NOT NULL,
+                used INTEGER DEFAULT 0,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY(user_id) REFERENCES users(id)
             )
         `);
 

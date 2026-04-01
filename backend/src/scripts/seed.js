@@ -197,7 +197,7 @@ async function seedData() {
         const robotId = crypto.randomUUID();
         await runCommand(
             `INSERT INTO robots (id, museum_id, name, status) VALUES (?, ?, ?, ?)`,
-            [robotId, museumId, 'Robot Guía Demo', 'idle']
+            ['b0a2b9f6-a4bc-47f6-82fc-99a5672c926a', museumId, 'Robot Guía Demo', 'idle']
         );
 
         console.log('\n=============================================');

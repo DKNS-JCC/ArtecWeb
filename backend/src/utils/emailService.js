@@ -59,6 +59,55 @@ const sendWelcomeEmail = async (toEmail, name, tempPassword, role, museumName) =
     }
 };
 
+/**
+ * Sends a password-reset link to a staff member.
+ * @param {string} toEmail Recipient email address
+ * @param {string} name    User's name
+ * @param {string} rawToken Plain-text reset token (not hashed)
+ */
+const sendPasswordResetEmail = async (toEmail, name, rawToken) => {
+    const appUrl   = process.env.APP_URL || 'http://localhost:5173';
+    const resetUrl = `${appUrl}/reset-password?token=${rawToken}`;
+
+    try {
+        const info = await transporter.sendMail({
+            from:    `"Artec Robotics" <${process.env.GMAIL_USER}>`,
+            to:      toEmail,
+            subject: 'Recuperación de contraseña — Artec Robotics',
+            html: `
+                <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 8px;">
+                    <h2 style="color: #2563eb; text-align: center;">Artec Robotics</h2>
+                    <p>Hola <strong>${name}</strong>,</p>
+                    <p>Recibimos una solicitud para restablecer la contraseña de tu cuenta.</p>
+                    <p>Haz clic en el botón de abajo para crear una nueva contraseña. Este enlace es válido durante <strong>1 hora</strong>.</p>
+
+                    <div style="text-align: center; margin: 30px 0;">
+                        <a href="${resetUrl}"
+                           style="background-color: #2563eb; color: white; padding: 14px 28px;
+                                  text-decoration: none; border-radius: 6px; font-weight: bold; font-size: 15px;">
+                            Restablecer contraseña
+                        </a>
+                    </div>
+
+                    <p style="font-size: 13px; color: #64748b;">
+                        Si no solicitaste este cambio, puedes ignorar este correo.
+                        Tu contraseña actual seguirá siendo válida.
+                    </p>
+                    <p style="font-size: 12px; color: #94a3b8; text-align: center; margin-top: 40px;">
+                        Este es un correo automático. Por favor, no respondas a este mensaje.
+                    </p>
+                </div>
+            `
+        });
+        console.log('Password reset email sent:', info.messageId);
+        return true;
+    } catch (error) {
+        console.error('Error sending password reset email:', error);
+        return false;
+    }
+};
+
 module.exports = {
-    sendWelcomeEmail
+    sendWelcomeEmail,
+    sendPasswordResetEmail
 };

@@ -79,6 +79,12 @@ const handleLogin = async () => {
                         <Button type="submit" :disabled="loading" class="w-full rounded-full">
                             {{ loading ? 'Entrando...' : 'Entrar' }}
                         </Button>
+
+                        <p class="text-center text-sm text-muted-foreground">
+                            <router-link to="/forgot-password" class="text-primary hover:underline">
+                                ¿Olvidaste tu contraseña?
+                            </router-link>
+                        </p>
                     </form>
                 </CardContent>
             </Card>

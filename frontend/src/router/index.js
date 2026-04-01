@@ -45,6 +45,16 @@ const router = createRouter({
             component: () => import('../views/ScanView.vue')
         },
         {
+            path: '/forgot-password',
+            name: 'forgot-password',
+            component: () => import('../views/ForgotPasswordView.vue')
+        },
+        {
+            path: '/reset-password',
+            name: 'reset-password',
+            component: () => import('../views/ResetPasswordView.vue')
+        },
+        {
             path: '/403',
             name: 'forbidden',
             component: () => import('../views/ForbiddenView.vue')

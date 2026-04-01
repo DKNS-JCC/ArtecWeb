@@ -47,8 +47,8 @@ export const useAuthStore = defineStore('auth', () => {
         return data
     }
 
-    async function createVisitor(robotId, name) {
-        const data = await authService.createVisitor(robotId, name)
+    async function createVisitor(robotId, name, expertiseLevel = 'general') {
+        const data = await authService.createVisitor(robotId, name, expertiseLevel)
         persist(data.token, data.visitor)
         return data
     }

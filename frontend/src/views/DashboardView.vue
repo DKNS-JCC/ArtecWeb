@@ -10,8 +10,9 @@ import { Card, CardContent, CardHeader } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Alert } from '@/components/ui/alert'
-import { RefreshCw, Zap, MapPin, Plus, X, Building2, Users, BarChart3, Clock, Settings, Wifi, Search, Pencil, Eye, EyeOff, Trash2, ShieldAlert, Map } from 'lucide-vue-next'
-import MapTab from '@/components/MapTab.vue'
+import { RefreshCw, Zap, MapPin, Plus, X, Building2, Users, BarChart3, Clock, Settings, Wifi, Search, Pencil, Eye, EyeOff, Trash2, ShieldAlert, Map, Bot, History } from 'lucide-vue-next'
+import MapTab         from '@/components/MapTab.vue'
+import ChatHistoryTab from '@/components/ChatHistoryTab.vue'
 
 const authStore = useAuthStore()
 const user = computed(() => authStore.user)
@@ -314,19 +315,19 @@ onUnmounted(() => {
 
         <!-- Custom Tabs Navigation -->
         <div class="flex gap-2 border-b border-border mb-8 overflow-x-auto">
-            <button @click="activeTab = 'robots'" class="px-4 py-2 text-sm font-medium transition-colors border-b-2"
+            <button @click="activeTab = 'robots'" class="px-4 py-2 text-sm font-medium transition-colors border-b-2 flex items-center gap-2"
                 :class="activeTab === 'robots' ? 'border-primary text-foreground' : 'border-transparent text-muted-foreground hover:text-foreground'">
-                Flota de Robots
+                <Bot class="w-4 h-4" /> Flota de Robots
             </button>
             <button v-if="isMuseumAdmin || isPlatformAdmin" @click="activeTab = 'staff'"
-                class="px-4 py-2 text-sm font-medium transition-colors border-b-2"
+                class="px-4 py-2 text-sm font-medium transition-colors border-b-2 flex items-center gap-2"
                 :class="activeTab === 'staff' ? 'border-primary text-foreground' : 'border-transparent text-muted-foreground hover:text-foreground'">
-                Personal
+                <Users class="w-4 h-4" /> Personal
             </button>
             <button v-if="isPlatformAdmin" @click="activeTab = 'museums'"
-                class="px-4 py-2 text-sm font-medium transition-colors border-b-2"
+                class="px-4 py-2 text-sm font-medium transition-colors border-b-2 flex items-center gap-2"
                 :class="activeTab === 'museums' ? 'border-primary text-foreground' : 'border-transparent text-muted-foreground hover:text-foreground'">
-                Gestión de Museos
+                <Building2 class="w-4 h-4" /> Gestión de Museos
             </button>
             <button v-if="isMuseumAdmin || isPlatformAdmin" @click="activeTab = 'map'"
                 class="px-4 py-2 text-sm font-medium transition-colors border-b-2 flex items-center gap-2"
@@ -337,6 +338,11 @@ onUnmounted(() => {
                 class="px-4 py-2 text-sm font-medium transition-colors border-b-2 flex items-center gap-2"
                 :class="activeTab === 'stats' ? 'border-primary text-foreground' : 'border-transparent text-muted-foreground hover:text-foreground'">
                 <BarChart3 class="w-4 h-4" /> Estadísticas
+            </button>
+            <button v-if="isMuseumAdmin || isPlatformAdmin" @click="activeTab = 'history'"
+                class="px-4 py-2 text-sm font-medium transition-colors border-b-2 flex items-center gap-2"
+                :class="activeTab === 'history' ? 'border-primary text-foreground' : 'border-transparent text-muted-foreground hover:text-foreground'">
+                <History class="w-4 h-4" /> Historial
             </button>
         </div>
 
@@ -633,6 +639,11 @@ onUnmounted(() => {
                     </div>
                 </Card>
             </div>
+        </div>
+
+        <!-- TAB: HISTORY -->
+        <div v-show="activeTab === 'history'">
+            <ChatHistoryTab />
         </div>
 
         <!-- TAB: MAP -->

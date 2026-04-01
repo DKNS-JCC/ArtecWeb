@@ -5,8 +5,8 @@ export const authService = {
         return api.post('/auth/login', { identifier, password })
     },
 
-    createVisitor(robotId, name) {
-        return api.post('/auth/visitor', { robotId, name })
+    createVisitor(robotId, name, expertiseLevel = 'general') {
+        return api.post('/auth/visitor', { robotId, name, expertiseLevel })
     },
 
     pingVisitor() {
@@ -51,5 +51,13 @@ export const authService = {
 
     deleteAvatar() {
         return api.delete('/auth/avatar')
+    },
+
+    forgotPassword(email) {
+        return api.post('/auth/forgot-password', { email })
+    },
+
+    resetPassword(token, new_password) {
+        return api.post('/auth/reset-password', { token, new_password })
     }
 }

@@ -8,8 +8,10 @@ const museumController = require('../controllers/museumController');
 const { authMiddleware, adminMiddleware, superAdminMiddleware } = require('../middleware/authMiddleware');
 const upload = require('../config/uploadConfig');
 const rosService = require('../services/rosService'); // <-- RosService Service
-const chatController = require('../controllers/chatController');
-const mapController = require('../controllers/mapController');
+const chatController        = require('../controllers/chatController');
+const chatHistoryController = require('../controllers/chatHistoryController');
+const passwordResetController = require('../controllers/passwordResetController');
+const mapController         = require('../controllers/mapController');
 const { visitorMiddleware } = require('../middleware/visitorMiddleware');
 const mapUpload = require('../config/mapUploadConfig');
 const rateLimit = require('express-rate-limit');
@@ -22,8 +24,10 @@ const chatLimiter = rateLimit({
 });
 
 // ─── PUBLIC Auth Routes ────────────────────────────────────────
-router.post('/auth/visitor', authController.createVisitor); // create visitor session
-router.post('/auth/login', authController.login);         // username or email
+router.post('/auth/visitor',         authController.createVisitor);
+router.post('/auth/login',           authController.login);
+router.post('/auth/forgot-password', passwordResetController.forgotPassword);
+router.post('/auth/reset-password',  passwordResetController.resetPassword);
 
 // ─── PROTECTED Auth Routes (any logged-in user or visitor) ───────────────
 router.post('/auth/visitor/ping', authMiddleware, authController.pingVisitor);
@@ -35,6 +39,11 @@ router.delete('/auth/avatar', authMiddleware, authController.deleteAvatar);
 
 // ─── VISITOR CHAT Route ───────────────────────────────────────
 router.post('/chat/message', chatLimiter, authMiddleware, visitorMiddleware, chatController.handleMessage);
+
+// ─── CHAT HISTORY Routes (admin only) ────────────────────────
+router.get('/chat-history/robots',                       authMiddleware, adminMiddleware, chatHistoryController.listRobotsForFilter);
+router.get('/chat-history/sessions',                     authMiddleware, adminMiddleware, chatHistoryController.listSessions);
+router.get('/chat-history/sessions/:session_id/messages', authMiddleware, adminMiddleware, chatHistoryController.getSessionMessages);
 
 // ─── ADMIN-ONLY Routes ────────────────────────────────────────
 // adminMiddleware allows both admin and superadmin

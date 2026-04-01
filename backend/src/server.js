@@ -40,7 +40,11 @@ app.use((req, res) => {
   res.status(404).json({ error: 'Not found' });
 });
 
-// Start Server
-app.listen(PORT, "0.0.0.0", () => {
-  console.log(`Preparen sus roombas que el backend esta on fire`);
-});
+// Start Server (skip in test mode — supertest handles binding)
+if (process.env.NODE_ENV !== 'test') {
+  app.listen(PORT, "0.0.0.0", () => {
+    console.log(`Preparen sus roombas que el backend esta on fire`);
+  });
+}
+
+module.exports = app;

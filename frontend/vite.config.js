@@ -5,6 +5,7 @@ import { fileURLToPath, URL } from 'node:url'
 
 export default defineConfig({
   base: process.env.VITE_BASE || '/',
+  envDir: '..',
   server: {
     host: '0.0.0.0',
   },

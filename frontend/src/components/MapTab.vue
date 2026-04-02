@@ -1,4 +1,4 @@
-<script setup>
+﻿<script setup>
 import { ref, computed, onMounted, onUnmounted, nextTick, watch } from 'vue'
 import { useAuthStore } from '@/stores/auth'
 import { mapService } from '@/services/mapService'
@@ -36,11 +36,11 @@ const props = defineProps({
 const API_ROOT = (import.meta.env.VITE_API_URL || 'http://localhost:3000/api').replace('/api', '')
 
 const CATEGORIES = [
-    { value: 'exhibit', label: 'Exhibición' },
+    { value: 'exhibit', label: 'ExhibiciÃ³n' },
     { value: 'obra', label: 'Obra' },
     { value: 'entrance', label: 'Entrada' },
     { value: 'exit', label: 'Salida' },
-    { value: 'restroom', label: 'Baños' },
+    { value: 'restroom', label: 'BaÃ±os' },
     { value: 'other', label: 'Otro' },
 ]
 
@@ -572,7 +572,7 @@ async function handleCreateZone() {
     }
 }
 
-async function handleUpdateZone() {
+function handleGoToZone() { if(!editingZone.value || robotsAssignedToMap.value.length === 0) return; const robot = robotsAssignedToMap.value[0]; const url = robot.ip?.startsWith("ws://") ? robot.ip : (robot.ip ? `ws://${robot.ip}:9090` : "ws://127.0.0.1:9090"); try { const rosClient = new RosClient(url); setTimeout(() => { rosClient.sendNavGoal(editingZone.value.map_x, editingZone.value.map_y, 0); success.value = `Enviando ${robot.name} a la zona: ${editingZone.value.name}`; setTimeout(() => { success.value = null; rosClient.ros.close(); }, 3000); showEditForm.value = false; }, 300); } catch(err) { error.value = "Error al enviar al robot: " + err.message; setTimeout(() => error.value = null, 3000); } } async function handleUpdateZone() {
     if (!selectedMapId.value || !editingZone.value || !editForm.value.name.trim()) return
 
     error.value = null
@@ -809,7 +809,7 @@ onUnmounted(() => {
                         class="gap-1.5 h-8 shadow-sm backdrop-blur-sm"
                     >
                         <Crosshair class="w-3.5 h-3.5" />
-                        {{ isPlacingMode ? 'Colocando...' : 'Añadir zona' }}
+                        {{ isPlacingMode ? 'Colocando...' : 'AÃ±adir zona' }}
                     </Button>
                 </div>
 
@@ -863,7 +863,7 @@ onUnmounted(() => {
                     <CardContent class="p-0">
                         <div v-if="zones.length === 0" class="px-4 pb-6 pt-2 text-center">
                             <MapPin class="w-7 h-7 text-muted-foreground mx-auto mb-2 opacity-40" />
-                            <p class="text-sm text-muted-foreground">Sin zonas. Usa <span class="font-medium text-foreground">Añadir zona</span> para marcar puntos en el mapa.</p>
+                            <p class="text-sm text-muted-foreground">Sin zonas. Usa <span class="font-medium text-foreground">AÃ±adir zona</span> para marcar puntos en el mapa.</p>
                         </div>
                         <div v-else class="max-h-64 overflow-y-auto divide-y divide-border">
                             <div
@@ -913,7 +913,7 @@ onUnmounted(() => {
 
                         <!-- Assigned robots list -->
                         <div v-if="robotsAssignedToMap.length === 0" class="text-sm text-muted-foreground text-center py-2">
-                            Ningún robot asignado.
+                            NingÃºn robot asignado.
                         </div>
                         <div v-else class="space-y-1.5 max-h-40 overflow-y-auto">
                             <div
@@ -957,7 +957,7 @@ onUnmounted(() => {
                     </div>
 
                     <div class="text-xs text-muted-foreground bg-muted rounded-lg px-3 py-2">
-                        Posición en mapa: ({{ pendingZone?.map_x }}, {{ pendingZone?.map_y }})
+                        PosiciÃ³n en mapa: ({{ pendingZone?.map_x }}, {{ pendingZone?.map_y }})
                     </div>
 
                     <div class="space-y-3">
@@ -966,11 +966,11 @@ onUnmounted(() => {
                             <Input v-model="zoneForm.name" placeholder="Ej: Sala principal" class="mt-1" autofocus />
                         </div>
                         <div>
-                            <Label>Descripción</Label>
-                            <Input v-model="zoneForm.description" placeholder="Breve descripción" class="mt-1" />
+                            <Label>DescripciÃ³n</Label>
+                            <Input v-model="zoneForm.description" placeholder="Breve descripciÃ³n" class="mt-1" />
                         </div>
                         <div>
-                            <Label>Categoría</Label>
+                            <Label>CategorÃ­a</Label>
                             <select
                                 v-model="zoneForm.category"
                                 class="mt-1 w-full h-10 rounded-lg border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
@@ -1011,11 +1011,11 @@ onUnmounted(() => {
                             <Input v-model="editForm.name" class="mt-1" />
                         </div>
                         <div>
-                            <Label>Descripción</Label>
+                            <Label>DescripciÃ³n</Label>
                             <Input v-model="editForm.description" class="mt-1" />
                         </div>
                         <div>
-                            <Label>Categoría</Label>
+                            <Label>CategorÃ­a</Label>
                             <select
                                 v-model="editForm.category"
                                 class="mt-1 w-full h-10 rounded-lg border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring"

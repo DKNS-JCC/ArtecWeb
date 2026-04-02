@@ -7,7 +7,8 @@ const authController = require('../controllers/authController');
 const museumController = require('../controllers/museumController');
 const { authMiddleware, adminMiddleware, superAdminMiddleware } = require('../middleware/authMiddleware');
 const upload = require('../config/uploadConfig');
-const rosService = require('../services/rosService'); // <-- RosService Service
+const rosService = require('../services/rosService');
+const sseService = require('../services/sseService');
 const chatController        = require('../controllers/chatController');
 const chatHistoryController = require('../controllers/chatHistoryController');
 const passwordResetController = require('../controllers/passwordResetController');
@@ -21,6 +22,31 @@ const chatLimiter = rateLimit({
     windowMs: 60 * 1000,
     max: 15,
     message: { error: 'Demasiados mensajes. Espera un momento antes de enviar otro.' }
+});
+
+// ─── SSE Robot Stream (must be declared BEFORE any rate limiter middleware) ───
+// Long-lived text/event-stream connection. One connection per admin browser tab.
+// EventSource cannot send custom headers, so the JWT is passed as ?token=...
+// We validate it inline rather than using authMiddleware (which reads the header).
+router.get('/robots/stream', (req, res) => {
+    const jwt = require('jsonwebtoken');
+    const JWT_SECRET = process.env.JWT_SECRET || 'super-secret-artec-key';
+    const token = req.query.token;
+
+    if (!token) return res.status(401).json({ error: 'Token required' });
+
+    let user;
+    try {
+        user = jwt.verify(token, JWT_SECRET);
+    } catch {
+        return res.status(401).json({ error: 'Invalid token' });
+    }
+
+    if (user.role !== 'museum_admin' && user.role !== 'platform_admin') {
+        return res.status(403).json({ error: 'Admin access required' });
+    }
+
+    sseService.addClient(req, res, user);
 });
 
 // ─── PUBLIC Auth Routes ────────────────────────────────────────
@@ -39,6 +65,89 @@ router.delete('/auth/avatar', authMiddleware, authController.deleteAvatar);
 
 // ─── VISITOR CHAT Route ───────────────────────────────────────
 router.post('/chat/message', chatLimiter, authMiddleware, visitorMiddleware, chatController.handleMessage);
+
+// ─── CONFIRM NAVIGATION Route (visitor only) ─────────────────────────────────
+
+/**
+ * POST /api/chat/confirm-nav
+ * Visitor explicitly confirms a navigate_to intent.
+ * Fires the actual Nav2 goal via rosService and persists the confirmation in chat history.
+ */
+router.post('/chat/confirm-nav', chatLimiter, authMiddleware, async (req, res) => {
+    // visitorMiddleware inline (avoids duplicating the import)
+    const { visitorMiddleware } = require('../middleware/visitorMiddleware');
+    visitorMiddleware(req, res, async () => {
+        const crypto = require('crypto');
+        const { place_id } = req.body;
+        const { id: visitorId, session_id, robot_id } = req.user;
+
+        if (!place_id) {
+            return res.status(400).json({ error: 'place_id is required' });
+        }
+
+        // Load zone + map metadata to convert pixel coords → ROS world coords
+        db.get(
+            `SELECT z.id, z.name, z.map_x, z.map_y,
+                    m.resolution, m.origin_x, m.origin_y, m.height
+             FROM zones z
+             JOIN maps m   ON z.map_id = m.id
+             JOIN robots r ON r.map_id = m.id
+             WHERE z.id = ? AND r.id = ?`,
+            [place_id, robot_id],
+            (err, zone) => {
+                if (err)   return res.status(500).json({ error: 'Database error' });
+                if (!zone) return res.status(404).json({ error: 'Place not found or not accessible from this robot' });
+
+                if (zone.map_x == null || zone.map_y == null) {
+                    return res.status(422).json({
+                        error: `"${zone.name}" no tiene coordenadas de navegación configuradas. Pide al administrador que las defina en el mapa.`
+                    });
+                }
+
+                // Check ROS connection before firing the goal
+                if (!rosService.getConnectionState(robot_id)) {
+                    return res.status(503).json({
+                        error: 'El robot no está conectado a ROS en este momento. Inténtalo de nuevo en un momento.'
+                    });
+                }
+
+                // Convert pixel coordinates to ROS world coordinates (meters)
+                const resolution = zone.resolution || 0.05;
+                const worldX = zone.origin_x + zone.map_x * resolution;
+                const worldY = zone.origin_y + (zone.height - zone.map_y) * resolution;
+
+                try {
+                    // Fire Nav2 goal — heading toward the zone straight-on (qz=0, qw=1)
+                    rosService.sendNavGoal(robot_id, worldX, worldY, 0, 1);
+                } catch (e) {
+                    return res.status(503).json({ error: e.message });
+                }
+
+                // Update robot status in DB
+                db.run(
+                    `UPDATE robots SET status = 'navigating', last_update = CURRENT_TIMESTAMP WHERE id = ?`,
+                    [robot_id]
+                );
+
+                // Persist robot confirmation message in chat history
+                db.run(
+                    `INSERT INTO chat_messages (id, visitor_id, session_id, robot_id, role, content, intent)
+                     VALUES (?, ?, ?, ?, 'assistant', ?, 'navigate_to')`,
+                    [
+                        crypto.randomUUID(), visitorId, session_id, robot_id,
+                        `¡En camino hacia ${zone.name}! Sígueme, por favor.`
+                    ]
+                );
+
+                res.json({
+                    message:    `Navigating to ${zone.name}`,
+                    nav_message: `¡En camino hacia ${zone.name}! Sígueme, por favor.`,
+                    place: { id: zone.id, name: zone.name, map_x: zone.map_x, map_y: zone.map_y }
+                });
+            }
+        );
+    });
+});
 
 // ─── CHAT HISTORY Routes (admin only) ────────────────────────
 router.get('/chat-history/robots',                       authMiddleware, adminMiddleware, chatHistoryController.listRobotsForFilter);
@@ -229,6 +338,7 @@ router.put('/robots/:id', authMiddleware, adminMiddleware, (req, res) => {
                 rosService.connect(robotId, ip);
             }
 
+            sseService.broadcastRobot(robotId);
             res.json({ message: 'Robot updated successfully' });
         });
     });
@@ -303,8 +413,150 @@ router.post('/robots/:id/command', authMiddleware, adminMiddleware, (req, res) =
         `;
         db.run(updateQuery, [status, px, py, pt, robotId], function (err) {
             if (err) return res.status(500).json({ error: 'Database error updating robot' });
+            sseService.broadcastRobot(robotId);
             res.json({ message: `Command ${command} sent successfully` });
         });
+    });
+});
+
+// ─── ROS Navigation / Sensor Routes ──────────────────────────────────────────
+
+// POST /api/robots/:id/nav-goal  — send Nav2 goal pose
+router.post('/robots/:id/nav-goal', authMiddleware, adminMiddleware, async (req, res) => {
+    const { x, y, qz = 0, qw = 1 } = req.body;
+    if (x === undefined || y === undefined) {
+        return res.status(400).json({ error: 'x and y are required' });
+    }
+
+    const robotId = req.params.id;
+    const isSuperAdmin = req.user.role === 'platform_admin';
+    const museumId = req.user.museum_id;
+
+    let query = `SELECT id FROM robots WHERE id = ?`;
+    let params = [robotId];
+    if (!isSuperAdmin) { query += ` AND museum_id = ?`; params.push(museumId); }
+
+    db.get(query, params, (err, robot) => {
+        if (err) return res.status(500).json({ error: 'Database error' });
+        if (!robot) return res.status(404).json({ error: 'Robot not found or unauthorized' });
+
+        try {
+            rosService.sendNavGoal(robotId, Number(x), Number(y), Number(qz), Number(qw));
+            res.json({ message: 'Navigation goal sent', x, y, qz, qw });
+        } catch (e) {
+            res.status(503).json({ error: e.message });
+        }
+    });
+});
+
+// POST /api/robots/:id/cancel-nav  — cancel active navigation
+router.post('/robots/:id/cancel-nav', authMiddleware, adminMiddleware, async (req, res) => {
+    const robotId = req.params.id;
+    const isSuperAdmin = req.user.role === 'platform_admin';
+    const museumId = req.user.museum_id;
+
+    let query = `SELECT id FROM robots WHERE id = ?`;
+    let params = [robotId];
+    if (!isSuperAdmin) { query += ` AND museum_id = ?`; params.push(museumId); }
+
+    db.get(query, params, async (err, robot) => {
+        if (err) return res.status(500).json({ error: 'Database error' });
+        if (!robot) return res.status(404).json({ error: 'Robot not found or unauthorized' });
+
+        try {
+            const result = await rosService.cancelNavigation(robotId);
+            res.json({ message: 'Navigation cancelled', result });
+        } catch (e) {
+            res.status(503).json({ error: e.message });
+        }
+    });
+});
+
+// POST /api/robots/:id/initial-pose  — set AMCL initial pose
+router.post('/robots/:id/initial-pose', authMiddleware, adminMiddleware, (req, res) => {
+    const { x, y, qz = 0, qw = 1, covariance = null } = req.body;
+    if (x === undefined || y === undefined) {
+        return res.status(400).json({ error: 'x and y are required' });
+    }
+
+    const robotId = req.params.id;
+    const isSuperAdmin = req.user.role === 'platform_admin';
+    const museumId = req.user.museum_id;
+
+    let query = `SELECT id FROM robots WHERE id = ?`;
+    let params = [robotId];
+    if (!isSuperAdmin) { query += ` AND museum_id = ?`; params.push(museumId); }
+
+    db.get(query, params, (err, robot) => {
+        if (err) return res.status(500).json({ error: 'Database error' });
+        if (!robot) return res.status(404).json({ error: 'Robot not found or unauthorized' });
+
+        try {
+            rosService.setInitialPose(robotId, Number(x), Number(y), Number(qz), Number(qw), covariance);
+            res.json({ message: 'Initial pose set', x, y, qz, qw });
+        } catch (e) {
+            res.status(503).json({ error: e.message });
+        }
+    });
+});
+
+// GET /api/robots/:id/map  — get latest occupancy grid
+router.get('/robots/:id/map', authMiddleware, adminMiddleware, (req, res) => {
+    const robotId = req.params.id;
+    const isSuperAdmin = req.user.role === 'platform_admin';
+    const museumId = req.user.museum_id;
+
+    let query = `SELECT id FROM robots WHERE id = ?`;
+    let params = [robotId];
+    if (!isSuperAdmin) { query += ` AND museum_id = ?`; params.push(museumId); }
+
+    db.get(query, params, (err, robot) => {
+        if (err) return res.status(500).json({ error: 'Database error' });
+        if (!robot) return res.status(404).json({ error: 'Robot not found or unauthorized' });
+
+        const map = rosService.getMap(robotId);
+        if (!map) return res.status(503).json({ error: 'Map not yet available. Is the robot connected?' });
+        res.json(map);
+    });
+});
+
+// GET /api/robots/:id/pose  — get latest AMCL pose
+router.get('/robots/:id/pose', authMiddleware, adminMiddleware, (req, res) => {
+    const robotId = req.params.id;
+    const isSuperAdmin = req.user.role === 'platform_admin';
+    const museumId = req.user.museum_id;
+
+    let query = `SELECT id FROM robots WHERE id = ?`;
+    let params = [robotId];
+    if (!isSuperAdmin) { query += ` AND museum_id = ?`; params.push(museumId); }
+
+    db.get(query, params, (err, robot) => {
+        if (err) return res.status(500).json({ error: 'Database error' });
+        if (!robot) return res.status(404).json({ error: 'Robot not found or unauthorized' });
+
+        const pose = rosService.getPose(robotId);
+        if (!pose) return res.status(503).json({ error: 'Pose not yet available. Is the robot connected?' });
+        res.json(pose);
+    });
+});
+
+// GET /api/robots/:id/scan  — get latest laser scan
+router.get('/robots/:id/scan', authMiddleware, adminMiddleware, (req, res) => {
+    const robotId = req.params.id;
+    const isSuperAdmin = req.user.role === 'platform_admin';
+    const museumId = req.user.museum_id;
+
+    let query = `SELECT id FROM robots WHERE id = ?`;
+    let params = [robotId];
+    if (!isSuperAdmin) { query += ` AND museum_id = ?`; params.push(museumId); }
+
+    db.get(query, params, (err, robot) => {
+        if (err) return res.status(500).json({ error: 'Database error' });
+        if (!robot) return res.status(404).json({ error: 'Robot not found or unauthorized' });
+
+        const scan = rosService.getLatestScan(robotId);
+        if (!scan) return res.status(503).json({ error: 'Scan not yet available. Is the robot connected?' });
+        res.json(scan);
     });
 });
 
@@ -343,6 +595,7 @@ router.post('/robots/:id/force-end', authMiddleware, adminMiddleware, (req, res)
 
                     db.run('COMMIT', (commitErr) => {
                         if (commitErr) return db.run('ROLLBACK', () => res.status(500).json({ error: 'Server error' }));
+                        sseService.broadcastRobot(robotId);
                         res.json({ message: 'Visita finalizada exitosamente' });
                     });
                 });

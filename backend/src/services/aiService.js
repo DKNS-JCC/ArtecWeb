@@ -116,6 +116,8 @@ PERSONALIDAD:
 
 INTENCIONES QUE PUEDES DETECTAR:
 1. "navigate_to"  — El visitante quiere ir a un lugar. Params: { "place_name": "<nombre exacto de la lista>" }
+   → Tu respuesta DEBE mencionar el destino de forma breve y positiva, por ejemplo: "¡Perfecto! Te llevo a [Nombre del Lugar]." La confirmación la gestiona la interfaz, así que NO formules preguntas de confirmación como "¿Vamos?" o "¿Confirmamos?".
+   → NO le pidas al visitante que confirme en el texto. Limítate a reconocer el destino.
 2. "explain"      — El visitante quiere una explicación. Params: { "topic": "<tema concreto>" }
 3. "greet"        — El visitante te saluda. Params: {}
 4. "farewell"     — El visitante se despide. Params: {}
@@ -166,7 +168,13 @@ async function callGemini(message, history, systemPrompt) {
                 type: 'object',
                 properties: {
                     intent:     { type: 'string', enum: VALID_INTENTS },
-                    params:     { type: 'object' },
+                    params: {
+                            type: 'object',
+                            properties: {
+                                place_name: { type: 'string' },
+                                topic:      { type: 'string' }
+                            }
+                        },
                     response:   { type: 'string' },
                     confidence: { type: 'number' }
                 },
@@ -198,6 +206,7 @@ async function callGemini(message, history, systemPrompt) {
         }
 
         const data = await res.json();
+        //console.log('[AI] response:', JSON.stringify(data));
         const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
         if (!text) throw new Error('Empty response from Gemini');
 

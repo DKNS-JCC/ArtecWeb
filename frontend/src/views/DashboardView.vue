@@ -10,9 +10,10 @@ import { Card, CardContent, CardHeader } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Alert } from '@/components/ui/alert'
-import { RefreshCw, Zap, MapPin, Plus, X, Building2, Users, BarChart3, Clock, Settings, Wifi, Search, Pencil, Eye, EyeOff, Trash2, ShieldAlert, Map, Bot, History } from 'lucide-vue-next'
-import MapTab         from '@/components/MapTab.vue'
-import ChatHistoryTab from '@/components/ChatHistoryTab.vue'
+import { RefreshCw, Zap, MapPin, Plus, X, Building2, Users, BarChart3, Clock, Settings, Wifi, Search, Pencil, Eye, EyeOff, Trash2, ShieldAlert, Map, Bot, History, ChevronDown, ChevronUp } from 'lucide-vue-next'
+import MapTab             from '@/components/MapTab.vue'
+import ChatHistoryTab     from '@/components/ChatHistoryTab.vue'
+import RobotControlPanel  from '@/components/RobotControlPanel.vue'
 
 const authStore = useAuthStore()
 const user = computed(() => authStore.user)
@@ -22,19 +23,70 @@ const isPlatformAdmin = computed(() => authStore.isPlatformAdmin)
 const activeTab = ref('robots')
 const originUrl = window?.location?.origin || ''
 
-// ---------------- ROBOTS ----------------
+// ---------------- ROBOTS (SSE) ----------------
 const robots = ref([])
 const loadingRobots = ref(true)
 const errorRobots = ref(null)
-let intervalId = null
+let robotEventSource = null
 
+const expandedRobots = ref(new Set())
+const toggleControlPanel = (id) => {
+    const s = new Set(expandedRobots.value)
+    s.has(id) ? s.delete(id) : s.add(id)
+    expandedRobots.value = s
+}
+
+/** Apply a single robot update pushed by the server. */
+const applyRobotUpdate = (updated) => {
+    const idx = robots.value.findIndex(r => r.id === updated.id)
+    if (idx === -1) {
+        robots.value.push(updated)
+    } else {
+        robots.value[idx] = updated
+    }
+}
+
+/** Open the SSE stream. Reconnects automatically on error (browser built-in). */
+const startRobotStream = () => {
+    if (robotEventSource) robotEventSource.close()
+
+    const token = localStorage.getItem('artec_token')
+    if (!token) return
+
+    const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:3000/api'
+    const url = `${API_BASE}/robots/stream?token=${encodeURIComponent(token)}`
+
+    robotEventSource = new EventSource(url)
+
+    robotEventSource.addEventListener('robot', (e) => {
+        try {
+            const data = JSON.parse(e.data)
+            applyRobotUpdate(data)
+        } catch { /* ignore malformed event */ }
+    })
+
+    robotEventSource.addEventListener('ready', () => {
+        loadingRobots.value = false
+        errorRobots.value = null
+    })
+
+    robotEventSource.onerror = () => {
+        // EventSource retries automatically — only show error if we never got data
+        if (robots.value.length === 0) {
+            loadingRobots.value = false
+            errorRobots.value = 'No se pudo conectar con el servidor en tiempo real.'
+        }
+    }
+}
+
+/** Manual refresh — still useful after mutations (connect/disconnect/update). */
 const fetchRobots = async () => {
-    loadingRobots.value = true
     try {
-        robots.value = await robotService.fetchAll()
+        const fresh = await robotService.fetchAll()
+        robots.value = fresh
         errorRobots.value = null
     } catch (err) {
-        errorRobots.value = 'No se pudo conectar con el servidor para obtener los robots.'
+        errorRobots.value = 'No se pudo obtener la lista de robots.'
     } finally {
         loadingRobots.value = false
     }
@@ -278,25 +330,21 @@ const fetchStats = async () => {
 
 // ---------------- GLOBAL TAB REFRESH ----------------
 const refreshCurrentTab = () => {
-    if (activeTab.value === 'robots') fetchRobots()
+    if (activeTab.value === 'robots') fetchRobots()   // manual one-shot after mutations
     if (activeTab.value === 'staff') fetchStaff()
     if (activeTab.value === 'museums') fetchMuseums()
     if (activeTab.value === 'stats') fetchStats()
 }
 
 onMounted(() => {
-    fetchRobots()
+    startRobotStream()
     if (isMuseumAdmin.value || isPlatformAdmin.value) fetchStaff()
     if (isPlatformAdmin.value) fetchMuseums()
     fetchStats()
-    intervalId = setInterval(() => { 
-        if (activeTab.value === 'robots') fetchRobots() 
-        if (activeTab.value === 'stats') fetchStats()
-    }, 3000)
 })
 
 onUnmounted(() => {
-    if (intervalId) clearInterval(intervalId)
+    if (robotEventSource) robotEventSource.close()
 })
 </script>
 
@@ -461,7 +509,25 @@ onUnmounted(() => {
                             <Button @click="window.open(originUrl + '/r/' + robot.id, '_blank')" variant="outline" size="sm" class="mt-2"
                             >Test</Button>
                         </div>
-                      </div>                </Card>
+                      </div>
+                        <!-- Control Panel toggle -->
+                        <div class="mt-3 pt-3 border-t border-border">
+                            <Button
+                                @click="toggleControlPanel(robot.id)"
+                                :disabled="!robot.connected"
+                                variant="ghost"
+                                size="sm"
+                                class="w-full gap-2 text-xs"
+                            >
+                                <ChevronUp v-if="expandedRobots.has(robot.id)" class="w-3.5 h-3.5" />
+                                <ChevronDown v-else class="w-3.5 h-3.5" />
+                                {{ expandedRobots.has(robot.id) ? 'Ocultar Panel de Control' : 'Panel de Control' }}
+                            </Button>
+                            <div v-if="expandedRobots.has(robot.id)" class="mt-4">
+                                <RobotControlPanel :robot="robot" @refresh="fetchRobots" />
+                            </div>
+                        </div>
+                </Card>
             </div>
         </div>
 

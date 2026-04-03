@@ -112,6 +112,10 @@ exports.handleMessage = async (req, res) => {
                 aiResult.params.place_id   = resolvedPlace.id;
                 if (resolvedPlace.map_x != null) aiResult.params.map_x = resolvedPlace.map_x;
                 if (resolvedPlace.map_y != null) aiResult.params.map_y = resolvedPlace.map_y;
+
+                // NOTE: Confirmation is handled by the frontend modal dialog.
+                // The AI response should acknowledge the destination but not ask
+                // for text-based confirmation — the modal takes care of that.
             } else if (requestedName) {
                 // AI suggested a place that doesn't exist — downgrade intent
                 aiResult.intent = 'none';

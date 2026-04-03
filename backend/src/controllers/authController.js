@@ -2,6 +2,7 @@ const db = require('../database');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
+const rosService = require('../services/rosService');
 
 const JWT_SECRET = process.env.JWT_SECRET || 'super-secret-artec-key';
 const SALT_ROUNDS = 10;
@@ -29,12 +30,17 @@ exports.createVisitor = (req, res) => {
     db.run('BEGIN IMMEDIATE', (beginErr) => {
         if (beginErr) return res.status(500).json({ error: 'Error interno del servidor' });
 
-        db.get('SELECT id, name, museum_id, locked_until FROM robots WHERE id = ?', [robotId], (err, robot) => {
+        db.get('SELECT id, name, museum_id, ip, locked_until FROM robots WHERE id = ?', [robotId], (err, robot) => {
             if (err || !robot) {
                 return db.run('ROLLBACK', () => {
                     if (err) return res.status(500).json({ error: 'Error verificando el robot' });
                     res.status(404).json({ error: 'Robot no válido o no encontrado' });
                 });
+            }
+
+            // Auto-connect to ROS when visitor scans the QR (scanning = connecting to the robot)
+            if (robot.ip && !rosService.getConnectionState(robot.id)) {
+                rosService.connect(robot.id, robot.ip);
             }
 
             if (robot.locked_until && new Date(robot.locked_until) > now) {

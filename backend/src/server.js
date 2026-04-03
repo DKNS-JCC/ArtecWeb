@@ -15,7 +15,8 @@ const ratelimit = require('express-rate-limit');
 const limiter = ratelimit({
   windowMs: 15 * 60 * 1000, // 15 minutos
   max: 100, // Limitar a 100 solicitudes por IP por ventana
-  message: { error: 'Demasiadas solicitudes, por favor intente nuevamente más tarde.' }
+  message: { error: 'Demasiadas solicitudes, por favor intente nuevamente más tarde.' },
+  skip: (req) => req.path.includes('/api/robots'),
 });
 
 // Middleware

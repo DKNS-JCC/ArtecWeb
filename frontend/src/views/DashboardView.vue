@@ -10,10 +10,9 @@ import { Card, CardContent, CardHeader } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Alert } from '@/components/ui/alert'
-import { RefreshCw, Zap, MapPin, Plus, X, Building2, Users, BarChart3, Clock, Settings, Wifi, Search, Pencil, Eye, EyeOff, Trash2, ShieldAlert, Map, Bot, History, ChevronDown, ChevronUp } from 'lucide-vue-next'
+import { RefreshCw, Zap, MapPin, Plus, X, Building2, Users, BarChart3, Clock, Settings, Wifi, Search, Pencil, Eye, EyeOff, Trash2, ShieldAlert, Map, Bot, History } from 'lucide-vue-next'
 import MapTab             from '@/components/MapTab.vue'
 import ChatHistoryTab     from '@/components/ChatHistoryTab.vue'
-import RobotControlPanel  from '@/components/RobotControlPanel.vue'
 
 const authStore = useAuthStore()
 const user = computed(() => authStore.user)
@@ -28,13 +27,6 @@ const robots = ref([])
 const loadingRobots = ref(true)
 const errorRobots = ref(null)
 let robotEventSource = null
-
-const expandedRobots = ref(new Set())
-const toggleControlPanel = (id) => {
-    const s = new Set(expandedRobots.value)
-    s.has(id) ? s.delete(id) : s.add(id)
-    expandedRobots.value = s
-}
 
 /** Apply a single robot update pushed by the server. */
 const applyRobotUpdate = (updated) => {
@@ -143,8 +135,7 @@ const handleEditRobot = async () => {
 
 const sendCommand = async (id, command) => {
     try {
-        const payload = command === 'move' ? { linearX: 0.5, angularZ: 0.0 } : null
-        await robotService.sendCommand(id, command, payload)
+        await robotService.sendCommand(id, command, null)
         await fetchRobots()
     } catch (err) { }
 }
@@ -496,11 +487,6 @@ onUnmounted(() => {
                                 Desconectar
                             </Button>
                         </div>
-                        <div class="flex gap-2">
-                            <Button @click="sendCommand(robot.id, 'move')" :disabled="!robot.connected" size="sm" class="flex-1">Mover</Button>
-                            <Button @click="sendCommand(robot.id, 'stop')" :disabled="!robot.connected" variant="secondary" size="sm" class="flex-1">Detener</Button>
-                            <Button @click="sendCommand(robot.id, 'charge')" :disabled="!robot.connected" variant="outline" size="sm" class="flex-1">Cargar</Button>
-                        </div>
                     </div>                      <div class="mt-4 pt-4 border-t border-border flex flex-col gap-2">
                         <div class="mt-2 text-center">
                             <img :src="'https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=' + encodeURIComponent(originUrl + '/r/' + robot.id)" alt="QR Code" class="w-24 h-24 mx-auto" />
@@ -510,23 +496,6 @@ onUnmounted(() => {
                             >Test</Button>
                         </div>
                       </div>
-                        <!-- Control Panel toggle -->
-                        <div class="mt-3 pt-3 border-t border-border">
-                            <Button
-                                @click="toggleControlPanel(robot.id)"
-                                :disabled="!robot.connected"
-                                variant="ghost"
-                                size="sm"
-                                class="w-full gap-2 text-xs"
-                            >
-                                <ChevronUp v-if="expandedRobots.has(robot.id)" class="w-3.5 h-3.5" />
-                                <ChevronDown v-else class="w-3.5 h-3.5" />
-                                {{ expandedRobots.has(robot.id) ? 'Ocultar Panel de Control' : 'Panel de Control' }}
-                            </Button>
-                            <div v-if="expandedRobots.has(robot.id)" class="mt-4">
-                                <RobotControlPanel :robot="robot" @refresh="fetchRobots" />
-                            </div>
-                        </div>
                 </Card>
             </div>
         </div>

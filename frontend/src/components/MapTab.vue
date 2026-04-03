@@ -36,11 +36,11 @@ const props = defineProps({
 const API_ROOT = (import.meta.env.VITE_API_URL || 'http://localhost:3000/api').replace('/api', '')
 
 const CATEGORIES = [
-    { value: 'exhibit', label: 'ExhibiciÃ³n' },
+    { value: 'exhibit', label: 'Exhibición' },
     { value: 'obra', label: 'Obra' },
     { value: 'entrance', label: 'Entrada' },
     { value: 'exit', label: 'Salida' },
-    { value: 'restroom', label: 'BaÃ±os' },
+    { value: 'restroom', label: 'Baños' },
     { value: 'other', label: 'Otro' },
 ]
 
@@ -269,16 +269,17 @@ function draw() {
         drawMarker(ctx, zone, zone.id === hoveredZone.value)
     }
 
-    if (pendingZone.value) {
-        drawPendingMarker(ctx, pendingZone.value.map_x, pendingZone.value.map_y)
+    if (pendingZone.value && mapData.value) {
+        const { x: px, y: py } = worldToPixel(pendingZone.value.map_x, pendingZone.value.map_y)
+        drawPendingMarker(ctx, px, py)
     }
 
     ctx.restore()
 }
 
 function drawMarker(ctx, zone, isHovered) {
-    const x = zone.map_x
-    const y = zone.map_y
+    if (!mapData.value) return
+    const { x, y } = worldToPixel(zone.map_x, zone.map_y)
     const color = CATEGORY_COLORS[zone.category] || CATEGORY_COLORS.other
     const radius = isHovered ? 10 : 7
 
@@ -356,12 +357,31 @@ function screenToImage(clientX, clientY) {
     }
 }
 
+// Convert image-pixel coords → ROS world coords (meters), matching RViz frame
+function pixelToWorld(px, py) {
+    const { resolution, origin_x, origin_y, height } = mapData.value
+    return {
+        x: parseFloat((origin_x + px * resolution).toFixed(4)),
+        y: parseFloat((origin_y + (height - py) * resolution).toFixed(4))
+    }
+}
+
+// Convert ROS world coords (meters) → image-pixel coords for canvas rendering
+function worldToPixel(wx, wy) {
+    const { resolution, origin_x, origin_y, height } = mapData.value
+    return {
+        x: (wx - origin_x) / resolution,
+        y: height - (wy - origin_y) / resolution
+    }
+}
+
 function findZoneAtPosition(imgX, imgY) {
     const threshold = 12 / scale.value
     for (const zone of zones.value) {
         if (zone.map_x == null || zone.map_y == null) continue
-        const dx = zone.map_x - imgX
-        const dy = zone.map_y - imgY
+        const { x, y } = worldToPixel(zone.map_x, zone.map_y)
+        const dx = x - imgX
+        const dy = y - imgY
         if (Math.sqrt(dx * dx + dy * dy) < threshold) return zone
     }
     return null
@@ -373,7 +393,8 @@ function handleCanvasClick(e) {
     const { x, y } = screenToImage(e.clientX, e.clientY)
 
     if (isPlacingMode.value) {
-        pendingZone.value = { map_x: Math.round(x), map_y: Math.round(y) }
+        const world = pixelToWorld(x, y)
+        pendingZone.value = { map_x: world.x, map_y: world.y }
         zoneForm.value = { name: '', description: '', category: 'exhibit' }
         showZoneForm.value = true
         isPlacingMode.value = false
@@ -572,7 +593,7 @@ async function handleCreateZone() {
     }
 }
 
-function handleGoToZone() { if(!editingZone.value || robotsAssignedToMap.value.length === 0) return; const robot = robotsAssignedToMap.value[0]; const url = robot.ip?.startsWith("ws://") ? robot.ip : (robot.ip ? `ws://${robot.ip}:9090` : "ws://127.0.0.1:9090"); try { const rosClient = new RosClient(url); setTimeout(() => { rosClient.sendNavGoal(editingZone.value.map_x, editingZone.value.map_y, 0); success.value = `Enviando ${robot.name} a la zona: ${editingZone.value.name}`; setTimeout(() => { success.value = null; rosClient.ros.close(); }, 3000); showEditForm.value = false; }, 300); } catch(err) { error.value = "Error al enviar al robot: " + err.message; setTimeout(() => error.value = null, 3000); } } async function handleUpdateZone() {
+async function handleUpdateZone() {
     if (!selectedMapId.value || !editingZone.value || !editForm.value.name.trim()) return
 
     error.value = null
@@ -646,6 +667,13 @@ onMounted(async () => {
 
     if (!selectedMuseumId.value && museumOptions.value.length > 0) {
         selectedMuseumId.value = museumOptions.value[0].id
+    }
+
+    // watch(selectedMuseumId) misses the initial value set by watch(museumOptions, { immediate: true })
+    // because that watch fires during setup before watch(selectedMuseumId) is registered.
+    // Explicitly load maps here if they haven't been fetched yet.
+    if (selectedMuseumId.value && maps.value.length === 0) {
+        await fetchMaps(selectedMuseumId.value)
     }
 
     resizeObserver = new ResizeObserver(() => {
@@ -809,7 +837,7 @@ onUnmounted(() => {
                         class="gap-1.5 h-8 shadow-sm backdrop-blur-sm"
                     >
                         <Crosshair class="w-3.5 h-3.5" />
-                        {{ isPlacingMode ? 'Colocando...' : 'AÃ±adir zona' }}
+                        {{ isPlacingMode ? 'Colocando...' : 'Añadir zona' }}
                     </Button>
                 </div>
 
@@ -863,7 +891,7 @@ onUnmounted(() => {
                     <CardContent class="p-0">
                         <div v-if="zones.length === 0" class="px-4 pb-6 pt-2 text-center">
                             <MapPin class="w-7 h-7 text-muted-foreground mx-auto mb-2 opacity-40" />
-                            <p class="text-sm text-muted-foreground">Sin zonas. Usa <span class="font-medium text-foreground">AÃ±adir zona</span> para marcar puntos en el mapa.</p>
+                            <p class="text-sm text-muted-foreground">Sin zonas. Usa <span class="font-medium text-foreground">Añadir zona</span> para marcar puntos en el mapa.</p>
                         </div>
                         <div v-else class="max-h-64 overflow-y-auto divide-y divide-border">
                             <div
@@ -913,7 +941,7 @@ onUnmounted(() => {
 
                         <!-- Assigned robots list -->
                         <div v-if="robotsAssignedToMap.length === 0" class="text-sm text-muted-foreground text-center py-2">
-                            NingÃºn robot asignado.
+                            Ningún robot asignado.
                         </div>
                         <div v-else class="space-y-1.5 max-h-40 overflow-y-auto">
                             <div
@@ -957,7 +985,7 @@ onUnmounted(() => {
                     </div>
 
                     <div class="text-xs text-muted-foreground bg-muted rounded-lg px-3 py-2">
-                        PosiciÃ³n en mapa: ({{ pendingZone?.map_x }}, {{ pendingZone?.map_y }})
+                        Posición en mapa: ({{ pendingZone?.map_x }}, {{ pendingZone?.map_y }})
                     </div>
 
                     <div class="space-y-3">
@@ -966,11 +994,11 @@ onUnmounted(() => {
                             <Input v-model="zoneForm.name" placeholder="Ej: Sala principal" class="mt-1" autofocus />
                         </div>
                         <div>
-                            <Label>DescripciÃ³n</Label>
-                            <Input v-model="zoneForm.description" placeholder="Breve descripciÃ³n" class="mt-1" />
+                            <Label>Descripción</Label>
+                            <Input v-model="zoneForm.description" placeholder="Breve descripción" class="mt-1" />
                         </div>
                         <div>
-                            <Label>CategorÃ­a</Label>
+                            <Label>Categoría</Label>
                             <select
                                 v-model="zoneForm.category"
                                 class="mt-1 w-full h-10 rounded-lg border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
@@ -1011,11 +1039,11 @@ onUnmounted(() => {
                             <Input v-model="editForm.name" class="mt-1" />
                         </div>
                         <div>
-                            <Label>DescripciÃ³n</Label>
+                            <Label>Descripción</Label>
                             <Input v-model="editForm.description" class="mt-1" />
                         </div>
                         <div>
-                            <Label>CategorÃ­a</Label>
+                            <Label>Categoría</Label>
                             <select
                                 v-model="editForm.category"
                                 class="mt-1 w-full h-10 rounded-lg border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring"

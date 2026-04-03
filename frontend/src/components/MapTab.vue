@@ -1,4 +1,4 @@
-<script setup>
+﻿<script setup>
 import { ref, computed, onMounted, onUnmounted, nextTick, watch } from 'vue'
 import { useAuthStore } from '@/stores/auth'
 import { mapService } from '@/services/mapService'
@@ -269,16 +269,17 @@ function draw() {
         drawMarker(ctx, zone, zone.id === hoveredZone.value)
     }
 
-    if (pendingZone.value) {
-        drawPendingMarker(ctx, pendingZone.value.map_x, pendingZone.value.map_y)
+    if (pendingZone.value && mapData.value) {
+        const { x: px, y: py } = worldToPixel(pendingZone.value.map_x, pendingZone.value.map_y)
+        drawPendingMarker(ctx, px, py)
     }
 
     ctx.restore()
 }
 
 function drawMarker(ctx, zone, isHovered) {
-    const x = zone.map_x
-    const y = zone.map_y
+    if (!mapData.value) return
+    const { x, y } = worldToPixel(zone.map_x, zone.map_y)
     const color = CATEGORY_COLORS[zone.category] || CATEGORY_COLORS.other
     const radius = isHovered ? 10 : 7
 
@@ -356,12 +357,31 @@ function screenToImage(clientX, clientY) {
     }
 }
 
+// Convert image-pixel coords → ROS world coords (meters), matching RViz frame
+function pixelToWorld(px, py) {
+    const { resolution, origin_x, origin_y, height } = mapData.value
+    return {
+        x: parseFloat((origin_x + px * resolution).toFixed(4)),
+        y: parseFloat((origin_y + (height - py) * resolution).toFixed(4))
+    }
+}
+
+// Convert ROS world coords (meters) → image-pixel coords for canvas rendering
+function worldToPixel(wx, wy) {
+    const { resolution, origin_x, origin_y, height } = mapData.value
+    return {
+        x: (wx - origin_x) / resolution,
+        y: height - (wy - origin_y) / resolution
+    }
+}
+
 function findZoneAtPosition(imgX, imgY) {
     const threshold = 12 / scale.value
     for (const zone of zones.value) {
         if (zone.map_x == null || zone.map_y == null) continue
-        const dx = zone.map_x - imgX
-        const dy = zone.map_y - imgY
+        const { x, y } = worldToPixel(zone.map_x, zone.map_y)
+        const dx = x - imgX
+        const dy = y - imgY
         if (Math.sqrt(dx * dx + dy * dy) < threshold) return zone
     }
     return null
@@ -373,7 +393,8 @@ function handleCanvasClick(e) {
     const { x, y } = screenToImage(e.clientX, e.clientY)
 
     if (isPlacingMode.value) {
-        pendingZone.value = { map_x: Math.round(x), map_y: Math.round(y) }
+        const world = pixelToWorld(x, y)
+        pendingZone.value = { map_x: world.x, map_y: world.y }
         zoneForm.value = { name: '', description: '', category: 'exhibit' }
         showZoneForm.value = true
         isPlacingMode.value = false
@@ -646,6 +667,13 @@ onMounted(async () => {
 
     if (!selectedMuseumId.value && museumOptions.value.length > 0) {
         selectedMuseumId.value = museumOptions.value[0].id
+    }
+
+    // watch(selectedMuseumId) misses the initial value set by watch(museumOptions, { immediate: true })
+    // because that watch fires during setup before watch(selectedMuseumId) is registered.
+    // Explicitly load maps here if they haven't been fetched yet.
+    if (selectedMuseumId.value && maps.value.length === 0) {
+        await fetchMaps(selectedMuseumId.value)
     }
 
     resizeObserver = new ResizeObserver(() => {

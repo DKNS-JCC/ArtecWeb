@@ -11,8 +11,8 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Alert } from '@/components/ui/alert'
 import { RefreshCw, Zap, MapPin, Plus, X, Building2, Users, BarChart3, Clock, Settings, Wifi, Search, Pencil, Eye, EyeOff, Trash2, ShieldAlert, Map, Bot, History } from 'lucide-vue-next'
-import MapTab         from '@/components/MapTab.vue'
-import ChatHistoryTab from '@/components/ChatHistoryTab.vue'
+import MapTab             from '@/components/MapTab.vue'
+import ChatHistoryTab     from '@/components/ChatHistoryTab.vue'
 
 const authStore = useAuthStore()
 const user = computed(() => authStore.user)
@@ -22,19 +22,63 @@ const isPlatformAdmin = computed(() => authStore.isPlatformAdmin)
 const activeTab = ref('robots')
 const originUrl = window?.location?.origin || ''
 
-// ---------------- ROBOTS ----------------
+// ---------------- ROBOTS (SSE) ----------------
 const robots = ref([])
 const loadingRobots = ref(true)
 const errorRobots = ref(null)
-let intervalId = null
+let robotEventSource = null
 
+/** Apply a single robot update pushed by the server. */
+const applyRobotUpdate = (updated) => {
+    const idx = robots.value.findIndex(r => r.id === updated.id)
+    if (idx === -1) {
+        robots.value.push(updated)
+    } else {
+        robots.value[idx] = updated
+    }
+}
+
+/** Open the SSE stream. Reconnects automatically on error (browser built-in). */
+const startRobotStream = () => {
+    if (robotEventSource) robotEventSource.close()
+
+    const token = localStorage.getItem('artec_token')
+    if (!token) return
+
+    const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:3000/api'
+    const url = `${API_BASE}/robots/stream?token=${encodeURIComponent(token)}`
+
+    robotEventSource = new EventSource(url)
+
+    robotEventSource.addEventListener('robot', (e) => {
+        try {
+            const data = JSON.parse(e.data)
+            applyRobotUpdate(data)
+        } catch { /* ignore malformed event */ }
+    })
+
+    robotEventSource.addEventListener('ready', () => {
+        loadingRobots.value = false
+        errorRobots.value = null
+    })
+
+    robotEventSource.onerror = () => {
+        // EventSource retries automatically — only show error if we never got data
+        if (robots.value.length === 0) {
+            loadingRobots.value = false
+            errorRobots.value = 'No se pudo conectar con el servidor en tiempo real.'
+        }
+    }
+}
+
+/** Manual refresh — still useful after mutations (connect/disconnect/update). */
 const fetchRobots = async () => {
-    loadingRobots.value = true
     try {
-        robots.value = await robotService.fetchAll()
+        const fresh = await robotService.fetchAll()
+        robots.value = fresh
         errorRobots.value = null
     } catch (err) {
-        errorRobots.value = 'No se pudo conectar con el servidor para obtener los robots.'
+        errorRobots.value = 'No se pudo obtener la lista de robots.'
     } finally {
         loadingRobots.value = false
     }
@@ -91,8 +135,7 @@ const handleEditRobot = async () => {
 
 const sendCommand = async (id, command) => {
     try {
-        const payload = command === 'move' ? { linearX: 0.5, angularZ: 0.0 } : null
-        await robotService.sendCommand(id, command, payload)
+        await robotService.sendCommand(id, command, null)
         await fetchRobots()
     } catch (err) { }
 }
@@ -278,25 +321,21 @@ const fetchStats = async () => {
 
 // ---------------- GLOBAL TAB REFRESH ----------------
 const refreshCurrentTab = () => {
-    if (activeTab.value === 'robots') fetchRobots()
+    if (activeTab.value === 'robots') fetchRobots()   // manual one-shot after mutations
     if (activeTab.value === 'staff') fetchStaff()
     if (activeTab.value === 'museums') fetchMuseums()
     if (activeTab.value === 'stats') fetchStats()
 }
 
 onMounted(() => {
-    fetchRobots()
+    startRobotStream()
     if (isMuseumAdmin.value || isPlatformAdmin.value) fetchStaff()
     if (isPlatformAdmin.value) fetchMuseums()
     fetchStats()
-    intervalId = setInterval(() => { 
-        if (activeTab.value === 'robots') fetchRobots() 
-        if (activeTab.value === 'stats') fetchStats()
-    }, 3000)
 })
 
 onUnmounted(() => {
-    if (intervalId) clearInterval(intervalId)
+    if (robotEventSource) robotEventSource.close()
 })
 </script>
 
@@ -448,11 +487,6 @@ onUnmounted(() => {
                                 Desconectar
                             </Button>
                         </div>
-                        <div class="flex gap-2">
-                            <Button @click="sendCommand(robot.id, 'move')" :disabled="!robot.connected" size="sm" class="flex-1">Mover</Button>
-                            <Button @click="sendCommand(robot.id, 'stop')" :disabled="!robot.connected" variant="secondary" size="sm" class="flex-1">Detener</Button>
-                            <Button @click="sendCommand(robot.id, 'charge')" :disabled="!robot.connected" variant="outline" size="sm" class="flex-1">Cargar</Button>
-                        </div>
                     </div>                      <div class="mt-4 pt-4 border-t border-border flex flex-col gap-2">
                         <div class="mt-2 text-center">
                             <img :src="'https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=' + encodeURIComponent(originUrl + '/r/' + robot.id)" alt="QR Code" class="w-24 h-24 mx-auto" />
@@ -461,7 +495,8 @@ onUnmounted(() => {
                             <Button @click="window.open(originUrl + '/r/' + robot.id, '_blank')" variant="outline" size="sm" class="mt-2"
                             >Test</Button>
                         </div>
-                      </div>                </Card>
+                      </div>
+                </Card>
             </div>
         </div>
 

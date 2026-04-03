@@ -11,5 +11,20 @@ export const chatService = {
      */
     confirmNav(placeId) {
         return api.post('/chat/confirm-nav', { place_id: placeId })
+    },
+
+    /** Get the map and zones assigned to the visitor's robot. */
+    getVisitorMap() {
+        return api.get('/visitor/map')
+    },
+
+    /** Lightweight poll — returns { x, y, theta, last_update } for the visitor's robot. */
+    getRobotPosition() {
+        return api.get('/visitor/robot-position')
+    },
+
+    /** Update the visitor's expertise level (AI adapts language on next message). */
+    updateExpertise(level) {
+        return api.patch('/visitor/expertise', { expertise_level: level })
     }
 }

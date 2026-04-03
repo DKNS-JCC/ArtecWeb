@@ -85,10 +85,9 @@ router.post('/chat/confirm-nav', chatLimiter, authMiddleware, async (req, res) =
             return res.status(400).json({ error: 'place_id is required' });
         }
 
-        // Load zone + map metadata to convert pixel coords → ROS world coords
+        // Load zone — coordinates are already stored as ROS world coords (meters)
         db.get(
-            `SELECT z.id, z.name, z.map_x, z.map_y,
-                    m.resolution, m.origin_x, m.origin_y, m.height
+            `SELECT z.id, z.name, z.map_x, z.map_y
              FROM zones z
              JOIN maps m   ON z.map_id = m.id
              JOIN robots r ON r.map_id = m.id
@@ -111,14 +110,9 @@ router.post('/chat/confirm-nav', chatLimiter, authMiddleware, async (req, res) =
                     });
                 }
 
-                // Convert pixel coordinates to ROS world coordinates (meters)
-                const resolution = zone.resolution || 0.05;
-                const worldX = zone.origin_x + zone.map_x * resolution;
-                const worldY = zone.origin_y + (zone.height - zone.map_y) * resolution;
-
                 try {
-                    // Fire Nav2 goal — heading toward the zone straight-on (qz=0, qw=1)
-                    rosService.sendNavGoal(robot_id, worldX, worldY, 0, 1);
+                    // Coordinates are stored in ROS world frame (meters) — send directly
+                    rosService.sendNavGoal(robot_id, zone.map_x, zone.map_y, 0, 1);
                 } catch (e) {
                     return res.status(503).json({ error: e.message });
                 }
@@ -146,6 +140,81 @@ router.post('/chat/confirm-nav', chatLimiter, authMiddleware, async (req, res) =
                 });
             }
         );
+    });
+});
+
+// ─── VISITOR EXPERTISE Route ─────────────────────────────────────────────────
+/**
+ * PATCH /api/visitor/expertise
+ * Update the expertise level of the current visitor (AI reads it from DB on each message).
+ */
+router.patch('/visitor/expertise', authMiddleware, (req, res) => {
+    const { visitorMiddleware } = require('../middleware/visitorMiddleware');
+    visitorMiddleware(req, res, () => {
+        const { id: visitorId } = req.user;
+        const { expertise_level } = req.body;
+        const VALID = ['nino', 'general', 'estudiante', 'experto'];
+        if (!VALID.includes(expertise_level)) {
+            return res.status(400).json({ error: 'Nivel no válido' });
+        }
+        db.run(
+            'UPDATE visitors SET expertise_level = ? WHERE id = ?',
+            [expertise_level, visitorId],
+            (err) => {
+                if (err) return res.status(500).json({ error: 'Database error' });
+                res.json({ expertise_level });
+            }
+        );
+    });
+});
+
+// ─── VISITOR ROBOT POSITION Route ────────────────────────────────────────────
+/**
+ * GET /api/visitor/robot-position
+ * Lightweight poll endpoint — returns only the robot's current position for the map overlay.
+ */
+router.get('/visitor/robot-position', authMiddleware, (req, res) => {
+    const { visitorMiddleware } = require('../middleware/visitorMiddleware');
+    visitorMiddleware(req, res, () => {
+        const { robot_id } = req.user;
+        db.get(
+            'SELECT position_x, position_y, position_theta, last_update FROM robots WHERE id = ?',
+            [robot_id],
+            (err, row) => {
+                if (err || !row) return res.status(500).json({ error: 'Database error' });
+                res.json({
+                    x:           row.position_x,
+                    y:           row.position_y,
+                    theta:       row.position_theta,
+                    last_update: row.last_update,
+                });
+            }
+        );
+    });
+});
+
+// ─── VISITOR MAP Route ───────────────────────────────────────────────────────
+/**
+ * GET /api/visitor/map
+ * Returns the map metadata and zones for the robot assigned to the current visitor.
+ */
+router.get('/visitor/map', authMiddleware, (req, res) => {
+    const { visitorMiddleware } = require('../middleware/visitorMiddleware');
+    visitorMiddleware(req, res, () => {
+        const { robot_id } = req.user;
+        db.get('SELECT map_id FROM robots WHERE id = ?', [robot_id], (err, robot) => {
+            if (err) return res.status(500).json({ error: 'Database error' });
+            if (!robot?.map_id) return res.status(404).json({ error: 'Este robot no tiene un mapa asignado.' });
+
+            db.get('SELECT * FROM maps WHERE id = ?', [robot.map_id], (err, map) => {
+                if (err || !map) return res.status(500).json({ error: 'Error al obtener el mapa' });
+
+                db.all('SELECT * FROM zones WHERE map_id = ?', [robot.map_id], (err, zones) => {
+                    if (err) return res.status(500).json({ error: 'Error al obtener las zonas' });
+                    res.json({ map, zones: zones || [] });
+                });
+            });
+        });
     });
 });
 

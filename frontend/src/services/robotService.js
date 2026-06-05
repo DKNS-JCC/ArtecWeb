@@ -50,6 +50,13 @@ export const robotService = {
     },
 
     /**
+     * Send the robot to its map's base point (home / return location).
+     */
+    goToBase(id) {
+        return api.post(`/robots/${id}/go-to-base`, {})
+    },
+
+    /**
      * Set the AMCL initial pose estimate (equivalent to RViz "2D Pose Estimate").
      * @param {string} id
      * @param {number} x

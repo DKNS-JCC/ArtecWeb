@@ -101,11 +101,19 @@ function buildSystemPrompt(context) {
             .join('\n');
     }
 
+    const currentLocation = context.currentLocation
+        ? sanitizeForPrompt(context.currentLocation, 50)
+        : null;
+    const locationSection = currentLocation
+        ? `\nUBICACIÓN ACTUAL DEL ROBOT:\nEn este momento te encuentras junto a "${currentLocation}". Si el visitante te pregunta dónde estás o qué hay cerca, usa esta información de forma natural.\n`
+        : '';
+
     return `Eres ${robotName}, un robot guía del museo "${museumName}".
 Estás hablando con el visitante "${visitorName}".
 
 NIVEL DE CONOCIMIENTO DEL VISITANTE:
 ${expertiseDirective}
+${locationSection}
 
 PERSONALIDAD:
 - Amable, entusiasta y educativo

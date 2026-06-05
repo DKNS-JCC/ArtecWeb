@@ -1,6 +1,8 @@
 const crypto = require('crypto');
 const db = require('../database');
 const aiService = require('../services/aiService');
+const sttService = require('../services/sttService');
+const { findNearestZone, BASE_CATEGORY } = require('../utils/geo');
 
 const MAX_MESSAGE_LENGTH = 500;
 const HISTORY_LIMIT = 8;  // Slightly more context for better AI coherence
@@ -73,11 +75,16 @@ exports.handleMessage = async (req, res) => {
         // Load museum context
         const museum = await dbGet('SELECT name FROM museums WHERE id = ?', [museum_id]);
 
-        // Load zones from the map assigned to the robot (if any)
-        const robot = await dbGet('SELECT map_id FROM robots WHERE id = ?', [robot_id]);
+        // Load zones from the map assigned to the robot (if any).
+        // The base point is internal — exclude it from anything the AI sees.
+        const robot = await dbGet('SELECT map_id, position_x, position_y FROM robots WHERE id = ?', [robot_id]);
         const places = robot?.map_id
-            ? await dbAll('SELECT id, name, description, map_x, map_y FROM zones WHERE map_id = ?', [robot.map_id])
+            ? await dbAll('SELECT id, name, description, category, map_x, map_y FROM zones WHERE map_id = ? AND category != ?', [robot.map_id, BASE_CATEGORY])
             : [];
+
+        // Where is the robot right now? Nearest named waypoint to its live pose,
+        // so it can answer "¿dónde estás?" naturally.
+        const nearest = findNearestZone(robot?.position_x, robot?.position_y, places);
 
         // Load conversation history from DB (server-side, prevents forgery)
         const recentMessages = await dbAll(
@@ -94,7 +101,8 @@ exports.handleMessage = async (req, res) => {
             museumName:     museum?.name || 'Museo',
             museumId:       museum_id,
             expertiseLevel: expertise_level || 'general',
-            places
+            places,
+            currentLocation: nearest?.name || null
         };
 
         // Call AI service
@@ -157,6 +165,34 @@ exports.handleMessage = async (req, res) => {
             params:     {},
             confidence: 0,
             resolved_place: null
+        });
+    }
+};
+
+/**
+ * POST /api/chat/stt
+ * Transcribes a visitor voice clip to text using the local Whisper model.
+ * The audio (16 kHz mono WAV) arrives in memory via multer; nothing is stored.
+ * Returns only the recognised text — the client then sends it like a typed
+ * message, so the existing /chat/message pipeline (AI, history, intents) is reused.
+ */
+exports.handleTranscribe = async (req, res) => {
+    if (!req.file || !req.file.buffer?.length) {
+        return res.status(400).json({ error: 'No se recibió ningún audio.' });
+    }
+
+    try {
+        const text = await sttService.transcribe(req.file.buffer);
+        return res.json({ text });
+    } catch (err) {
+        console.error('[STT] Transcription failed:', err.message);
+        // Validation errors carry a user-friendly Spanish message; surface them
+        // as 400, anything unexpected as 503 (model load / inference failure).
+        const isUserError = /audio|grabación|formato|corto|PCM|WAV/i.test(err.message || '');
+        return res.status(isUserError ? 400 : 503).json({
+            error: isUserError
+                ? err.message
+                : 'El reconocimiento de voz no está disponible en este momento.',
         });
     }
 };

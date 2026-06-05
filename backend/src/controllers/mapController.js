@@ -3,6 +3,8 @@ const fs = require('fs');
 const path = require('path');
 const sharp = require('sharp');
 const db = require('../database');
+const zoneCache = require('../utils/zoneCache');
+const { BASE_CATEGORY } = require('../utils/geo');
 
 // Promisified DB helpers
 function dbGet(sql, params) {
@@ -235,6 +237,7 @@ exports.deleteMap = async (req, res) => {
         // Delete zones (FK constraint)
         await dbRun('DELETE FROM zones WHERE map_id = ?', [map_id]);
         await dbRun('DELETE FROM maps WHERE id = ?', [map_id]);
+        zoneCache.invalidate(map_id);
 
         res.json({ message: 'Mapa eliminado' });
     } catch (err) {
@@ -281,11 +284,25 @@ exports.createZone = async (req, res) => {
 
         if (!name) return res.status(400).json({ error: 'El nombre es obligatorio' });
 
+        // A base point requires coordinates (it's a navigation target).
+        if (category === BASE_CATEGORY && (map_x == null || map_y == null)) {
+            return res.status(400).json({ error: 'El punto base necesita una posición en el mapa.' });
+        }
+
         const id = crypto.randomUUID();
-        await dbRun(
-            'INSERT INTO zones (id, map_id, name, description, category, map_x, map_y) VALUES (?,?,?,?,?,?,?)',
-            [id, map_id, name, description || null, category || 'exhibit', map_x ?? null, map_y ?? null]
-        );
+        try {
+            await dbRun(
+                'INSERT INTO zones (id, map_id, name, description, category, map_x, map_y) VALUES (?,?,?,?,?,?,?)',
+                [id, map_id, name, description || null, category || 'exhibit', map_x ?? null, map_y ?? null]
+            );
+        } catch (e) {
+            // Partial unique index → only one base per map.
+            if (category === BASE_CATEGORY && /UNIQUE/i.test(e.message)) {
+                return res.status(409).json({ error: 'Este mapa ya tiene un punto base. Edítalo para moverlo.' });
+            }
+            throw e;
+        }
+        zoneCache.invalidate(map_id);
         const zone = await dbGet('SELECT * FROM zones WHERE id = ?', [id]);
         res.status(201).json(zone);
     } catch (err) {
@@ -311,17 +328,25 @@ exports.updateZone = async (req, res) => {
         const existing = await dbGet('SELECT * FROM zones WHERE id = ? AND map_id = ?', [id, map_id]);
         if (!existing) return res.status(404).json({ error: 'Zona no encontrada' });
 
-        await dbRun(
-            'UPDATE zones SET name = ?, description = ?, category = ?, map_x = ?, map_y = ? WHERE id = ?',
-            [
-                name ?? existing.name,
-                description ?? existing.description,
-                category ?? existing.category,
-                map_x ?? existing.map_x,
-                map_y ?? existing.map_y,
-                id
-            ]
-        );
+        try {
+            await dbRun(
+                'UPDATE zones SET name = ?, description = ?, category = ?, map_x = ?, map_y = ? WHERE id = ?',
+                [
+                    name ?? existing.name,
+                    description ?? existing.description,
+                    category ?? existing.category,
+                    map_x ?? existing.map_x,
+                    map_y ?? existing.map_y,
+                    id
+                ]
+            );
+        } catch (e) {
+            if (/UNIQUE/i.test(e.message)) {
+                return res.status(409).json({ error: 'Este mapa ya tiene un punto base. Solo puede haber uno.' });
+            }
+            throw e;
+        }
+        zoneCache.invalidate(map_id);
         const updated = await dbGet('SELECT * FROM zones WHERE id = ?', [id]);
         res.json(updated);
     } catch (err) {
@@ -347,6 +372,7 @@ exports.deleteZone = async (req, res) => {
         if (!existing) return res.status(404).json({ error: 'Zona no encontrada' });
 
         await dbRun('DELETE FROM zones WHERE id = ?', [id]);
+        zoneCache.invalidate(map_id);
         res.json({ message: 'Zona eliminada' });
     } catch (err) {
         res.status(500).json({ error: 'Error al eliminar la zona' });

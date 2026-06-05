@@ -22,6 +22,8 @@ import {
     Bot,
     Link,
     Link2Off,
+    Home,
+    AlertTriangle,
 } from 'lucide-vue-next'
 
 const authStore = useAuthStore()
@@ -33,7 +35,7 @@ const props = defineProps({
     }
 })
 
-const API_ROOT = (import.meta.env.VITE_API_URL || 'http://localhost:3000/api').replace('/api', '')
+const API_ROOT = (import.meta.env.VITE_API_URL || '').replace('/api', '')
 
 const CATEGORIES = [
     { value: 'exhibit', label: 'Exhibición' },
@@ -44,6 +46,11 @@ const CATEGORIES = [
     { value: 'other', label: 'Otro' },
 ]
 
+// Internal robot home/return point. Not a visitor-facing category, so it lives
+// outside CATEGORIES (the dropdown) — it's managed via its own controls.
+const BASE_CATEGORY = 'base'
+const BASE_COLOR = '#0ea5e9'
+
 const CATEGORY_COLORS = {
     exhibit: '#3b82f6',
     obra: '#f59e0b',
@@ -51,6 +58,7 @@ const CATEGORY_COLORS = {
     exit: '#ef4444',
     restroom: '#8b5cf6',
     other: '#6b7280',
+    base: BASE_COLOR,
 }
 
 const loading = ref(true)
@@ -81,9 +89,15 @@ let isPanning = false
 let panStart = { x: 0, y: 0 }
 
 const isPlacingMode = ref(false)
+const placingBase = ref(false)        // placing/moving the internal base point
 const pendingZone = ref(null)
 const showZoneForm = ref(false)
 const zoneForm = ref({ name: '', description: '', category: 'exhibit' })
+
+// The single base point of the current map (or null if not defined yet).
+const baseZone = computed(() => zones.value.find(z => z.category === BASE_CATEGORY) || null)
+// Visitor-facing zones shown in the regular list (base is managed separately).
+const regularZones = computed(() => zones.value.filter(z => z.category !== BASE_CATEGORY))
 
 const editingZone = ref(null)
 const showEditForm = ref(false)
@@ -392,6 +406,13 @@ function handleCanvasClick(e) {
 
     const { x, y } = screenToImage(e.clientX, e.clientY)
 
+    if (placingBase.value) {
+        const world = pixelToWorld(x, y)
+        placingBase.value = false
+        handlePlaceBase(world)
+        return
+    }
+
     if (isPlacingMode.value) {
         const world = pixelToWorld(x, y)
         pendingZone.value = { map_x: world.x, map_y: world.y }
@@ -404,6 +425,8 @@ function handleCanvasClick(e) {
 
     const clicked = findZoneAtPosition(x, y)
     if (clicked) {
+        // The base point is edited via its dedicated controls, not the zone form.
+        if (clicked.category === BASE_CATEGORY) return
         editingZone.value = clicked
         editForm.value = {
             name: clicked.name,
@@ -411,6 +434,46 @@ function handleCanvasClick(e) {
             category: clicked.category
         }
         showEditForm.value = true
+    }
+}
+
+// ── Base point management ──────────────────────────────────────────────────────
+
+function startPlacingBase() {
+    isPlacingMode.value = false
+    placingBase.value = true
+    if (canvasRef.value) canvasRef.value.style.cursor = 'crosshair'
+}
+
+async function handlePlaceBase(world) {
+    if (!selectedMapId.value) return
+    error.value = null
+    try {
+        if (baseZone.value) {
+            await mapService.updateZone(selectedMapId.value, baseZone.value.id, { map_x: world.x, map_y: world.y })
+        } else {
+            await mapService.createZone(selectedMapId.value, {
+                name: 'Base', category: BASE_CATEGORY, map_x: world.x, map_y: world.y,
+            })
+        }
+        await refreshZones()
+        success.value = 'Punto base actualizado'
+        setTimeout(() => { success.value = null }, 3000)
+    } catch (err) {
+        error.value = err.message
+    }
+}
+
+async function handleDeleteBase() {
+    if (!selectedMapId.value || !baseZone.value) return
+    if (!confirm('¿Eliminar el punto base? Sin base no podrás asignar este mapa a un robot.')) return
+    try {
+        await mapService.deleteZone(selectedMapId.value, baseZone.value.id)
+        await refreshZones()
+        success.value = 'Punto base eliminado'
+        setTimeout(() => { success.value = null }, 3000)
+    } catch (err) {
+        error.value = err.message
     }
 }
 
@@ -438,7 +501,7 @@ function handleCanvasMouseMove(e) {
         draw()
     }
 
-    if (isPlacingMode.value) {
+    if (isPlacingMode.value || placingBase.value) {
         canvasRef.value.style.cursor = 'crosshair'
     } else if (hovered) {
         canvasRef.value.style.cursor = 'pointer'
@@ -448,7 +511,7 @@ function handleCanvasMouseMove(e) {
 }
 
 function handleCanvasMouseDown(e) {
-    if (isPlacingMode.value || !selectedMapId.value || !mapImage.value) return
+    if (isPlacingMode.value || placingBase.value || !selectedMapId.value || !mapImage.value) return
     isPanning = true
     panStart = { x: e.clientX, y: e.clientY }
     if (canvasRef.value) canvasRef.value.style.cursor = 'grabbing'
@@ -632,6 +695,7 @@ function cancelPlacement() {
     pendingZone.value = null
     showZoneForm.value = false
     isPlacingMode.value = false
+    placingBase.value = false
     draw()
 }
 
@@ -818,8 +882,25 @@ onUnmounted(() => {
             </p>
         </div>
 
+        <!-- Map selected: optional base warning + workspace -->
+        <div v-else class="flex flex-col gap-4">
+        <!-- Mandatory base warning -->
+        <div v-if="!baseZone"
+            class="flex items-start gap-3 rounded-xl border border-amber-300 dark:border-amber-700/40 bg-amber-50 dark:bg-amber-900/20 px-4 py-3">
+            <AlertTriangle class="w-5 h-5 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
+            <div class="flex-1 min-w-0">
+                <p class="text-sm font-semibold text-amber-800 dark:text-amber-300">Este mapa no tiene punto base</p>
+                <p class="text-xs text-amber-700 dark:text-amber-400/80 mt-0.5">
+                    El punto base es a donde vuelve el robot al terminar. Es obligatorio para poder asignar este mapa a un robot.
+                </p>
+            </div>
+            <Button @click="startPlacingBase" size="sm" class="gap-1.5 shrink-0 bg-sky-600 hover:bg-sky-700 text-white">
+                <Home class="w-4 h-4" /> Colocar base
+            </Button>
+        </div>
+
         <!-- Main map workspace -->
-        <div v-else class="flex gap-4 flex-col xl:flex-row">
+        <div class="flex gap-4 flex-col xl:flex-row">
             <!-- Canvas card with floating controls -->
             <Card class="flex-1 overflow-hidden relative">
                 <!-- Top-left: map name + zone count + add-zone button -->
@@ -828,7 +909,7 @@ onUnmounted(() => {
                         {{ mapData?.name }}
                     </span>
                     <span class="text-xs text-muted-foreground bg-background/90 backdrop-blur-sm px-2.5 py-1.5 rounded-lg border border-border shadow-sm">
-                        {{ zones.length }} zona{{ zones.length !== 1 ? 's' : '' }}
+                        {{ regularZones.length }} zona{{ regularZones.length !== 1 ? 's' : '' }}
                     </span>
                     <Button
                         @click="isPlacingMode = !isPlacingMode"
@@ -856,11 +937,12 @@ onUnmounted(() => {
 
                 <!-- Placing mode banner (centered top overlay) -->
                 <div
-                    v-if="isPlacingMode"
-                    class="absolute top-3 left-1/2 -translate-x-1/2 z-10 flex items-center gap-2 px-4 py-2 rounded-xl bg-primary text-primary-foreground shadow-lg text-sm font-medium whitespace-nowrap"
+                    v-if="isPlacingMode || placingBase"
+                    class="absolute top-3 left-1/2 -translate-x-1/2 z-10 flex items-center gap-2 px-4 py-2 rounded-xl shadow-lg text-sm font-medium whitespace-nowrap"
+                    :class="placingBase ? 'bg-sky-500 text-white' : 'bg-primary text-primary-foreground'"
                 >
                     <Crosshair class="w-4 h-4 animate-pulse shrink-0" />
-                    Haz clic en el mapa para colocar una zona
+                    {{ placingBase ? 'Haz clic para fijar el punto base' : 'Haz clic en el mapa para colocar una zona' }}
                     <button @click="cancelPlacement" class="ml-1 hover:opacity-70 shrink-0">
                         <X class="w-4 h-4" />
                     </button>
@@ -889,13 +971,13 @@ onUnmounted(() => {
                         <h4 class="text-sm font-semibold text-foreground">Zonas</h4>
                     </CardHeader>
                     <CardContent class="p-0">
-                        <div v-if="zones.length === 0" class="px-4 pb-6 pt-2 text-center">
+                        <div v-if="regularZones.length === 0" class="px-4 pb-6 pt-2 text-center">
                             <MapPin class="w-7 h-7 text-muted-foreground mx-auto mb-2 opacity-40" />
                             <p class="text-sm text-muted-foreground">Sin zonas. Usa <span class="font-medium text-foreground">Añadir zona</span> para marcar puntos en el mapa.</p>
                         </div>
                         <div v-else class="max-h-64 overflow-y-auto divide-y divide-border">
                             <div
-                                v-for="zone in zones"
+                                v-for="zone in regularZones"
                                 :key="zone.id"
                                 class="flex items-center gap-3 px-4 py-2.5 hover:bg-muted/50 transition-colors cursor-pointer group"
                                 @mouseenter="hoveredZone = zone.id; draw()"
@@ -916,6 +998,37 @@ onUnmounted(() => {
                     </CardContent>
                 </Card>
 
+                <!-- Base point (internal) -->
+                <Card>
+                    <CardHeader class="pb-2 pt-4 px-4">
+                        <h4 class="text-sm font-semibold text-foreground flex items-center gap-1.5">
+                            <Home class="w-4 h-4 text-sky-500" /> Punto base
+                        </h4>
+                    </CardHeader>
+                    <CardContent class="px-4 pb-4 space-y-2">
+                        <p class="text-xs text-muted-foreground">
+                            Punto interno (no visible para visitantes) al que vuelve el robot al terminar.
+                        </p>
+                        <div v-if="baseZone" class="flex items-center gap-2 rounded-lg border border-sky-500/30 bg-sky-500/5 px-3 py-2">
+                            <span class="w-2.5 h-2.5 rounded-full bg-sky-500 shrink-0"></span>
+                            <span class="text-sm font-medium flex-1">Definido</span>
+                            <span class="text-[0.7rem] font-mono text-muted-foreground">({{ baseZone.map_x }}, {{ baseZone.map_y }})</span>
+                        </div>
+                        <div v-else class="text-xs text-amber-600 dark:text-amber-400 flex items-center gap-1.5">
+                            <AlertTriangle class="w-3.5 h-3.5 shrink-0" /> Sin definir
+                        </div>
+                        <div class="flex gap-2">
+                            <Button @click="startPlacingBase" :variant="placingBase ? 'default' : 'outline'" size="sm" class="gap-1.5 flex-1">
+                                <Home class="w-3.5 h-3.5" /> {{ baseZone ? 'Mover base' : 'Colocar base' }}
+                            </Button>
+                            <Button v-if="baseZone" @click="handleDeleteBase" variant="ghost" size="sm"
+                                class="h-9 px-2 text-muted-foreground hover:text-destructive shrink-0" title="Eliminar base">
+                                <Trash2 class="w-3.5 h-3.5" />
+                            </Button>
+                        </div>
+                    </CardContent>
+                </Card>
+
                 <!-- Robot assignment -->
                 <Card>
                     <CardHeader class="pb-2 pt-4 px-4">
@@ -926,18 +1039,22 @@ onUnmounted(() => {
                         <div class="flex gap-2">
                             <select
                                 v-model="selectedRobotToAssign"
-                                class="flex h-9 flex-1 rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                                :disabled="!baseZone"
+                                class="flex h-9 flex-1 rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50"
                             >
                                 <option value="">Selecciona un robot...</option>
                                 <option v-for="robot in robotsAvailableForAssignment" :key="robot.id" :value="robot.id">
                                     {{ robot.name }}
                                 </option>
                             </select>
-                            <Button @click="assignRobotToMap" :disabled="!selectedRobotToAssign" size="sm" class="gap-1 shrink-0">
+                            <Button @click="assignRobotToMap" :disabled="!selectedRobotToAssign || !baseZone" size="sm" class="gap-1 shrink-0">
                                 <Link class="w-4 h-4" />
                                 Asignar
                             </Button>
                         </div>
+                        <p v-if="!baseZone" class="text-xs text-amber-600 dark:text-amber-400">
+                            Define el punto base para poder asignar robots.
+                        </p>
 
                         <!-- Assigned robots list -->
                         <div v-if="robotsAssignedToMap.length === 0" class="text-sm text-muted-foreground text-center py-2">
@@ -967,6 +1084,7 @@ onUnmounted(() => {
                     </CardContent>
                 </Card>
             </div>
+        </div>
         </div>
 
         <!-- New zone modal -->

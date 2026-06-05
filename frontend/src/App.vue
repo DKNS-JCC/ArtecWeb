@@ -22,7 +22,7 @@ const isVisitor = computed(() => authStore.isVisitor)
 const avatarUrl = computed(() => {
   const avatar = authStore.user?.avatar
   if (!avatar) return null
-  const baseUrl = import.meta.env.VITE_API_URL ? import.meta.env.VITE_API_URL.replace('/api', '') : 'http://localhost:3000'
+  const baseUrl = import.meta.env.VITE_API_URL ? import.meta.env.VITE_API_URL.replace('/api', '') : ''
   return `${baseUrl}${avatar}`
 })
 

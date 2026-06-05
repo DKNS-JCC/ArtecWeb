@@ -159,6 +159,8 @@ function initializeDatabase() {
         db.run(`CREATE INDEX IF NOT EXISTS idx_robots_museum_id ON robots(museum_id)`);
         db.run(`CREATE INDEX IF NOT EXISTS idx_robots_map_id ON robots(map_id)`);
         db.run(`CREATE INDEX IF NOT EXISTS idx_zones_map_id ON zones(map_id)`);
+        // At most one "base" zone (robot home/return point) per map.
+        db.run(`CREATE UNIQUE INDEX IF NOT EXISTS idx_zones_one_base_per_map ON zones(map_id) WHERE category = 'base'`);
         db.run(`CREATE INDEX IF NOT EXISTS idx_visitors_robot_id ON visitors(robot_id)`);
         db.run(`CREATE INDEX IF NOT EXISTS idx_visitors_session_id ON visitors(session_id)`);
         db.run(`CREATE INDEX IF NOT EXISTS idx_chat_messages_session ON chat_messages(session_id)`);

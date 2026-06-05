@@ -15,9 +15,8 @@ const isUploading = ref(false)
 const avatarUrl = computed(() => {
     const avatar = authStore.user?.avatar
     if (!avatar) return null
-    // Assuming backend runs on 3000, or we use relative if served together. Since frontend fetch is local:
-    const baseUrl = import.meta.env.VITE_API_URL ? import.meta.env.VITE_API_URL.replace('/api', '') :
-        'http://localhost:3000'
+    // Same-origin relative path by default (Vite proxies /uploads to the backend).
+    const baseUrl = import.meta.env.VITE_API_URL ? import.meta.env.VITE_API_URL.replace('/api', '') : ''
     return `${baseUrl}${avatar}`
 })
 

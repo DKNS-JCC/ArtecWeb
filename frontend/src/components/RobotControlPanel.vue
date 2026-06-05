@@ -16,7 +16,7 @@ import { robotService } from '@/services/robotService'
 import { Button } from '@/components/ui/button'
 import {
     Navigation, Crosshair, X, RotateCcw, ArrowUp, ArrowDown,
-    ArrowLeft, ArrowRight, RotateCw, Wifi, Loader2
+    ArrowLeft, ArrowRight, RotateCw, Wifi, Loader2, Home, MapPin
 } from 'lucide-vue-next'
 
 const props = defineProps({
@@ -241,6 +241,22 @@ const cancelNav = async () => {
     }
 }
 
+const baseLoading = ref(false)
+
+const goToBase = async () => {
+    baseLoading.value = true
+    navStatus.value   = null
+    try {
+        const res = await robotService.goToBase(props.robot.id)
+        navStatus.value = res.message || 'Enviando el robot a la base'
+        emit('refresh')
+    } catch (e) {
+        navStatus.value = `Error: ${e.message}`
+    } finally {
+        baseLoading.value = false
+    }
+}
+
 // ── Teleoperation ─────────────────────────────────────────────────────────────
 
 const LINEAR_SPEED  = 0.3  // m/s
@@ -348,6 +364,9 @@ const mapModeLabel = computed(() => ({
     'nav-goal':     'Modo: Clic → Arrastrar para establecer objetivo',
     'initial-pose': 'Modo: Clic → Arrastrar para establecer pose inicial',
 }[mapMode.value]))
+
+// Current location = nearest waypoint to the live pose (from API/SSE).
+const currentLocation = computed(() => props.robot.current_location?.name || null)
 </script>
 
 <template>
@@ -384,8 +403,21 @@ const mapModeLabel = computed(() => ({
                         class="h-7 px-2 text-xs gap-1">
                         <X class="w-3 h-3" /> Cancelar Nav
                     </Button>
+                    <Button size="sm" variant="outline"
+                        @click="goToBase"
+                        :disabled="!robot.connected || baseLoading"
+                        class="h-7 px-2 text-xs gap-1">
+                        <Loader2 v-if="baseLoading" class="w-3 h-3 animate-spin" />
+                        <Home v-else class="w-3 h-3" /> Ir a Base
+                    </Button>
                 </div>
             </div>
+
+            <!-- Current location (nearest waypoint) -->
+            <p v-if="currentLocation" class="text-xs flex items-center gap-1 text-muted-foreground">
+                <MapPin class="w-3 h-3 text-primary shrink-0" />
+                Ubicación actual: <span class="font-medium text-foreground">{{ currentLocation }}</span>
+            </p>
 
             <!-- Mode hint -->
             <p v-if="mapMode !== 'none'" class="text-xs px-2 py-1 rounded"

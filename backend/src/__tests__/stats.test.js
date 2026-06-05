@@ -10,7 +10,9 @@ jest.mock('../services/rosService', () => ({
     connect:            jest.fn(),
     disconnect:         jest.fn(),
     getConnectionState: jest.fn().mockReturnValue(false),
-    move:               jest.fn()
+    move:               jest.fn(),
+    sendNavGoal:        jest.fn(),
+    on:                 jest.fn(),   // rosService is an EventEmitter (sseService subscribes)
 }));
 
 // ─── State ────────────────────────────────────────────────────────────────────

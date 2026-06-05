@@ -104,6 +104,39 @@ class RosService extends EventEmitter {
         return this.robots.get(robotId)?.isConnected ?? false;
     }
 
+    /**
+     * Resolves once the robot's WebSocket actually connects, or false on
+     * error/close/timeout. Lets the HTTP "connect" command report a real result
+     * instead of returning before the connection is established.
+     */
+    waitForConnection(robotId, timeoutMs = 6000) {
+        const robot = this.robots.get(robotId);
+        if (!robot) return Promise.resolve(false);
+        if (robot.isConnected) return Promise.resolve(true);
+
+        return new Promise((resolve) => {
+            let settled = false;
+            const finish = (result) => {
+                if (settled) return;
+                settled = true;
+                clearTimeout(timer);
+                try {
+                    robot.ros.removeListener('connection', onConnect);
+                    robot.ros.removeListener('error', onFail);
+                    robot.ros.removeListener('close', onFail);
+                } catch (_) { /* ignore */ }
+                resolve(result);
+            };
+            const onConnect = () => finish(true);
+            const onFail = () => finish(false);
+            const timer = setTimeout(() => finish(false), timeoutMs);
+
+            robot.ros.on('connection', onConnect);
+            robot.ros.on('error', onFail);
+            robot.ros.on('close', onFail);
+        });
+    }
+
     // ── Topic initialisation ──────────────────────────────────────────────────
 
     _initTopics(robotId, robotState) {

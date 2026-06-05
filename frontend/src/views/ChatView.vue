@@ -3,11 +3,33 @@ import { ref, onMounted, onUnmounted, computed, nextTick } from 'vue';
 import { useRouter } from 'vue-router';
 import { useAuthStore } from '@/stores/auth';
 import { chatService } from '@/services/chatService';
-import { Send, LogOut, Bot, Clock, Navigation, Check, X, Loader2, Map as MapIcon, Settings, ChevronRight } from 'lucide-vue-next';
+import { Send, LogOut, Bot, Clock, Navigation, Check, X, Loader2, Map as MapIcon, Settings, ChevronRight, Mic, Volume2, VolumeX } from 'lucide-vue-next';
 import VisitorMap from '@/components/VisitorMap.vue';
+import { useTextToSpeech } from '@/composables/useTextToSpeech';
+import { useSpeechToText } from '@/composables/useSpeechToText';
 
 const router   = useRouter();
 const authStore = useAuthStore();
+
+// ── Voice: TTS (robot speaks) + STT (visitor talks), both local & free ────────
+const tts = useTextToSpeech();
+const stt = useSpeechToText();
+
+/** Hold-to-talk: record while pressed, transcribe on release, then send. */
+const handleMicDown = async () => {
+    if (isSending.value || stt.isTranscribing.value) return;
+    tts.cancel();                       // don't capture the robot's own voice
+    await stt.start();
+};
+
+const handleMicUp = async () => {
+    if (!stt.isRecording.value) return;
+    const text = await stt.stopAndTranscribe();
+    if (text) {
+        messageText.value = text;
+        sendMessage();
+    }
+};
 
 const STORAGE_KEY       = 'artec_chat_messages';
 const MAX_MESSAGE_LENGTH = 500;
@@ -48,15 +70,6 @@ function saveMessages() {
 const messages  = ref(loadMessages());
 const showMap   = ref(false);
 
-// ── Suggestion chips (zones fetched on mount) ─────────────────────────────────
-const suggestionZones = ref([]);
-
-const sendSuggestion = (zoneName) => {
-    if (isSending.value) return;
-    messageText.value = `Llévame a ${zoneName}`;
-    sendMessage();
-};
-
 // ── Expertise level ───────────────────────────────────────────────────────────
 const showExpertiseModal  = ref(false);
 const isUpdatingExpertise = ref(false);
@@ -92,15 +105,18 @@ const updateExpertise = async (level) => {
 // ── Map navigation handler ────────────────────────────────────────────────────
 const handleMapNavigated = (navMessage, zoneName, errMsg) => {
     showMap.value = false;
+    const mapMsgId = Date.now();
+    const text = navMessage || errMsg || 'No pude iniciar la navegación.';
     messages.value.push({
-        id:             Date.now(),
+        id:             mapMsgId,
         sender:         'robot',
-        text:           navMessage || errMsg || 'No pude iniciar la navegación.',
+        text,
         isNavExecuting: !!navMessage,
         isError:        !!errMsg,
         placeName:      zoneName,
         time:           new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
     });
+    tts.speakIfAuto(text, mapMsgId);
     saveMessages();
     nextTick(() => scrollToBottom());
 };
@@ -123,14 +139,16 @@ const handleConfirmNav = async () => {
 
     try {
         const data = await chatService.confirmNav(nav.place_id);
+        const navMsgId = Date.now();
         messages.value.push({
-            id:              Date.now(),
+            id:              navMsgId,
             sender:          'robot',
             text:            data.nav_message,
             isNavExecuting:  true,
             placeName:       nav.place_name,
             time:            new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
         });
+        tts.speakIfAuto(data.nav_message, navMsgId);
     } catch (err) {
         messages.value.push({
             id:      Date.now(),
@@ -167,13 +185,9 @@ const isTimeExpiring = computed(() => timeLeft.value <= 60);
 
 const startTimer = () => {
     if (timerInterval) clearInterval(timerInterval);
-    timerInterval = setInterval(async () => {
+    timerInterval = setInterval(() => {
         if (timeLeft.value > 0) {
             timeLeft.value--;
-            if (timeLeft.value % 3 === 0) {
-                const status = await authStore.checkVisitorStatus();
-                if (!status.active) handleForcedEndSession();
-            }
         } else {
             handleEndSession();
         }
@@ -238,13 +252,15 @@ const sendMessage = async () => {
         if (idx !== -1) messages.value.splice(idx, 1);
 
         // Add robot response
+        const robotMsgId = Date.now() + 2;
         messages.value.push({
-            id:     Date.now() + 2,
+            id:     robotMsgId,
             sender: 'robot',
             text:   data.response,
             intent: data.intent,
             time:   new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
         });
+        tts.speakIfAuto(data.response, robotMsgId);
 
         // ── Navigation confirmation gate ──────────────────────────────────
         if (data.intent === 'navigate_to' && data.resolved_place?.map_x != null) {
@@ -263,6 +279,13 @@ const sendMessage = async () => {
     } catch (err) {
         const idx = messages.value.findIndex(m => m.id === typingId);
         if (idx !== -1) messages.value.splice(idx, 1);
+
+        // Session was ended/reassigned by an admin (or it expired) → force out.
+        if (err.status === 403) {
+            handleForcedEndSession();
+            return;
+        }
+
         messages.value.push({
             id:      Date.now() + 2,
             sender:  'robot',
@@ -277,13 +300,9 @@ const sendMessage = async () => {
     }
 };
 
-onMounted(async () => {
+onMounted(() => {
     startTimer();
     scrollToBottom();
-    try {
-        const data = await chatService.getVisitorMap();
-        suggestionZones.value = (data.zones || []).slice(0, 6);
-    } catch { /* chips are best-effort */ }
 });
 
 onUnmounted(() => {
@@ -311,13 +330,26 @@ onUnmounted(() => {
                 </button>
             </div>
 
-            <div class="flex flex-col items-center justify-center bg-black/5 dark:bg-white/10 px-2 py-1.5 rounded-lg border border-transparent transition-colors"
-                :class="{'animate-pulse border-red-500/50 bg-red-500/10 text-red-600 dark:text-red-400': isTimeExpiring}">
-                <Clock class="w-4 h-4 mb-0.5" :class="isTimeExpiring ? 'text-red-500' : 'text-muted-foreground'" />
-                <span class="font-mono text-xs font-bold tabular-nums tracking-tighter"
-                      :class="isTimeExpiring ? 'text-red-500' : 'text-foreground'">
-                    {{ formattedTime }}
-                </span>
+            <div class="flex items-center gap-2">
+                <!-- Auto-voice toggle (robot reads its replies aloud) -->
+                <button v-if="tts.supported" @click="tts.toggleAutoSpeak()"
+                    class="w-9 h-9 rounded-full flex items-center justify-center transition-all active:scale-95"
+                    :class="tts.autoSpeak.value
+                        ? 'bg-[#007aff]/15 text-[#007aff] ring-1 ring-[#007aff]/30'
+                        : 'bg-black/5 dark:bg-white/10 text-muted-foreground'"
+                    :title="tts.autoSpeak.value ? 'Voz activada — el robot lee sus respuestas' : 'Voz silenciada'">
+                    <Volume2 v-if="tts.autoSpeak.value" class="w-4 h-4" :class="{ 'animate-pulse': tts.isSpeaking.value }" />
+                    <VolumeX v-else class="w-4 h-4" />
+                </button>
+
+                <div class="flex flex-col items-center justify-center bg-black/5 dark:bg-white/10 px-2 py-1.5 rounded-lg border border-transparent transition-colors"
+                    :class="{'animate-pulse border-red-500/50 bg-red-500/10 text-red-600 dark:text-red-400': isTimeExpiring}">
+                    <Clock class="w-4 h-4 mb-0.5" :class="isTimeExpiring ? 'text-red-500' : 'text-muted-foreground'" />
+                    <span class="font-mono text-xs font-bold tabular-nums tracking-tighter"
+                          :class="isTimeExpiring ? 'text-red-500' : 'text-foreground'">
+                        {{ formattedTime }}
+                    </span>
+                </div>
             </div>
         </header>
 
@@ -373,7 +405,17 @@ onUnmounted(() => {
                     <template v-else>{{ msg.text }}</template>
                 </div>
 
-                <span v-if="!msg.isTyping" class="text-[0.65rem] text-muted-foreground mt-1 mx-1">{{ msg.time }}</span>
+                <div v-if="!msg.isTyping" class="flex items-center gap-1.5 mt-1 mx-1">
+                    <span class="text-[0.65rem] text-muted-foreground">{{ msg.time }}</span>
+                    <!-- Per-message replay (text-to-speech) on robot bubbles -->
+                    <button v-if="tts.supported && msg.sender === 'robot' && msg.text"
+                        @click="tts.speakingId.value === msg.id ? tts.cancel() : tts.speak(msg.text, msg.id)"
+                        class="text-muted-foreground hover:text-[#007aff] transition-colors active:scale-90"
+                        :title="tts.speakingId.value === msg.id ? 'Detener' : 'Escuchar'">
+                        <VolumeX v-if="tts.speakingId.value === msg.id" class="w-3.5 h-3.5" />
+                        <Volume2 v-else class="w-3.5 h-3.5" />
+                    </button>
+                </div>
             </div>
 
 
@@ -384,16 +426,24 @@ onUnmounted(() => {
         <footer class="glass-footer p-3 sm:pb-3 pb-safe border-t border-black/5 dark:border-white/10 flex-shrink-0"
             :class="showMap ? 'relative' : 'absolute bottom-0 left-0 right-0'">
 
-            <!-- Suggestion chips -->
-            <div v-if="!showMap && suggestionZones.length > 0"
-                class="flex gap-2 overflow-x-auto pb-2.5 scrollbar-hide">
-                <button v-for="zone in suggestionZones" :key="zone.id"
-                    @click="sendSuggestion(zone.name)"
-                    :disabled="isSending"
-                    class="flex-shrink-0 text-xs font-medium px-3 py-1.5 rounded-full bg-white dark:bg-[#2c2c2e] border border-black/10 dark:border-white/10 text-gray-700 dark:text-gray-300 active:scale-95 transition-all disabled:opacity-40 whitespace-nowrap shadow-sm">
-                    {{ zone.name }}
-                </button>
-            </div>
+            <!-- Voice status banner (recording / transcribing) -->
+            <Transition name="banner">
+                <div v-if="stt.isRecording.value || stt.isTranscribing.value"
+                    class="flex items-center justify-center gap-2 pb-2.5 text-sm font-medium"
+                    :class="stt.isRecording.value ? 'text-red-500' : 'text-[#007aff]'">
+                    <template v-if="stt.isRecording.value">
+                        <span class="relative flex h-2.5 w-2.5">
+                            <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+                            <span class="relative inline-flex rounded-full h-2.5 w-2.5 bg-red-500"></span>
+                        </span>
+                        Escuchando… suelta para enviar
+                    </template>
+                    <template v-else>
+                        <Loader2 class="w-4 h-4 animate-spin" />
+                        Transcribiendo…
+                    </template>
+                </div>
+            </Transition>
 
             <form @submit.prevent="sendMessage"
                 class="flex items-end gap-2 p-1 bg-white dark:bg-[#1c1c1e] border border-black/10 dark:border-white/10 rounded-3xl shadow-sm focus-within:ring-2 focus-within:ring-primary/20 transition-all">
@@ -413,7 +463,25 @@ onUnmounted(() => {
                     @keydown.enter.prevent="sendMessage"
                 ></textarea>
 
+                <!-- Hold-to-talk microphone (local Whisper speech-to-text) -->
+                <button v-if="stt.supported && !messageText.trim()"
+                    type="button"
+                    @pointerdown.prevent="handleMicDown"
+                    @pointerup.prevent="handleMicUp"
+                    @pointerleave="stt.isRecording.value && handleMicUp()"
+                    @contextmenu.prevent
+                    :disabled="isSending || stt.isTranscribing.value"
+                    class="w-9 h-9 m-1 rounded-full flex flex-shrink-0 items-center justify-center transition-all select-none touch-none disabled:opacity-50"
+                    :class="stt.isRecording.value
+                        ? 'bg-red-500 text-white scale-110 ring-4 ring-red-500/20'
+                        : 'bg-gray-100 dark:bg-gray-800 text-gray-500 hover:text-[#007aff] active:scale-95'"
+                    title="Mantén pulsado para hablar">
+                    <Loader2 v-if="stt.isTranscribing.value" class="w-4 h-4 animate-spin" />
+                    <Mic v-else class="w-4 h-4" />
+                </button>
+
                 <button
+                    v-else
                     type="submit"
                     :disabled="!messageText.trim() || isSending"
                     class="w-9 h-9 m-1 rounded-full flex flex-shrink-0 items-center justify-center transition-all"

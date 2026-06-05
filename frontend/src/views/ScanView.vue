@@ -2,6 +2,7 @@
 import { onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
+import { authService } from '@/services/authService'
 
 const route     = useRoute()
 const router    = useRouter()
@@ -9,10 +10,11 @@ const authStore = useAuthStore()
 
 const error          = ref('')
 const loading        = ref(false)
+const checking       = ref(true)   // verifying robot availability on entry
 const robotId        = ref('')
 const visitorName    = ref('')
 const expertiseLevel = ref('general')
-const showNamePrompt = ref(true)
+const showNamePrompt = ref(false)
 
 const LEVELS = [
     {
@@ -41,11 +43,29 @@ const LEVELS = [
     }
 ]
 
-onMounted(() => {
+onMounted(async () => {
     robotId.value = route.params.id
     if (!robotId.value) {
-        error.value      = 'Código QR no válido'
-        showNamePrompt.value = false
+        error.value    = 'Código QR no válido'
+        checking.value = false
+        return
+    }
+
+    // Verify the robot is reachable BEFORE prompting — an offline or occupied
+    // robot is reported here instead of failing later during navigation.
+    try {
+        const status = await authService.checkRobotAvailability(robotId.value)
+        if (status.occupied) {
+            error.value = 'Este robot ya está siendo utilizado por otro visitante. Por favor, espera a que termine su visita.'
+        } else if (!status.online) {
+            error.value = 'El robot no está disponible en este momento. Puede estar apagado o sin conexión. Inténtalo de nuevo en unos minutos.'
+        } else {
+            showNamePrompt.value = true
+        }
+    } catch (err) {
+        error.value = err.message || 'No se pudo verificar el robot. Inténtalo de nuevo.'
+    } finally {
+        checking.value = false
     }
 })
 
@@ -73,8 +93,14 @@ const startChat = async () => {
 <template>
   <div class="min-h-screen flex items-center justify-center p-6 bg-background">
 
+    <!-- Checking robot availability -->
+    <div v-if="checking" class="flex flex-col items-center gap-4">
+      <div class="h-10 w-10 rounded-full border-4 border-t-primary animate-spin"></div>
+      <p class="text-lg animate-pulse text-muted-foreground">Comprobando el robot...</p>
+    </div>
+
     <!-- Error -->
-    <div v-if="error" class="text-destructive font-semibold bg-destructive/10 p-6 rounded-2xl w-full max-w-sm text-center">
+    <div v-else-if="error" class="text-destructive font-semibold bg-destructive/10 p-6 rounded-2xl w-full max-w-sm text-center">
       <p>{{ error }}</p>
       <router-link to="/" class="mt-4 block text-primary underline">Volver al inicio</router-link>
     </div>

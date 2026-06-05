@@ -5,7 +5,7 @@ import { Navigation, Loader2, X } from 'lucide-vue-next'
 
 const emit = defineEmits(['navigated'])
 
-const API_ROOT = (import.meta.env.VITE_API_URL || 'http://localhost:3000/api').replace('/api', '')
+const API_ROOT = (import.meta.env.VITE_API_URL || '').replace('/api', '')
 
 const CATEGORY_COLORS = {
     exhibit:  '#3b82f6',
@@ -24,8 +24,6 @@ const CATEGORY_LABELS = {
     restroom: 'Baños',
     other:    'Otro',
 }
-
-const POSITION_POLL_MS = 3000   // refresh robot position every 3 s
 
 const canvasRef    = ref(null)
 const containerRef = ref(null)
@@ -298,15 +296,28 @@ function dismissZone() {
     draw()
 }
 
-// ── Robot position polling ────────────────────────────────────────────────────
-let positionInterval = null
+// ── Robot position stream (SSE) ───────────────────────────────────────────────
+// Replaces HTTP polling: the server pushes the live pose over one connection,
+// so the overlay stays real-time without hitting the rate limiter.
+let positionSource = null
 
-async function fetchRobotPosition() {
-    try {
-        const pos     = await chatService.getRobotPosition()
-        robotPos.value = pos
-        draw()
-    } catch { /* silently ignore — position overlay is non-critical */ }
+function startPositionStream() {
+    if (positionSource) positionSource.close()
+
+    const token = localStorage.getItem('artec_token')
+    if (!token) return
+
+    const API_BASE = import.meta.env.VITE_API_URL || '/api'
+    const url      = `${API_BASE}/robots/position-stream?token=${encodeURIComponent(token)}`
+
+    positionSource = new EventSource(url)
+    positionSource.addEventListener('position', (e) => {
+        try {
+            robotPos.value = JSON.parse(e.data)
+            draw()
+        } catch { /* ignore malformed event */ }
+    })
+    // EventSource reconnects automatically on error — overlay is non-critical.
 }
 
 // ── Lifecycle ─────────────────────────────────────────────────────────────────
@@ -332,17 +343,16 @@ onMounted(async () => {
         loading.value = false
     }
 
-    // Start position polling — fetch immediately, then every POSITION_POLL_MS
-    fetchRobotPosition()
-    positionInterval = setInterval(fetchRobotPosition, POSITION_POLL_MS)
+    // Open the live position stream (server pushes the pose, no polling)
+    startPositionStream()
 
     resizeObserver = new ResizeObserver(() => { if (mapImage.value) { fitMapToCanvas(); draw() } })
     if (containerRef.value) resizeObserver.observe(containerRef.value)
 })
 
 onUnmounted(() => {
-    if (positionInterval)  clearInterval(positionInterval)
-    if (resizeObserver)    resizeObserver.disconnect()
+    if (positionSource)  positionSource.close()
+    if (resizeObserver)  resizeObserver.disconnect()
 })
 </script>
 

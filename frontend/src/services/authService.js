@@ -9,6 +9,11 @@ export const authService = {
         return api.post('/auth/visitor', { robotId, name, expertiseLevel })
     },
 
+    /** QR pre-flight: { available, online, occupied, robot_name }. */
+    checkRobotAvailability(robotId) {
+        return api.get(`/robots/${robotId}/availability`)
+    },
+
     pingVisitor() {
         return api.post('/auth/visitor/ping')
     },

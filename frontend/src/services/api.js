@@ -1,4 +1,8 @@
-const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:3000/api'
+// Default to a SAME-ORIGIN relative path ('/api'), which Vite proxies to the
+// backend. This means the app works on any network with no IP to configure:
+// whatever host the phone used to load the page is the host the API calls go to.
+// Set VITE_API_URL only to override (e.g. point at a remote backend).
+const API_BASE = import.meta.env.VITE_API_URL || '/api'
 async function request(endpoint, options = {}) {
     const token = localStorage.getItem('artec_token')
 
@@ -26,7 +30,9 @@ async function request(endpoint, options = {}) {
     const data = await res.json()
 
     if (!res.ok) {
-        throw new Error(data.error || `Error ${res.status}`)
+        const err = new Error(data.error || `Error ${res.status}`)
+        err.status = res.status
+        throw err
     }
 
     return data

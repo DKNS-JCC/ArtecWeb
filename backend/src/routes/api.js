@@ -16,6 +16,8 @@ const mapController         = require('../controllers/mapController');
 const { visitorMiddleware } = require('../middleware/visitorMiddleware');
 const mapUpload = require('../config/mapUploadConfig');
 const rateLimit = require('express-rate-limit');
+const navService = require('../services/navService');
+const { findNearestZone, BASE_CATEGORY } = require('../utils/geo');
 
 // Chat-specific rate limiter (stricter: 15 msgs/min)
 const chatLimiter = rateLimit({
@@ -23,6 +25,16 @@ const chatLimiter = rateLimit({
     max: 15,
     message: { error: 'Demasiados mensajes. Espera un momento antes de enviar otro.' }
 });
+
+// Speech-to-text limiter — local Whisper inference is CPU-heavy, so cap it
+// tighter than text chat (20 clips/min per IP).
+const sttLimiter = rateLimit({
+    windowMs: 60 * 1000,
+    max: 20,
+    message: { error: 'Demasiadas grabaciones. Espera un momento antes de volver a hablar.' }
+});
+
+const audioUpload = require('../config/audioUploadConfig');
 
 // ─── SSE Robot Stream (must be declared BEFORE any rate limiter middleware) ───
 // Long-lived text/event-stream connection. One connection per admin browser tab.
@@ -49,6 +61,69 @@ router.get('/robots/stream', (req, res) => {
     sseService.addClient(req, res, user);
 });
 
+// ─── SSE Visitor Robot-Position Stream ───────────────────────────────────────
+// Replaces the 3 s polling of /visitor/robot-position. Pushes the assigned
+// robot's live pose to the visitor map overlay over a single connection.
+// EventSource can't send headers, so the JWT is passed as ?token=...
+router.get('/robots/position-stream', (req, res) => {
+    const jwt = require('jsonwebtoken');
+    const JWT_SECRET = process.env.JWT_SECRET || 'super-secret-artec-key';
+    const token = req.query.token;
+
+    if (!token) return res.status(401).json({ error: 'Token required' });
+
+    let user;
+    try {
+        user = jwt.verify(token, JWT_SECRET);
+    } catch {
+        return res.status(401).json({ error: 'Invalid token' });
+    }
+
+    if (user.role !== 'visitor' || !user.robot_id) {
+        return res.status(403).json({ error: 'Visitor access required' });
+    }
+
+    // Confirm the visitor still owns this robot session before streaming.
+    db.get(
+        'SELECT id FROM robots WHERE id = ? AND current_visitor_id = ?',
+        [user.robot_id, user.id],
+        (err, robot) => {
+            if (err)    return res.status(500).json({ error: 'Database error' });
+            if (!robot) return res.status(403).json({ error: 'Session expired or robot reassigned' });
+            sseService.addPositionClient(req, res, user.robot_id);
+        }
+    );
+});
+
+// ─── PUBLIC Robot Availability (QR pre-flight) ───────────────────────────────
+/**
+ * GET /api/robots/:id/availability
+ * Checked by the scan screen BEFORE prompting the visitor, so an offline or
+ * occupied robot is reported up-front instead of failing later on navigation.
+ * Path is under /robots → skipped by the global rate limiter.
+ */
+router.get('/robots/:id/availability', (req, res) => {
+    db.get('SELECT id, name, ip, locked_until FROM robots WHERE id = ?', [req.params.id], async (err, robot) => {
+        if (err)    return res.status(500).json({ error: 'Error verificando el robot' });
+        if (!robot) return res.status(404).json({ available: false, error: 'Robot no válido o no encontrado' });
+
+        const occupied = !!(robot.locked_until && new Date(robot.locked_until) > new Date());
+
+        let online = rosService.getConnectionState(robot.id);
+        if (!online && robot.ip) {
+            rosService.connect(robot.id, robot.ip);
+            online = await rosService.waitForConnection(robot.id);
+        }
+
+        res.json({
+            available:  online && !occupied,
+            online,
+            occupied,
+            robot_name: robot.name,
+        });
+    });
+});
+
 // ─── PUBLIC Auth Routes ────────────────────────────────────────
 router.post('/auth/visitor',         authController.createVisitor);
 router.post('/auth/login',           authController.login);
@@ -65,6 +140,10 @@ router.delete('/auth/avatar', authMiddleware, authController.deleteAvatar);
 
 // ─── VISITOR CHAT Route ───────────────────────────────────────
 router.post('/chat/message', chatLimiter, authMiddleware, visitorMiddleware, chatController.handleMessage);
+
+// ─── VISITOR SPEECH-TO-TEXT Route (local Whisper) ─────────────
+// Accepts a 16 kHz mono WAV clip, returns the recognised text.
+router.post('/chat/stt', sttLimiter, authMiddleware, visitorMiddleware, audioUpload.single('audio'), chatController.handleTranscribe);
 
 // ─── CONFIRM NAVIGATION Route (visitor only) ─────────────────────────────────
 
@@ -168,31 +247,6 @@ router.patch('/visitor/expertise', authMiddleware, (req, res) => {
     });
 });
 
-// ─── VISITOR ROBOT POSITION Route ────────────────────────────────────────────
-/**
- * GET /api/visitor/robot-position
- * Lightweight poll endpoint — returns only the robot's current position for the map overlay.
- */
-router.get('/visitor/robot-position', authMiddleware, (req, res) => {
-    const { visitorMiddleware } = require('../middleware/visitorMiddleware');
-    visitorMiddleware(req, res, () => {
-        const { robot_id } = req.user;
-        db.get(
-            'SELECT position_x, position_y, position_theta, last_update FROM robots WHERE id = ?',
-            [robot_id],
-            (err, row) => {
-                if (err || !row) return res.status(500).json({ error: 'Database error' });
-                res.json({
-                    x:           row.position_x,
-                    y:           row.position_y,
-                    theta:       row.position_theta,
-                    last_update: row.last_update,
-                });
-            }
-        );
-    });
-});
-
 // ─── VISITOR MAP Route ───────────────────────────────────────────────────────
 /**
  * GET /api/visitor/map
@@ -209,7 +263,8 @@ router.get('/visitor/map', authMiddleware, (req, res) => {
             db.get('SELECT * FROM maps WHERE id = ?', [robot.map_id], (err, map) => {
                 if (err || !map) return res.status(500).json({ error: 'Error al obtener el mapa' });
 
-                db.all('SELECT * FROM zones WHERE map_id = ?', [robot.map_id], (err, zones) => {
+                // Exclude the internal base point — it's opaque to visitors.
+                db.all('SELECT * FROM zones WHERE map_id = ? AND category != ?', [robot.map_id, BASE_CATEGORY], (err, zones) => {
                     if (err) return res.status(500).json({ error: 'Error al obtener las zonas' });
                     res.json({ map, zones: zones || [] });
                 });
@@ -304,9 +359,13 @@ router.get('/robots', authMiddleware, adminMiddleware, (req, res) => {
 
         const now = new Date();
 
-        // Parse position (storing as flat fields but returning as object for frontend compatibility)
-        const formattedRobots = rows.map(r => {
+        // Batch-load zones for every map involved, then derive each robot's
+        // current location as the nearest waypoint to its live position.
+        const mapIds = [...new Set(rows.map(r => r.map_id).filter(Boolean))];
+
+        const buildResponse = (zonesByMap) => rows.map(r => {
             const isLocked = r.locked_until && new Date(r.locked_until) > now;
+            const nearest = findNearestZone(r.position_x, r.position_y, zonesByMap[r.map_id] || []);
             return {
                 id: r.id,
                 name: r.name,
@@ -318,13 +377,23 @@ router.get('/robots', authMiddleware, adminMiddleware, (req, res) => {
                 last_update: r.last_update,
                 museum_id: r.museum_id,
                 map_id: r.map_id,
+                current_location: nearest ? { name: nearest.name, category: nearest.category, distance: Math.round(nearest.distance * 100) / 100 } : null,
                 is_occupied: isLocked,
                 locked_until: r.locked_until,
                 visitor_name: isLocked ? (r.visitor_name || 'Visitante Anónimo') : null
             };
         });
 
-        res.json(formattedRobots);
+        if (mapIds.length === 0) return res.json(buildResponse({}));
+
+        const placeholders = mapIds.map(() => '?').join(',');
+        db.all(`SELECT id, name, category, map_x, map_y, map_id FROM zones WHERE map_id IN (${placeholders})`, mapIds, (zErr, zoneRows) => {
+            const zonesByMap = {};
+            if (!zErr && zoneRows) {
+                for (const z of zoneRows) (zonesByMap[z.map_id] ||= []).push(z);
+            }
+            res.json(buildResponse(zonesByMap));
+        });
     });
 });
 
@@ -384,7 +453,7 @@ router.put('/robots/:id', authMiddleware, adminMiddleware, (req, res) => {
         if (err) return res.status(500).json({ error: 'Database error' });
         if (!robot) return res.status(404).json({ error: 'Robot not found or unauthorized' });
 
-        // If assigning a map, verify it belongs to the same museum
+        // If assigning a map, verify it belongs to the same museum AND has a base point.
         if (map_id !== undefined && map_id !== null) {
             const mapRow = await new Promise(resolve => {
                 db.get('SELECT museum_id FROM maps WHERE id = ?', [map_id], (e, row) => resolve(row || null));
@@ -392,6 +461,13 @@ router.put('/robots/:id', authMiddleware, adminMiddleware, (req, res) => {
             if (!mapRow) return res.status(404).json({ error: 'Mapa no encontrado' });
             if (!isSuperAdmin && mapRow.museum_id !== museumId) {
                 return res.status(403).json({ error: 'El mapa no pertenece a tu museo' });
+            }
+            // Mandatory base: a map without a base point cannot drive a robot.
+            const base = await new Promise(resolve => {
+                db.get('SELECT id FROM zones WHERE map_id = ? AND category = ? LIMIT 1', [map_id, BASE_CATEGORY], (e, row) => resolve(row || null));
+            });
+            if (!base) {
+                return res.status(422).json({ error: 'Este mapa no tiene un punto base definido. Defínelo en el editor de mapas antes de asignarlo a un robot.' });
             }
         }
 
@@ -427,7 +503,7 @@ router.post('/robots/:id/command', authMiddleware, adminMiddleware, (req, res) =
         verifyParams.push(museumId);
     }
 
-    db.get(verifyQuery, verifyParams, (err, robot) => {
+    db.get(verifyQuery, verifyParams, async (err, robot) => {
         if (err) return res.status(500).json({ error: 'Database error' });
         if (!robot) return res.status(404).json({ error: 'Robot not found or unauthorized' });
 
@@ -438,8 +514,20 @@ router.post('/robots/:id/command', authMiddleware, adminMiddleware, (req, res) =
 
         if (command === 'connect') {
             const ip = payload?.ip || robot.ip || '127.0.0.1';
-            rosService.connect(robotId, ip);
-            return res.json({ message: `ROS Connection initiated for ${robot.name} at ${ip}` });
+            try {
+                await rosService.connect(robotId, ip);
+            } catch (e) {
+                return res.status(503).json({ error: `Error iniciando la conexión: ${e.message}` });
+            }
+            // Wait for the actual WebSocket to come up so we report a real result.
+            const ok = await rosService.waitForConnection(robotId, 6000);
+            if (ok) {
+                sseService.broadcastRobot(robotId);
+                return res.json({ message: `Conectado a ${robot.name}`, connected: true });
+            }
+            return res.status(504).json({
+                error: `No se pudo conectar con "${robot.name}" en ${ip}:9090. Comprueba que el robot está encendido, en la misma red y con rosbridge_server activo.`
+            });
         }
 
         if (command === 'disconnect') {
@@ -538,6 +626,36 @@ router.post('/robots/:id/cancel-nav', authMiddleware, adminMiddleware, async (re
         } catch (e) {
             res.status(503).json({ error: e.message });
         }
+    });
+});
+
+// POST /api/robots/:id/go-to-base  — send the robot to its map's base point
+router.post('/robots/:id/go-to-base', authMiddleware, adminMiddleware, async (req, res) => {
+    const robotId = req.params.id;
+    const isSuperAdmin = req.user.role === 'platform_admin';
+    const museumId = req.user.museum_id;
+
+    let query = `SELECT id FROM robots WHERE id = ?`;
+    let params = [robotId];
+    if (!isSuperAdmin) { query += ` AND museum_id = ?`; params.push(museumId); }
+
+    db.get(query, params, async (err, robot) => {
+        if (err) return res.status(500).json({ error: 'Database error' });
+        if (!robot) return res.status(404).json({ error: 'Robot not found or unauthorized' });
+
+        const result = await navService.sendRobotToBase(robotId);
+        if (result.ok) {
+            sseService.broadcastRobot(robotId);
+            return res.json({ message: `Enviando el robot a la base "${result.base.name}".`, base: result.base });
+        }
+
+        const messages = {
+            no_map:        'El robot no tiene un mapa asignado.',
+            no_base:       'El mapa del robot no tiene un punto base definido.',
+            not_connected: 'El robot no está conectado a ROS en este momento.',
+            ros_error:     result.error || 'Error al enviar el objetivo de navegación.',
+        };
+        return res.status(409).json({ error: messages[result.reason] || 'No se pudo enviar el robot a la base.' });
     });
 });
 
@@ -664,6 +782,8 @@ router.post('/robots/:id/force-end', authMiddleware, adminMiddleware, (req, res)
 
                     db.run('COMMIT', (commitErr) => {
                         if (commitErr) return db.run('ROLLBACK', () => res.status(500).json({ error: 'Server error' }));
+                        // Send the robot home to base (best-effort).
+                        navService.sendRobotToBase(robotId).catch(() => {});
                         sseService.broadcastRobot(robotId);
                         res.json({ message: 'Visita finalizada exitosamente' });
                     });

@@ -10,9 +10,10 @@ import { Card, CardContent, CardHeader } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Alert } from '@/components/ui/alert'
-import { RefreshCw, Zap, MapPin, Plus, X, Building2, Users, BarChart3, Clock, Settings, Wifi, Search, Pencil, Eye, EyeOff, Trash2, ShieldAlert, Map, Bot, History } from 'lucide-vue-next'
+import { RefreshCw, Zap, MapPin, Plus, X, Building2, Users, BarChart3, Clock, Settings, Wifi, Search, Pencil, Eye, EyeOff, Trash2, ShieldAlert, Map, Bot, History, Navigation, Loader2 } from 'lucide-vue-next'
 import MapTab             from '@/components/MapTab.vue'
 import ChatHistoryTab     from '@/components/ChatHistoryTab.vue'
+import QRCode             from 'qrcode'
 
 const authStore = useAuthStore()
 const user = computed(() => authStore.user)
@@ -45,7 +46,7 @@ const startRobotStream = () => {
     const token = localStorage.getItem('artec_token')
     if (!token) return
 
-    const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:3000/api'
+    const API_BASE = import.meta.env.VITE_API_URL || '/api'
     const url = `${API_BASE}/robots/stream?token=${encodeURIComponent(token)}`
 
     robotEventSource = new EventSource(url)
@@ -71,12 +72,29 @@ const startRobotStream = () => {
     }
 }
 
+// QR codes are generated LOCALLY (no internet) so the demo works on any network.
+// Keyed by robot id → PNG data URL. Regenerated whenever the robot list changes.
+const qrCodes = ref({})
+
+const buildVisitUrl = (robotId) => `${originUrl}/r/${robotId}`
+
+const generateQrCodes = async () => {
+    const map = {}
+    for (const robot of robots.value) {
+        try {
+            map[robot.id] = await QRCode.toDataURL(buildVisitUrl(robot.id), { width: 300, margin: 1 })
+        } catch { /* skip individual failures */ }
+    }
+    qrCodes.value = map
+}
+
 /** Manual refresh — still useful after mutations (connect/disconnect/update). */
 const fetchRobots = async () => {
     try {
         const fresh = await robotService.fetchAll()
         robots.value = fresh
         errorRobots.value = null
+        generateQrCodes()
     } catch (err) {
         errorRobots.value = 'No se pudo obtener la lista de robots.'
     } finally {
@@ -133,11 +151,20 @@ const handleEditRobot = async () => {
     }
 }
 
+const pendingCommandId = ref(null)
+const commandError = ref(null)   // { id, message } | null — scoped to the failing robot
+
 const sendCommand = async (id, command) => {
+    pendingCommandId.value = id
+    commandError.value = null
     try {
         await robotService.sendCommand(id, command, null)
         await fetchRobots()
-    } catch (err) { }
+    } catch (err) {
+        commandError.value = { id, message: err.message || 'No se pudo ejecutar el comando.' }
+    } finally {
+        pendingCommandId.value = null
+    }
 }
 
 const handleEndVisit = async (id) => {
@@ -447,6 +474,14 @@ onUnmounted(() => {
                             </span>
                             <span v-else class="text-xs text-muted-foreground italic">Sin Telemetría</span>
                         </div>
+                        <div v-if="robot.connected && robot.current_location" class="flex justify-between items-center text-sm">
+                            <span class="text-muted-foreground flex items-center gap-1">
+                                <Navigation class="w-4 h-4" /> Ubicación
+                            </span>
+                            <span class="bg-primary/10 text-primary px-2 py-0.5 rounded text-xs font-semibold">
+                                {{ robot.current_location.name }}
+                            </span>
+                        </div>
                         <div class="flex justify-between items-center text-sm">
                             <span class="text-muted-foreground flex items-center gap-1">
                                 <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-4 h-4"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg> Ocupación
@@ -480,19 +515,25 @@ onUnmounted(() => {
                     </div>
                     <div class="border-t border-border pt-4 flex flex-col gap-2">
                         <div class="flex gap-2">
-                            <Button v-if="!robot.connected" @click="sendCommand(robot.id, 'connect')" size="sm" class="flex-1 bg-green-600 hover:bg-green-700 text-white">
-                                Conectar
+                            <Button v-if="!robot.connected" @click="sendCommand(robot.id, 'connect')" :disabled="pendingCommandId === robot.id" size="sm" class="flex-1 bg-green-600 hover:bg-green-700 text-white gap-1.5">
+                                <Loader2 v-if="pendingCommandId === robot.id" class="w-4 h-4 animate-spin" />
+                                {{ pendingCommandId === robot.id ? 'Conectando…' : 'Conectar' }}
                             </Button>
-                            <Button v-else @click="sendCommand(robot.id, 'disconnect')" size="sm" variant="destructive" class="flex-1">
-                                Desconectar
+                            <Button v-else @click="sendCommand(robot.id, 'disconnect')" :disabled="pendingCommandId === robot.id" size="sm" variant="destructive" class="flex-1 gap-1.5">
+                                <Loader2 v-if="pendingCommandId === robot.id" class="w-4 h-4 animate-spin" />
+                                {{ pendingCommandId === robot.id ? 'Desconectando…' : 'Desconectar' }}
                             </Button>
                         </div>
+                        <p v-if="commandError && commandError.id === robot.id" class="text-xs text-destructive">
+                            {{ commandError.message }}
+                        </p>
                     </div>                      <div class="mt-4 pt-4 border-t border-border flex flex-col gap-2">
                         <div class="mt-2 text-center">
-                            <img :src="'https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=' + encodeURIComponent(originUrl + '/r/' + robot.id)" alt="QR Code" class="w-24 h-24 mx-auto" />
-                            <Button as="a" :href="'https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=' + encodeURIComponent(originUrl + '/r/' + robot.id)" target="_blank" size="sm" class="mt-2"
+                            <img v-if="qrCodes[robot.id]" :src="qrCodes[robot.id]" alt="QR Code" class="w-24 h-24 mx-auto" />
+                            <div v-else class="w-24 h-24 mx-auto flex items-center justify-center text-xs text-muted-foreground">Generando QR…</div>
+                            <Button v-if="qrCodes[robot.id]" as="a" :href="qrCodes[robot.id]" :download="`qr-${robot.name || robot.id}.png`" size="sm" class="mt-2"
                             >Descargar</Button>
-                            <Button @click="window.open(originUrl + '/r/' + robot.id, '_blank')" variant="outline" size="sm" class="mt-2"
+                            <Button @click="window.open(buildVisitUrl(robot.id), '_blank')" variant="outline" size="sm" class="mt-2"
                             >Test</Button>
                         </div>
                       </div>

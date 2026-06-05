@@ -3,6 +3,7 @@ const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
 const rosService = require('../services/rosService');
+const navService = require('../services/navService');
 
 const JWT_SECRET = process.env.JWT_SECRET || 'super-secret-artec-key';
 const SALT_ROUNDS = 10;
@@ -26,7 +27,28 @@ exports.createVisitor = (req, res) => {
     const now = new Date();
     const newLockTime = new Date(now.getTime() + 10 * 60000).toISOString();
 
+    // ── Pre-flight: the robot must actually be online before we reserve it. ──
+    // Otherwise the visitor gets a session against an offline robot and only
+    // discovers it when navigation later fails. We attempt the connection and
+    // wait for a real result (outside the transaction, so no write lock is held).
+    db.get('SELECT id, ip FROM robots WHERE id = ?', [robotId], async (preErr, preRobot) => {
+        if (preErr)    return res.status(500).json({ error: 'Error verificando el robot' });
+        if (!preRobot) return res.status(404).json({ error: 'Robot no válido o no encontrado' });
+
+        let online = rosService.getConnectionState(preRobot.id);
+        if (!online && preRobot.ip) {
+            rosService.connect(preRobot.id, preRobot.ip);
+            online = await rosService.waitForConnection(preRobot.id);
+        }
+        if (!online) {
+            return res.status(503).json({ error: 'El robot no está disponible en este momento. Puede estar apagado o sin conexión. Inténtalo de nuevo en unos minutos.' });
+        }
+
+        reserveRobot();
+    });
+
     // Use IMMEDIATE transaction to prevent race conditions on robot locking
+    function reserveRobot() {
     db.run('BEGIN IMMEDIATE', (beginErr) => {
         if (beginErr) return res.status(500).json({ error: 'Error interno del servidor' });
 
@@ -36,11 +58,6 @@ exports.createVisitor = (req, res) => {
                     if (err) return res.status(500).json({ error: 'Error verificando el robot' });
                     res.status(404).json({ error: 'Robot no válido o no encontrado' });
                 });
-            }
-
-            // Auto-connect to ROS when visitor scans the QR (scanning = connecting to the robot)
-            if (robot.ip && !rosService.getConnectionState(robot.id)) {
-                rosService.connect(robot.id, robot.ip);
             }
 
             if (robot.locked_until && new Date(robot.locked_until) > now) {
@@ -100,6 +117,7 @@ exports.createVisitor = (req, res) => {
             });
         });
     });
+    }
 };
 
 exports.pingVisitor = (req, res) => {
@@ -136,10 +154,14 @@ exports.endVisitor = (req, res) => {
     // Libera el robot para otros
     db.run('UPDATE robots SET locked_until = NULL, current_visitor_id = NULL WHERE id = ?', [robotId], (err) => {
         if (err) return res.status(500).json({ error: 'Database error' });
-        
+
         // Registrar fin de la sesión del visitante
         db.run('UPDATE visitors SET ended_at = CURRENT_TIMESTAMP WHERE id = ?', [visitorId], (err2) => {
             if (err2) console.error('Error updating visitor ended_at', err2);
+
+            // Send the robot home to its base point (best-effort — never blocks end).
+            navService.sendRobotToBase(robotId).catch(() => {});
+
             res.json({ message: 'Session ended' });
         });
     });

@@ -307,6 +307,7 @@ El backend mantiene conexiones WebSocket persistentes con cada robot físico med
 | `/mobile_base/sensors/core` | `kobuki_msgs/SensorState` | Suscripción | Batería (cada 5s) |
 | `/amcl_pose` | `PoseWithCovarianceStamped` | Suscripción | Posición del robot (cada 2s) |
 | `/goal_pose` | `geometry_msgs/PoseStamped` | Publicación | Enviar objetivo de navegación Nav2 |
+| `/navigate_to_pose/_action/status` | `action_msgs/GoalStatusArray` | Suscripción | Detectar fin de navegación (éxito/cancelación/abortada) y devolver `status` del robot a `idle` |
 | `/initialpose` | `PoseWithCovarianceStamped` | Publicación | Establecer pose inicial AMCL |
 | `/scan` | `sensor_msgs/LaserScan` | Suscripción (lazy) | Datos LIDAR (bajo demanda) |
 | `/map` | `nav_msgs/OccupancyGrid` | Suscripción (lazy) | Mapa de ocupación (bajo demanda) |

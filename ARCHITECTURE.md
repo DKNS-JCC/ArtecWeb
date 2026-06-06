@@ -288,11 +288,14 @@ museum_id TEXT → museums,  created_by TEXT → users,  active INTEGER DEFAULT 
 
 ### robots
 ```sql
-id TEXT,  name TEXT,  museum_id TEXT → museums,
-status TEXT CHECK('idle'|'moving'|'charging'),  battery INTEGER,
+id TEXT,  museum_id TEXT → museums,  map_id TEXT → maps,  name TEXT,
+status TEXT DEFAULT 'idle' ('idle'|'moving'|'charging'|'navigating'),  battery INTEGER,
 position_x REAL,  position_y REAL,  position_theta REAL,  last_update DATETIME,
-locked_until DATETIME,  current_visitor_id TEXT → visitors
+locked_until TEXT,  current_visitor_id TEXT → visitors,  ip TEXT
 ```
+> `status` has no DB-level CHECK constraint — the four values above are the ones the
+> backend writes. `navigating` is set while a Nav2 goal is in flight and cleared back
+> to `idle` by `rosService`'s subscription to `/navigate_to_pose/_action/status`.
 
 ### visitors
 ```sql

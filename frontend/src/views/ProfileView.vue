@@ -4,8 +4,7 @@ import { ref, computed } from 'vue'
 import { useAuthStore } from '@/stores/auth'
 import { authService } from '@/services/authService'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent } from '@/components/ui/card'
-import { User, Shield, AlertTriangle, KeyRound, LogOut, Mail, Mails, Loader2, Camera, Trash2 } from 'lucide-vue-next'
+import { User, KeyRound, LogOut, Mails, Loader2, Camera, Trash2 } from 'lucide-vue-next'
 
 const router = useRouter()
 const authStore = useAuthStore()
@@ -70,36 +69,30 @@ const handleDeleteAvatar = async (event) => {
 </script>
 
 <template>
-    <div class="px-4 py-8 max-w-3xl mx-auto min-h-[calc(100vh-4rem)] flex flex-col items-center justify-center">
-        <div class="w-full">
-            <div class="text-center mb-10">
-                <div class="relative w-28 h-28 mx-auto mb-4 group cursor-pointer" @click="triggerFileInput">
-                    <!-- Base circle -->
-                    <div
-                        class="w-full h-full bg-primary/10 rounded-full flex items-center justify-center border border-primary/20 overflow-hidden relative">
-                        <!-- Image if present -->
+    <div class="min-h-screen flex items-center justify-center bg-background px-6 py-12">
+        <div class="w-full max-w-[26rem]">
+
+            <!-- Masthead, framed portrait like a gallery wall card -->
+            <header class="text-center reveal" style="animation-delay: 40ms">
+                <div class="relative w-28 h-28 mx-auto mb-6 group cursor-pointer" @click="triggerFileInput">
+                    <div class="w-full h-full bg-muted border border-border rounded-sm flex items-center justify-center overflow-hidden relative">
                         <img v-if="avatarUrl && !isUploading" :src="avatarUrl" alt="Avatar"
                             class="w-full h-full object-cover" />
-
-                        <!-- Fallback icon -->
-                        <User v-else-if="!isUploading" class="w-12 h-12 text-primary" />
-
-                        <!-- Loading spinner -->
-                        <div v-if="isUploading"
-                            class="absolute inset-0 bg-background/80 flex items-center justify-center backdrop-blur-sm">
-                            <Loader2 class="w-8 h-8 text-primary animate-spin" />
+                        <User v-else-if="!isUploading" class="w-10 h-10 text-muted-foreground" />
+                        <div v-if="isUploading" class="absolute inset-0 bg-background/80 flex items-center justify-center">
+                            <Loader2 class="w-7 h-7 text-primary animate-spin" />
                         </div>
                     </div>
 
                     <!-- Hover edit overlay -->
                     <div v-if="!isUploading"
-                        class="absolute inset-0 bg-black/40 rounded-full opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center gap-1 text-white backdrop-blur-sm">
+                        class="absolute inset-0 bg-foreground/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-background">
                         <Camera class="w-6 h-6" />
                     </div>
 
                     <!-- Delete button (only show if has avatar) -->
                     <button v-if="avatarUrl && !isUploading" @click="handleDeleteAvatar"
-                        class="absolute -right-2 -bottom-2 md:-right-4 md:-bottom-2 w-10 h-10 rounded-full bg-destructive text-destructive-foreground shadow-lg flex items-center justify-center transition-transform hover:scale-110 focus:outline-none focus:ring-2 focus:ring-destructive focus:ring-offset-2 focus:ring-offset-background"
+                        class="absolute -right-2 -bottom-2 w-9 h-9 rounded-sm bg-destructive text-destructive-foreground flex items-center justify-center transition-colors hover:bg-destructive/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
                         title="Eliminar foto" type="button">
                         <Trash2 class="w-4 h-4" />
                     </button>
@@ -107,61 +100,50 @@ const handleDeleteAvatar = async (event) => {
                     <!-- Hidden file input -->
                     <input type="file" ref="fileInput" class="hidden" accept="image/*" @change="handleFileChange" />
                 </div>
-                <h1 class="text-3xl font-bold tracking-tight text-foreground">
-                    Hola, {{ authStore.user?.name }}
+                <h1 class="font-display text-5xl font-medium tracking-tight leading-[0.95] mb-3">
+                    {{ authStore.user?.name }}
                 </h1>
-                <p class="text-muted-foreground mt-2">
+                <p class="text-muted-foreground text-[0.95rem] leading-relaxed">
                     Gestiona tu cuenta y credenciales
                 </p>
+            </header>
+
+            <hr class="hairline my-8 reveal" style="animation-delay: 120ms" />
+
+            <!-- Account details -->
+            <div class="reveal" style="animation-delay: 200ms">
+                <div class="flex items-center justify-between py-4 border-b border-border">
+                    <div class="flex items-center gap-2.5 text-muted-foreground">
+                        <User class="w-4 h-4" />
+                        <span class="text-xs font-semibold uppercase tracking-[0.14em]">Usuario</span>
+                    </div>
+                    <span class="font-medium text-foreground">{{ authStore.user?.name }}</span>
+                </div>
+                <div class="flex items-center justify-between py-4 border-b border-border">
+                    <div class="flex items-center gap-2.5 text-muted-foreground">
+                        <Mails class="w-4 h-4" />
+                        <span class="text-xs font-semibold uppercase tracking-[0.14em]">Correo</span>
+                    </div>
+                    <span class="font-medium text-foreground">{{ authStore.user?.email }}</span>
+                </div>
+                <div class="flex items-center justify-between py-4">
+                    <div class="flex items-center gap-2.5 text-muted-foreground">
+                        <KeyRound class="w-4 h-4" />
+                        <span class="text-xs font-semibold uppercase tracking-[0.14em]">Contraseña</span>
+                    </div>
+                    <router-link to="/change-password">
+                        <Button variant="outline" size="sm">Cambiar</Button>
+                    </router-link>
+                </div>
             </div>
 
-            <Card class="p-6 md:p-8 rounded-[2rem] shadow-sm">
-                <CardContent class="p-0 space-y-8">
+            <hr class="hairline my-8 reveal" style="animation-delay: 280ms" />
 
-                    <!-- User Details -->
-                    <div class="space-y-4">
-                        <div
-                            class="flex items-center justify-between p-4 rounded-xl bg-secondary/50 border border-border">
-                            <div class="flex items-center gap-3 text-muted-foreground">
-                                <User class="w-5 h-5" />
-                                <span class="font-medium">Usuario</span>
-                            </div>
-                            <span class="font-bold text-foreground">{{ authStore.user?.name }}</span>
-                        </div>
-                        <div
-                            class="flex items-center justify-between p-4 rounded-xl bg-secondary/50 border border-border">
-                            <div class="flex items-center gap-3 text-muted-foreground">
-                                <Mails class="w-5 h-5" />
-                                <span class="font-medium">Correo</span>
-                            </div>
-                            <span class="font-bold text-foreground">{{ authStore.user?.email }}</span>
-                        </div>
-                        <div
-                            class="flex items-center justify-between p-4 rounded-xl bg-secondary/50 border border-border">
-                            <div class="flex items-center gap-3 text-muted-foreground">
-                                <KeyRound class="w-5 h-5" />
-                                <span class="font-medium">Contraseña</span>
-                            </div>
-                            <Button variant="outline"
-                                class="flex justify-center items-center gap-2 h-12 rounded-xl border-border">
-                                Cambiar contraseña
-                            </Button>
-                        </div>
-                    </div>
+            <Button @click="handleLogout" variant="destructive" size="lg" class="w-full reveal" style="animation-delay: 320ms">
+                <LogOut class="w-4 h-4" />
+                Cerrar sesión
+            </Button>
 
-                    <hr class="border-border" />
-
-                    <!-- Actions -->
-                    <div class="flex flex-col sm:flex-row gap-4">
-                        <Button @click="handleLogout" variant="destructive"
-                            class="flex-1 flex justify-center items-center gap-2 h-12 rounded-xl">
-                            <LogOut class="w-4 h-4" />
-                            Cerrar sesión
-                        </Button>
-                    </div>
-
-                </CardContent>
-            </Card>
         </div>
     </div>
 </template>

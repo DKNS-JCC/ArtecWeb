@@ -6,7 +6,6 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Alert } from '@/components/ui/alert'
-import { Card, CardContent } from '@/components/ui/card'
 
 const router = useRouter()
 const authStore = useAuthStore()
@@ -48,53 +47,55 @@ const handleChange = async () => {
 </script>
 
 <template>
-    <div class="min-h-screen flex items-center justify-center bg-background px-4 py-12">
-        <div class="max-w-md w-full">
+    <div class="min-h-screen flex items-center justify-center bg-background px-6 py-12">
+        <div class="w-full max-w-[26rem]">
 
-            <div class="text-center mb-10">
-                <h2 class="text-3xl font-extrabold text-foreground tracking-tight mb-2">
+            <!-- Masthead, like the head of a catalogue entry -->
+            <header class="reveal" style="animation-delay: 40ms">
+                <h1 class="font-display text-5xl font-medium tracking-tight leading-[0.95] mb-3">
                     {{ isForced ? 'Cambia tu contraseña' : 'Cambiar contraseña' }}
-                </h2>
-                <p v-if="isForced" class="text-amber-600 dark:text-amber-400 font-semibold text-sm">
-                    Cambia tu contraseña.
+                </h1>
+                <p v-if="isForced" class="text-destructive font-semibold text-[0.95rem] leading-relaxed">
+                    Por seguridad, debes establecer una contraseña nueva antes de continuar.
                 </p>
-                <p v-else class="text-muted-foreground">Actualiza tu contraseña de acceso</p>
-            </div>
+                <p v-else class="text-muted-foreground text-[0.95rem] leading-relaxed">
+                    Actualiza tu contraseña de acceso.
+                </p>
+            </header>
 
-            <Card class="px-8 py-10 rounded-3xl shadow-[0_8px_30px_rgba(0,0,0,0.04)]">
-                <CardContent class="p-0">
-                    <form @submit.prevent="handleChange" class="space-y-6">
+            <hr class="hairline my-8 reveal" style="animation-delay: 120ms" />
 
-                        <Alert v-if="errorMsg" variant="destructive">
-                            {{ errorMsg }}
-                        </Alert>
+            <form @submit.prevent="handleChange" class="space-y-7 reveal" style="animation-delay: 200ms">
 
-                        <div>
-                            <Label for="current-password">
-                                {{ isForced ? 'Contraseña temporal actual' : 'Contraseña actual' }}
-                            </Label>
-                            <Input id="current-password" type="password" v-model="currentPassword"
-                                placeholder="••••••••" required autocomplete="current-password" />
-                        </div>
+                <Alert v-if="errorMsg" variant="destructive">
+                    {{ errorMsg }}
+                </Alert>
 
-                        <div>
-                            <Label for="new-password">Nueva contraseña</Label>
-                            <Input id="new-password" type="password" v-model="newPassword"
-                                placeholder="Mínimo 6 caracteres" required autocomplete="new-password" />
-                        </div>
+                <div>
+                    <Label for="current-password">
+                        {{ isForced ? 'Contraseña temporal actual' : 'Contraseña actual' }}
+                    </Label>
+                    <Input id="current-password" type="password" v-model="currentPassword"
+                        placeholder="••••••••" required autocomplete="current-password" />
+                </div>
 
-                        <div>
-                            <Label for="confirm-password">Confirmar contraseña</Label>
-                            <Input id="confirm-password" type="password" v-model="confirmPassword"
-                                placeholder="Repite la nueva contraseña" required autocomplete="new-password" />
-                        </div>
+                <div>
+                    <Label for="new-password">Nueva contraseña</Label>
+                    <Input id="new-password" type="password" v-model="newPassword"
+                        placeholder="Mínimo 6 caracteres" required autocomplete="new-password" />
+                </div>
 
-                        <Button type="submit" :disabled="loading" class="w-full rounded-full">
-                            {{ loading ? 'Guardando...' : 'Guardar nueva contraseña' }}
-                        </Button>
-                    </form>
-                </CardContent>
-            </Card>
+                <div>
+                    <Label for="confirm-password">Confirmar contraseña</Label>
+                    <Input id="confirm-password" type="password" v-model="confirmPassword"
+                        placeholder="Repite la nueva contraseña" required autocomplete="new-password" />
+                </div>
+
+                <Button type="submit" :disabled="loading" size="lg" class="w-full group">
+                    {{ loading ? 'Guardando…' : 'Guardar nueva contraseña' }}
+                    <span v-if="!loading" class="transition-transform group-hover:translate-x-1">&rarr;</span>
+                </Button>
+            </form>
 
         </div>
     </div>

@@ -2,7 +2,6 @@
 import { ref, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { authService } from '@/services/authService'
-import { Card, CardContent } from '@/components/ui/card'
 import { Input }  from '@/components/ui/input'
 import { Label }  from '@/components/ui/label'
 import { Button } from '@/components/ui/button'
@@ -47,59 +46,61 @@ const handleSubmit = async () => {
 </script>
 
 <template>
-    <div class="min-h-screen flex items-center justify-center bg-background px-4 py-12">
-        <div class="max-w-md w-full">
+    <div class="min-h-screen flex items-center justify-center bg-background px-6 py-12">
+        <div class="w-full max-w-[26rem]">
 
-            <div class="text-center mb-10">
-                <router-link to="/" class="inline-block mb-6 transition-transform hover:scale-105">
-                    <img src="/icon.ico" alt="Artec" class="w-14 h-14 rounded-2xl shadow-[0_4px_20px_rgba(37,99,235,0.25)] object-contain" />
-                </router-link>
-                <h2 class="text-3xl font-extrabold text-foreground tracking-tight mb-2">Nueva contraseña</h2>
-                <p class="text-muted-foreground">Elige una contraseña segura para tu cuenta</p>
+            <!-- Masthead, like the head of a catalogue entry -->
+            <header class="reveal" style="animation-delay: 40ms">
+                <h1 class="font-display text-5xl font-medium tracking-tight leading-[0.95] mb-3">
+                    Nueva contraseña
+                </h1>
+                <p class="text-muted-foreground text-[0.95rem] leading-relaxed">
+                    Elige una contraseña segura para tu cuenta.
+                </p>
+            </header>
+
+            <hr class="hairline my-8 reveal" style="animation-delay: 120ms" />
+
+            <!-- Success -->
+            <div v-if="success" class="space-y-3 reveal" style="animation-delay: 200ms">
+                <p class="eyebrow text-primary">Listo</p>
+                <p class="text-foreground font-medium">¡Contraseña actualizada!</p>
+                <p class="text-sm text-muted-foreground">Redirigiendo al inicio de sesión…</p>
             </div>
 
-            <Card class="px-8 py-10 rounded-3xl shadow-[0_8px_30px_rgba(0,0,0,0.04)]">
-                <CardContent class="p-0">
+            <!-- Invalid token (no token in URL) -->
+            <div v-else-if="!token" class="space-y-7 reveal" style="animation-delay: 200ms">
+                <div class="space-y-3">
+                    <p class="eyebrow text-destructive">Enlace inválido</p>
+                    <p class="text-foreground leading-relaxed">{{ error }}</p>
+                </div>
+                <router-link to="/forgot-password">
+                    <Button size="lg" class="w-full">Solicitar nuevo enlace</Button>
+                </router-link>
+            </div>
 
-                    <!-- Success -->
-                    <div v-if="success" class="text-center space-y-4">
-                        <div class="text-5xl">✅</div>
-                        <p class="font-semibold text-foreground">¡Contraseña actualizada!</p>
-                        <p class="text-sm text-muted-foreground">Redirigiendo al inicio de sesión…</p>
-                    </div>
+            <!-- Form -->
+            <form v-else @submit.prevent="handleSubmit" class="space-y-7 reveal" style="animation-delay: 200ms">
+                <Alert v-if="error" variant="destructive">{{ error }}</Alert>
 
-                    <!-- Invalid token (no token in URL) -->
-                    <div v-else-if="!token" class="text-center space-y-4">
-                        <div class="text-5xl">⛔</div>
-                        <p class="font-semibold text-foreground">Enlace inválido</p>
-                        <router-link to="/forgot-password">
-                            <Button class="w-full rounded-full mt-2">Solicitar nuevo enlace</Button>
-                        </router-link>
-                    </div>
+                <div>
+                    <Label for="newpwd">Nueva contraseña</Label>
+                    <Input id="newpwd" type="password" v-model="newPassword"
+                        placeholder="Mínimo 6 caracteres" autocomplete="new-password" autofocus />
+                </div>
 
-                    <!-- Form -->
-                    <form v-else @submit.prevent="handleSubmit" class="space-y-6">
-                        <Alert v-if="error" variant="destructive">{{ error }}</Alert>
+                <div>
+                    <Label for="confirmpwd">Confirmar contraseña</Label>
+                    <Input id="confirmpwd" type="password" v-model="confirm"
+                        placeholder="Repite la contraseña" autocomplete="new-password" />
+                </div>
 
-                        <div>
-                            <Label for="newpwd">Nueva contraseña</Label>
-                            <Input id="newpwd" type="password" v-model="newPassword"
-                                placeholder="Mínimo 6 caracteres" autocomplete="new-password" autofocus />
-                        </div>
+                <Button type="submit" :disabled="loading" size="lg" class="w-full group">
+                    {{ loading ? 'Guardando…' : 'Guardar contraseña' }}
+                    <span v-if="!loading" class="transition-transform group-hover:translate-x-1">&rarr;</span>
+                </Button>
+            </form>
 
-                        <div>
-                            <Label for="confirmpwd">Confirmar contraseña</Label>
-                            <Input id="confirmpwd" type="password" v-model="confirm"
-                                placeholder="Repite la contraseña" autocomplete="new-password" />
-                        </div>
-
-                        <Button type="submit" :disabled="loading" class="w-full rounded-full">
-                            {{ loading ? 'Guardando...' : 'Guardar contraseña' }}
-                        </Button>
-                    </form>
-
-                </CardContent>
-            </Card>
         </div>
     </div>
 </template>

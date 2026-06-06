@@ -370,7 +370,7 @@ onUnmounted(() => {
     <div class="px-4 py-8 max-w-7xl mx-auto min-h-[calc(100vh-4rem)] relative">
         <div class="flex justify-between items-center mb-6">
             <div>
-                <h1 class="text-3xl font-bold tracking-tight text-foreground">Panel de Control</h1>
+                <h1 class="font-display text-3xl font-medium tracking-tight text-foreground">Panel de Control</h1>
                 <p class="text-muted-foreground mt-1">Gestión administrativa de Artec Robotics.</p>
             </div>
             <Button @click="refreshCurrentTab" variant="secondary" size="icon" class="rounded-full"
@@ -415,7 +415,7 @@ onUnmounted(() => {
         <!-- TAB: ROBOTS -->
         <div v-show="activeTab === 'robots'">
             <div class="flex justify-between items-center mb-6">
-                <h2 class="text-xl font-bold">Gestión de Robots</h2>
+                <h2 class="font-display text-xl font-medium tracking-tight">Gestión de Robots</h2>
                 <Button v-if="isPlatformAdmin" @click="openRobotModal" class="flex gap-2 items-center">
                     <Plus class="w-4 h-4" /> Crear Robot
                 </Button>
@@ -424,20 +424,20 @@ onUnmounted(() => {
                 <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
             </div>
             <Alert v-else-if="errorRobots" variant="destructive" class="p-6 mb-6">
-                <h3 class="font-bold">Error de Conexión</h3>
+                <h3 class="font-semibold">Error de Conexión</h3>
                 <p>{{ errorRobots }}</p>
             </Alert>
             <div v-else-if="robots.length === 0"
-                class="flex flex-col items-center justify-center p-12 text-muted-foreground border border-dashed border-border rounded-xl">
+                class="flex flex-col items-center justify-center p-12 text-muted-foreground border border-dashed border-border rounded-md">
                 <p>No se encontraron robots asignados a tu perfil.</p>
             </div>
             <div v-else class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 <!-- Robots Card Loop -->
                 <Card v-for="robot in robots" :key="robot.id"
-                    class="p-6 hover:shadow-md transition-shadow relative overflow-hidden group">
+                    class="p-6 hover:border-primary/40 transition-colors relative overflow-hidden group">
                     <div class="flex justify-between items-start mb-4">
                         <div>
-                            <h2 class="text-xl font-bold text-foreground">{{ robot.name }}</h2>
+                            <h2 class="font-display text-xl font-medium tracking-tight text-foreground">{{ robot.name }}</h2>
                             <span class="text-xs text-muted-foreground uppercase tracking-wider">{{ robot.id }}</span>
                         </div>
                         <div class="flex items-center gap-2">
@@ -469,7 +469,7 @@ onUnmounted(() => {
                             <span class="text-muted-foreground flex items-center gap-1">
                                 <MapPin class="w-4 h-4" /> Posición
                             </span>
-                            <span v-if="robot.connected" class="font-mono bg-secondary px-2 py-0.5 rounded text-xs text-secondary-foreground">
+                            <span v-if="robot.connected" class="font-mono bg-secondary px-2 py-0.5 rounded-sm text-xs text-secondary-foreground">
                                 x:{{ (robot.position?.x || 0).toFixed(1) }}, y:{{ (robot.position?.y || 0).toFixed(1) }}
                             </span>
                             <span v-else class="text-xs text-muted-foreground italic">Sin Telemetría</span>
@@ -478,7 +478,7 @@ onUnmounted(() => {
                             <span class="text-muted-foreground flex items-center gap-1">
                                 <Navigation class="w-4 h-4" /> Ubicación
                             </span>
-                            <span class="bg-primary/10 text-primary px-2 py-0.5 rounded text-xs font-semibold">
+                            <span class="bg-primary/10 text-primary px-2 py-0.5 rounded-sm text-xs font-semibold">
                                 {{ robot.current_location.name }}
                             </span>
                         </div>
@@ -487,7 +487,7 @@ onUnmounted(() => {
                                 <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-4 h-4"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg> Ocupación
                             </span>
                             <div v-if="robot.is_occupied" class="flex items-center gap-2">
-                                <span class="bg-primary/10 text-primary px-2 py-0.5 rounded text-xs font-semibold">
+                                <span class="bg-primary/10 text-primary px-2 py-0.5 rounded-sm text-xs font-semibold">
                                     Por: {{ robot.visitor_name }}
                                 </span>
                                 <Button @click="handleEndVisit(robot.id)" variant="destructive" size="icon" class="h-6 w-6 scale-90" title="Finalizar Visita Forzosamente">
@@ -504,7 +504,7 @@ onUnmounted(() => {
                                 WS: {{ robot.ip || '127.0.0.1' }}
                             </span>
                             <div class="flex items-center gap-1">
-                                <span :class="robot.connected ? 'text-green-500 bg-green-500/10' : 'text-red-500 bg-red-500/10'" class="px-2 py-0.5 rounded text-xs font-semibold">
+                                <span :class="robot.connected ? 'text-green-700 dark:text-green-400 bg-green-500/10' : 'text-red-700 dark:text-red-400 bg-red-500/10'" class="px-2 py-0.5 rounded-sm text-xs font-semibold">
                                     {{ robot.connected ? 'Conectado' : 'Desconectado' }}
                                 </span>
                                 <Button v-if="isPlatformAdmin" @click="openEditRobotModal(robot)" variant="ghost" size="icon" class="h-6 w-6 ml-1">
@@ -527,14 +527,16 @@ onUnmounted(() => {
                         <p v-if="commandError && commandError.id === robot.id" class="text-xs text-destructive">
                             {{ commandError.message }}
                         </p>
-                    </div>                      <div class="mt-4 pt-4 border-t border-border flex flex-col gap-2">
+                    </div>
+                    <div class="mt-4 pt-4 border-t border-border flex flex-col gap-2">
                         <div class="mt-2 text-center">
                             <img v-if="qrCodes[robot.id]" :src="qrCodes[robot.id]" alt="QR Code" class="w-24 h-24 mx-auto" />
                             <div v-else class="w-24 h-24 mx-auto flex items-center justify-center text-xs text-muted-foreground">Generando QR…</div>
                             <Button v-if="qrCodes[robot.id]" as="a" :href="qrCodes[robot.id]" :download="`qr-${robot.name || robot.id}.png`" size="sm" class="mt-2"
                             >Descargar</Button>
-                            <Button @click="window.open(buildVisitUrl(robot.id), '_blank')" variant="outline" size="sm" class="mt-2"
-                            >Test</Button>
+                            -
+                            <Button as="a" :href="buildVisitUrl(robot.id)" target="_blank" variant="outline" size="sm" class="mt-2"
+                            >Chat</Button>
                         </div>
                       </div>
                 </Card>
@@ -546,7 +548,7 @@ onUnmounted(() => {
             <!-- Header -->
             <div class="flex justify-between items-center mb-6">
                 <div>
-                    <h2 class="text-xl font-bold text-foreground">Gestión de Personal</h2>
+                    <h2 class="font-display text-xl font-medium tracking-tight text-foreground">Gestión de Personal</h2>
                     <p class="text-sm text-muted-foreground mt-0.5">
                         {{ staff.length }} miembro{{ staff.length !== 1 ? 's' : '' }} registrado{{ staff.length !== 1 ? 's' : '' }}
                     </p>
@@ -563,27 +565,27 @@ onUnmounted(() => {
                     <Input v-model="staffSearch" placeholder="Buscar por nombre o email…" class="pl-9" />
                 </div>
                 <select v-model="staffRoleFilter"
-                    class="flex h-10 rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                    class="h-10 rounded-sm border border-input bg-background px-3 text-sm text-foreground focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none">
                     <option value="all">Todos los roles</option>
                     <option value="museum_admin">Administrador</option>
                     <option value="technician">Técnico</option>
                 </select>
                 <select v-model="staffStatusFilter"
-                    class="flex h-10 rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                    class="h-10 rounded-sm border border-input bg-background px-3 text-sm text-foreground focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none">
                     <option value="all">Todos los estados</option>
                     <option value="active">Activo</option>
                     <option value="pending">Pendiente</option>
                     <option value="inactive">Inactivo</option>
                 </select>
                 <select v-if="isPlatformAdmin" v-model="staffMuseumFilter"
-                    class="flex h-10 rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                    class="h-10 rounded-sm border border-input bg-background px-3 text-sm text-foreground focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none">
                     <option value="all">Todos los museos</option>
                     <option v-for="m in museums" :key="m.id" :value="m.id">{{ m.name }}</option>
                 </select>
             </div>
 
             <!-- Table -->
-            <div class="border border-border rounded-xl overflow-hidden bg-card">
+            <div class="border border-border rounded-md overflow-hidden bg-card">
                 <div v-if="loadingStaff" class="flex justify-center items-center h-32">
                     <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
                 </div>
@@ -692,7 +694,7 @@ onUnmounted(() => {
         <!-- TAB: MUSEUMS -->
         <div v-show="activeTab === 'museums'">
             <div class="flex justify-between items-center mb-6">
-                <h2 class="text-xl font-semibold text-foreground">Museos Integrados</h2>
+                <h2 class="font-display text-xl font-medium tracking-tight text-foreground">Museos Integrados</h2>
                 <Button @click="openMuseumModal" class="gap-2">
                     <Plus class="w-4 h-4" /> Añadir Museo
                 </Button>
@@ -700,16 +702,16 @@ onUnmounted(() => {
 
             <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 <div v-if="museums.length === 0"
-                    class="col-span-full p-12 text-center border dashed border-border rounded-xl text-muted-foreground">
+                    class="col-span-full p-12 text-center border border-dashed border-border rounded-md text-muted-foreground">
                     No hay museos registrados actualmente en el sistema.
                 </div>
                 <Card v-for="museum in museums" :key="museum.id" class="p-6">
                     <div class="flex items-center gap-4 mb-4">
-                        <div class="w-12 h-12 bg-primary/10 rounded-xl flex items-center justify-center text-primary">
+                        <div class="w-12 h-12 bg-primary/10 rounded-sm flex items-center justify-center text-primary">
                             <Building2 class="w-6 h-6" />
                         </div>
                         <div>
-                            <h3 class="font-bold text-lg text-foreground leading-tight">{{ museum.name }}</h3>
+                            <h3 class="font-display text-lg font-medium tracking-tight text-foreground leading-tight">{{ museum.name }}</h3>
                             <p class="text-sm text-muted-foreground">{{ museum.company }}</p>
                         </div>
                     </div>
@@ -730,7 +732,7 @@ onUnmounted(() => {
         <!-- TAB: STATS -->
         <div v-show="activeTab === 'stats'">
             <div class="flex justify-between items-center mb-6">
-                <h2 class="text-xl font-semibold text-foreground">Estadísticas del Sistema</h2>
+                <h2 class="font-display text-xl font-medium tracking-tight text-foreground">Estadísticas del Sistema</h2>
                 <Button @click="fetchStats" variant="outline" size="sm" class="gap-2">
                     <RefreshCw class="w-4 h-4" /> Recargar
                 </Button>
@@ -743,7 +745,7 @@ onUnmounted(() => {
                         <Building2 class="w-4 h-4 text-muted-foreground" />
                     </CardHeader>
                     <CardContent>
-                        <div class="text-2xl font-bold">{{ stats.totalMuseums || 0 }}</div>
+                        <div class="font-display text-2xl font-medium">{{ stats.totalMuseums || 0 }}</div>
                         <p class="text-xs text-muted-foreground mt-1">Activos en la plataforma</p>
                     </CardContent>
                 </Card>
@@ -754,9 +756,9 @@ onUnmounted(() => {
                         <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-4 h-4 text-muted-foreground"><path d="M12 8V4H8"/><rect width="16" height="12" x="4" y="8" rx="2"/><path d="M2 14h2"/><path d="M20 14h2"/><path d="M15 13v2"/><path d="M9 13v2"/></svg>
                     </CardHeader>
                     <CardContent>
-                        <div class="text-2xl font-bold">{{ stats.totalRobots || 0 }}</div>
+                        <div class="font-display text-2xl font-medium">{{ stats.totalRobots || 0 }}</div>
                         <p class="text-xs text-muted-foreground mt-1">
-                            <span class="text-green-500 font-medium">{{ stats.activeRobots || 0 }} en operación</span>
+                            <span class="text-green-600 dark:text-green-400 font-medium">{{ stats.activeRobots || 0 }} en operación</span>
                         </p>
                     </CardContent>
                 </Card>
@@ -767,7 +769,7 @@ onUnmounted(() => {
                         <Users class="w-4 h-4 text-muted-foreground" />
                     </CardHeader>
                     <CardContent>
-                        <div class="text-2xl font-bold">{{ stats.totalVisitors || 0 }}</div>
+                        <div class="font-display text-2xl font-medium">{{ stats.totalVisitors || 0 }}</div>
                         <p class="text-xs text-muted-foreground mt-1">Interacciones registradas</p>
                     </CardContent>
                 </Card>
@@ -778,16 +780,16 @@ onUnmounted(() => {
                         <Clock class="w-4 h-4 text-muted-foreground" />
                     </CardHeader>
                     <CardContent>
-                        <div class="text-2xl font-bold">{{ stats.avgSessionTime > 0 ? stats.avgSessionTime + ' min' : '0 min' }}</div>
+                        <div class="font-display text-2xl font-medium">{{ stats.avgSessionTime > 0 ? stats.avgSessionTime + ' min' : '0 min' }}</div>
                         <p class="text-xs text-muted-foreground mt-1">Duración de visita x interacción</p>
                     </CardContent>
                 </Card>
             </div>
             
             <div class="mt-8">
-                <Card class="border shadow-none">
+                <Card>
                     <CardHeader>
-                        <h3 class="text-lg font-semibold">Resumen Rápido</h3>
+                        <h3 class="font-display text-lg font-medium tracking-tight">Resumen Rápido</h3>
                     </CardHeader>
                     <CardContent>
                         <p class="text-muted-foreground text-sm">
@@ -805,13 +807,13 @@ onUnmounted(() => {
         <!-- EDIT ROBOT MODAL -->
         <div v-if="showEditRobotModal"
             class="fixed inset-0 bg-background/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-            <Card class="w-full max-w-md shadow-2xl relative border-border animate-in fade-in zoom-in duration-200">
+            <Card class="w-full max-w-md relative">
                 <button @click="showEditRobotModal = false"
                     class="absolute top-4 right-4 text-muted-foreground hover:text-foreground">
                     <X class="w-5 h-5" />
                 </button>
                 <div class="p-6">
-                    <h2 class="text-2xl font-bold mb-6 flex items-center gap-2">
+                    <h2 class="font-display text-2xl font-medium tracking-tight mb-6 flex items-center gap-2">
                         <Settings class="w-6 h-6 text-primary" /> Editar Robot
                     </h2>
                     <form @submit.prevent="handleEditRobot" class="space-y-4">
@@ -826,7 +828,7 @@ onUnmounted(() => {
                         <Alert v-if="robotError" variant="destructive">
                             {{ robotError }}
                         </Alert>
-                        <Alert v-if="robotSuccess" class="border-green-500/50 text-green-600 bg-green-500/10">
+                        <Alert v-if="robotSuccess" variant="success">
                             {{ robotSuccess }}
                         </Alert>
                         <Button type="submit" class="w-full" :disabled="!robotForm.name || !robotForm.ip">Guardar Cambios</Button>
@@ -838,13 +840,13 @@ onUnmounted(() => {
         <!-- STAFF CREATE MODAL -->
         <div v-if="showStaffModal"
             class="fixed inset-0 bg-background/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-            <Card class="w-full max-w-md shadow-2xl relative border-border animate-in fade-in zoom-in duration-200">
+            <Card class="w-full max-w-md relative">
                 <button @click="showStaffModal = false"
                     class="absolute top-4 right-4 text-muted-foreground hover:text-foreground">
                     <X class="w-5 h-5" />
                 </button>
                 <div class="p-6">
-                    <h2 class="text-xl font-bold mb-1 flex items-center gap-2">
+                    <h2 class="font-display text-xl font-medium tracking-tight mb-1 flex items-center gap-2">
                         <Users class="w-5 h-5 text-primary" /> Añadir Personal
                     </h2>
                     <p class="text-sm text-muted-foreground mb-6">La cuenta quedará pendiente hasta el primer inicio de sesión.</p>
@@ -861,7 +863,7 @@ onUnmounted(() => {
                             <div class="space-y-2">
                                 <Label for="staff_role">Rol</Label>
                                 <select id="staff_role" v-model="staffForm.role"
-                                    class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                                    class="h-10 w-full rounded-sm border border-input bg-background px-3 text-sm text-foreground focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none">
                                     <option v-if="isPlatformAdmin" value="museum_admin">Administrador</option>
                                     <option value="technician">Técnico</option>
                                 </select>
@@ -869,17 +871,17 @@ onUnmounted(() => {
                             <div class="space-y-2" v-if="isPlatformAdmin">
                                 <Label for="staff_museum">Museo</Label>
                                 <select id="staff_museum" v-model="staffForm.museum_id" required
-                                    class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                                    class="h-10 w-full rounded-sm border border-input bg-background px-3 text-sm text-foreground focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none">
                                     <option value="" disabled>Seleccionar…</option>
                                     <option v-for="m in museums" :key="m.id" :value="m.id">{{ m.name }}</option>
                                 </select>
                             </div>
                         </div>
-                        <div class="bg-secondary/50 p-3 rounded-lg text-sm text-muted-foreground border border-border">
+                        <div class="bg-secondary/50 p-3 rounded-sm text-sm text-muted-foreground border border-border">
                             Se enviará un correo a <strong>{{ staffForm.email || '…' }}</strong> con credenciales temporales.
                         </div>
                         <Alert v-if="staffError" variant="destructive"><p>{{ staffError }}</p></Alert>
-                        <Alert v-if="staffSuccess" class="bg-green-500/10 text-green-600 border-green-500/20"><p>{{ staffSuccess }}</p></Alert>
+                        <Alert v-if="staffSuccess" variant="success"><p>{{ staffSuccess }}</p></Alert>
                         <Button type="submit" class="w-full"
                             :disabled="!staffForm.name || !staffForm.email || !staffForm.role || (isPlatformAdmin && !staffForm.museum_id)">
                             Enviar Invitación
@@ -892,13 +894,13 @@ onUnmounted(() => {
         <!-- STAFF EDIT MODAL -->
         <div v-if="showEditStaffModal"
             class="fixed inset-0 bg-background/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-            <Card class="w-full max-w-md shadow-2xl relative border-border animate-in fade-in zoom-in duration-200">
+            <Card class="w-full max-w-md relative">
                 <button @click="showEditStaffModal = false"
                     class="absolute top-4 right-4 text-muted-foreground hover:text-foreground">
                     <X class="w-5 h-5" />
                 </button>
                 <div class="p-6">
-                    <h2 class="text-xl font-bold mb-6 flex items-center gap-2">
+                    <h2 class="font-display text-xl font-medium tracking-tight mb-6 flex items-center gap-2">
                         <Pencil class="w-5 h-5 text-primary" /> Editar Usuario
                     </h2>
                     <form @submit.prevent="handleEditStaff" class="space-y-4">
@@ -913,13 +915,13 @@ onUnmounted(() => {
                         <div class="space-y-2">
                             <Label for="edit_staff_role">Rol</Label>
                             <select id="edit_staff_role" v-model="editStaffForm.role"
-                                class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                                class="h-10 w-full rounded-sm border border-input bg-background px-3 text-sm text-foreground focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none">
                                 <option v-if="isPlatformAdmin" value="museum_admin">Administrador</option>
                                 <option value="technician">Técnico</option>
                             </select>
                         </div>
                         <Alert v-if="staffError" variant="destructive"><p>{{ staffError }}</p></Alert>
-                        <Alert v-if="staffSuccess" class="bg-green-500/10 text-green-600 border-green-500/20"><p>{{ staffSuccess }}</p></Alert>
+                        <Alert v-if="staffSuccess" variant="success"><p>{{ staffSuccess }}</p></Alert>
                         <Button type="submit" class="w-full" :disabled="!editStaffForm.name || !editStaffForm.email">Guardar Cambios</Button>
                     </form>
                 </div>
@@ -929,14 +931,14 @@ onUnmounted(() => {
         <!-- STAFF DELETE CONFIRM MODAL -->
         <div v-if="showDeleteStaffModal"
             class="fixed inset-0 bg-background/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-            <Card class="w-full max-w-sm shadow-2xl border-border animate-in fade-in zoom-in duration-200">
+            <Card class="w-full max-w-sm">
                 <div class="p-6">
                     <div class="flex items-center gap-3 mb-4">
                         <div class="w-10 h-10 rounded-full bg-destructive/10 flex items-center justify-center flex-shrink-0">
                             <ShieldAlert class="w-5 h-5 text-destructive" />
                         </div>
                         <div>
-                            <h2 class="font-bold text-foreground">Eliminar cuenta</h2>
+                            <h2 class="font-display font-medium tracking-tight text-foreground">Eliminar cuenta</h2>
                             <p class="text-sm text-muted-foreground">Esta acción no se puede deshacer</p>
                         </div>
                     </div>
@@ -955,13 +957,13 @@ onUnmounted(() => {
         <!-- ROBOT MODAL -->
         <div v-if="showRobotModal"
             class="fixed inset-0 bg-background/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-            <Card class="w-full max-w-md shadow-2xl relative border-border animate-in fade-in zoom-in duration-200">
+            <Card class="w-full max-w-md relative">
                 <button @click="showRobotModal = false"
                     class="absolute top-4 right-4 text-muted-foreground hover:text-foreground">
                     <X class="w-5 h-5" />
                 </button>
                 <div class="p-6">
-                    <h2 class="text-2xl font-bold mb-6 flex items-center gap-2">
+                    <h2 class="font-display text-2xl font-medium tracking-tight mb-6 flex items-center gap-2">
                         <Plus class="w-6 h-6 text-primary" /> Crear Robot
                     </h2>
                     <form @submit.prevent="handleCreateRobot" class="space-y-4">
@@ -973,7 +975,7 @@ onUnmounted(() => {
                         <div class="space-y-2">
                             <Label for="robot_museum">Museo Asignado</Label>
                             <select id="robot_museum" v-model="robotForm.museum_id" required
-                                class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50">
+                                class="h-10 w-full rounded-sm border border-input bg-background px-3 text-sm text-foreground focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none">
                                 <option value="" disabled selected>Selecciona un museo</option>
                                 <option v-for="m in museums" :key="m.id" :value="m.id">
                                     {{ m.name }}
@@ -983,8 +985,7 @@ onUnmounted(() => {
                         <Alert v-if="robotError" variant="destructive">
                             {{ robotError }}
                         </Alert>
-                        <Alert v-if="robotSuccess"
-                            class="border-green-500/50 text-green-600 bg-green-500/10">
+                        <Alert v-if="robotSuccess" variant="success">
                             {{ robotSuccess }}
                         </Alert>
                         <Button type="submit" class="w-full" :disabled="!robotForm.name || !robotForm.museum_id">Registrar Robot</Button>
@@ -996,13 +997,13 @@ onUnmounted(() => {
         <!-- MUSEUM MODAL -->
         <div v-if="showMuseumModal"
             class="fixed inset-0 bg-background/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-            <Card class="w-full max-w-md shadow-2xl relative border-border animate-in fade-in zoom-in duration-200">
+            <Card class="w-full max-w-md relative">
                 <button @click="showMuseumModal = false"
                     class="absolute top-4 right-4 text-muted-foreground hover:text-foreground">
                     <X class="w-5 h-5" />
                 </button>
                 <div class="p-6">
-                    <h2 class="text-2xl font-bold mb-6 flex items-center gap-2">
+                    <h2 class="font-display text-2xl font-medium tracking-tight mb-6 flex items-center gap-2">
                         <Building2 class="w-6 h-6 text-primary" /> Registrar Museo
                     </h2>
                     <form @submit.prevent="handleCreateMuseum" class="space-y-4">
@@ -1019,8 +1020,7 @@ onUnmounted(() => {
                         <Alert v-if="museumError" variant="destructive" class="mb-4">
                             <p>{{ museumError }}</p>
                         </Alert>
-                        <Alert v-if="museumSuccess" variant="success"
-                            class="mb-4 bg-green-500/10 text-green-600 border-green-500/20">
+                        <Alert v-if="museumSuccess" variant="success" class="mb-4">
                             <p>{{ museumSuccess }}</p>
                         </Alert>
 

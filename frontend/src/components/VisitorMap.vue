@@ -2,28 +2,17 @@
 import { ref, onMounted, onUnmounted, nextTick } from 'vue'
 import { chatService } from '@/services/chatService'
 import { Navigation, Loader2, X } from 'lucide-vue-next'
+import { categoryColor, categoryLabel } from '@/lib/mapCategories'
 
 const emit = defineEmits(['navigated'])
 
 const API_ROOT = (import.meta.env.VITE_API_URL || '').replace('/api', '')
 
-const CATEGORY_COLORS = {
-    exhibit:  '#3b82f6',
-    obra:     '#f59e0b',
-    entrance: '#22c55e',
-    exit:     '#ef4444',
-    restroom: '#8b5cf6',
-    other:    '#6b7280',
-}
-
-const CATEGORY_LABELS = {
-    exhibit:  'Exhibición',
-    obra:     'Obra',
-    entrance: 'Entrada',
-    exit:     'Salida',
-    restroom: 'Baños',
-    other:    'Otro',
-}
+// Brand terracotta accent for the live robot marker — mirrors the dark-theme
+// value of --color-primary. Canvas fillStyle/shadowColor need a literal color
+// (CSS custom properties aren't resolved in the 2D context), and the map
+// canvas is always a dark surface regardless of the site theme.
+const ROBOT_COLOR = '#D9743E'
 
 const canvasRef    = ref(null)
 const containerRef = ref(null)
@@ -102,7 +91,7 @@ function draw() {
         if (zone.map_x == null || zone.map_y == null) continue
         const { x, y }  = worldToPixel(zone.map_x, zone.map_y)
         const isSelected = selectedZone.value?.id === zone.id
-        const color      = CATEGORY_COLORS[zone.category] || CATEGORY_COLORS.other
+        const color      = categoryColor(zone.category)
         const r          = isSelected ? 12 : 9
 
         // Glow ring
@@ -154,7 +143,7 @@ function draw() {
         ctx.rotate(angle)
 
         // Shadow/glow
-        ctx.shadowColor   = 'rgba(0,122,255,0.6)'
+        ctx.shadowColor   = ROBOT_COLOR + '99'
         ctx.shadowBlur    = 8 / scale.value
 
         // Teardrop navigation arrow pointing up (rotated to match angle)
@@ -171,7 +160,7 @@ function draw() {
         ctx.lineTo(-bx,  by)            // bottom-left
         ctx.closePath()
 
-        ctx.fillStyle = '#007aff'
+        ctx.fillStyle = ROBOT_COLOR
         ctx.fill()
 
         ctx.shadowBlur  = 0
@@ -361,8 +350,8 @@ onUnmounted(() => {
 
         <!-- Loading -->
         <div v-if="loading" class="flex-1 flex flex-col items-center justify-center gap-3">
-            <Loader2 class="w-8 h-8 animate-spin text-blue-400" />
-            <p class="text-sm text-gray-400">Cargando mapa...</p>
+            <Loader2 class="w-8 h-8 animate-spin text-primary" />
+            <p class="text-sm text-white/50">Cargando mapa...</p>
         </div>
 
         <!-- Error -->
@@ -371,7 +360,7 @@ onUnmounted(() => {
                 <X class="w-7 h-7 text-red-400" />
             </div>
             <p class="text-white font-semibold">Sin mapa disponible</p>
-            <p class="text-sm text-gray-400">{{ error }}</p>
+            <p class="text-sm text-white/50">{{ error }}</p>
         </div>
 
         <!-- Map canvas -->
@@ -399,42 +388,42 @@ onUnmounted(() => {
             <!-- No zones message -->
             <div v-if="zones.length === 0"
                 class="absolute inset-0 flex items-center justify-center pointer-events-none">
-                <p class="text-gray-500 text-sm">Este mapa no tiene zonas configuradas.</p>
+                <p class="text-white/40 text-sm">Este mapa no tiene zonas configuradas.</p>
             </div>
         </div>
 
         <!-- Zone bottom sheet -->
         <Transition name="sheet">
             <div v-if="selectedZone"
-                class="flex-shrink-0 bg-white dark:bg-[#1c1c1e] rounded-t-3xl px-5 pt-4 pb-6 shadow-2xl border-t border-black/10 dark:border-white/10">
+                class="flex-shrink-0 bg-card rounded-t-3xl px-5 pt-4 pb-6 shadow-2xl border-t border-foreground/10">
 
                 <!-- Handle -->
-                <div class="w-10 h-1 bg-gray-300 dark:bg-gray-600 rounded-full mx-auto mb-4" />
+                <div class="w-10 h-1 bg-foreground/20 rounded-full mx-auto mb-4" />
 
                 <!-- Zone info -->
                 <div class="flex items-start justify-between mb-2">
-                    <h3 class="text-lg font-bold text-black dark:text-white leading-tight pr-3">
+                    <h3 class="font-display text-lg font-medium tracking-tight text-foreground leading-tight pr-3">
                         {{ selectedZone.name }}
                     </h3>
                     <span class="flex-shrink-0 text-xs font-semibold px-2.5 py-1 rounded-full text-white"
-                        :style="{ backgroundColor: CATEGORY_COLORS[selectedZone.category] || CATEGORY_COLORS.other }">
-                        {{ CATEGORY_LABELS[selectedZone.category] || 'Zona' }}
+                        :style="{ backgroundColor: categoryColor(selectedZone.category) }">
+                        {{ categoryLabel(selectedZone.category) }}
                     </span>
                 </div>
 
-                <p class="text-sm text-gray-500 dark:text-gray-400 mb-4 leading-relaxed min-h-[1.25rem]">
+                <p class="text-sm text-muted-foreground mb-4 leading-relaxed min-h-[1.25rem]">
                     {{ selectedZone.description || 'Sin descripción.' }}
                 </p>
 
                 <!-- Navigation error -->
-                <p v-if="navError" class="text-xs text-red-500 mb-3 text-center">{{ navError }}</p>
+                <p v-if="navError" class="text-xs text-destructive mb-3 text-center">{{ navError }}</p>
 
                 <!-- Actions -->
                 <div class="flex gap-2.5">
                     <button
                         @click="navigateToZone"
                         :disabled="navigating"
-                        class="flex-1 flex items-center justify-center gap-2 bg-[#007aff] active:bg-[#0066d6] text-white text-[15px] font-semibold rounded-2xl py-3 transition-all active:scale-[0.97] disabled:opacity-60">
+                        class="flex-1 flex items-center justify-center gap-2 bg-primary active:bg-primary/80 text-primary-foreground text-[15px] font-semibold rounded-2xl py-3 transition-all active:scale-[0.97] disabled:opacity-60">
                         <Loader2 v-if="navigating" class="w-4 h-4 animate-spin" />
                         <Navigation v-else class="w-4 h-4" />
                         Ir aquí
@@ -442,7 +431,7 @@ onUnmounted(() => {
                     <button
                         @click="dismissZone"
                         :disabled="navigating"
-                        class="px-5 bg-gray-100 dark:bg-[#2c2c2e] text-gray-700 dark:text-gray-300 text-[15px] font-semibold rounded-2xl py-3 transition-all active:scale-[0.97] disabled:opacity-60">
+                        class="px-5 bg-muted text-foreground text-[15px] font-semibold rounded-2xl py-3 transition-all active:scale-[0.97] disabled:opacity-60">
                         Cancelar
                     </button>
                 </div>

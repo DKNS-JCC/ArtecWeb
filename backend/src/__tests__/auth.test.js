@@ -11,6 +11,16 @@ jest.mock('../utils/emailService', () => ({
     sendWelcomeEmail: jest.fn().mockResolvedValue(true)
 }));
 
+// Mock rosService so the visitor "robot must be online" pre-flight check
+// (see authController.createVisitor) passes without a real WebSocket/robot
+jest.mock('../services/rosService', () => ({
+    connect:            jest.fn(),
+    disconnect:         jest.fn(),
+    getConnectionState: jest.fn().mockReturnValue(true),
+    waitForConnection:  jest.fn().mockResolvedValue(true),
+    on:                 jest.fn(),
+}));
+
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 let museum, adminUser, superAdminUser, robot;

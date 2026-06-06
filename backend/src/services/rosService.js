@@ -192,6 +192,31 @@ class RosService extends EventEmitter {
             this._update(robotId, { position_x: px, position_y: py, position_theta: theta });
         });
 
+        // ── Nav2 goal status (/navigate_to_pose/_action/status)
+        //    Closes the loop opened by sendNavGoal()/sendRobotToBase(): once the
+        //    most recent goal reaches a terminal state, drop status back to 'idle'
+        //    so it doesn't stay stuck on 'navigating' forever.
+        robotState.topics.navStatus = new ROSLIB.Topic({
+            ros:         robotState.ros,
+            name:        '/navigate_to_pose/_action/status',
+            messageType: 'action_msgs/GoalStatusArray',
+        });
+        const TERMINAL_GOAL_STATUSES = [4, 5, 6]; // SUCCEEDED, CANCELED, ABORTED
+        robotState.topics.navStatus.subscribe((message) => {
+            const list = message.status_list || [];
+            const last = list[list.length - 1];
+            if (!last || !TERMINAL_GOAL_STATUSES.includes(last.status)) return;
+
+            const emitIdle = () => this.emit('robot:update', { robotId, fields: { status: 'idle' }, timestamp: Date.now() });
+            db.run(
+                `UPDATE robots SET status = 'idle', last_update = CURRENT_TIMESTAMP WHERE id = ? AND status = 'navigating'`,
+                [robotId],
+                function (err) {
+                    if (!err && this.changes > 0) emitIdle();
+                }
+            );
+        });
+
         // Scan and map are heavy — they are fetched on-demand via HTTP endpoints
         // (GET /robots/:id/scan and /robots/:id/map) only when the control panel
         // is open. No persistent subscriptions here.

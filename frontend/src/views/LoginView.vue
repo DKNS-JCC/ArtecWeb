@@ -6,7 +6,6 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Alert } from '@/components/ui/alert'
-import { Card, CardHeader, CardContent } from '@/components/ui/card'
 
 const router = useRouter()
 const authStore = useAuthStore()
@@ -44,50 +43,57 @@ const handleLogin = async () => {
 </script>
 
 <template>
-    <div class="min-h-screen flex items-center justify-center bg-background px-4 py-12">
-        <div class="max-w-md w-full">
+    <div class="min-h-screen flex items-center justify-center bg-background px-6 py-12">
+        <div class="w-full max-w-[26rem]">
 
-            <div class="text-center mb-10">
-                <router-link to="/" class="inline-block mb-6 transition-transform hover:scale-105">
-                    <img src="/icon.ico" alt="Artec"
-                        class="w-14 h-14 rounded-2xl shadow-[0_4px_20px_rgba(37,99,235,0.25)] object-contain" />
+            <!-- Masthead, like the head of a catalogue entry -->
+            <header class="reveal" style="animation-delay: 40ms">
+                <h1 class="font-display text-5xl font-medium tracking-tight leading-[0.95] mb-3">
+                    Inicio de sesión
+                </h1>
+                <p class="text-muted-foreground text-[0.95rem] leading-relaxed">
+                    
+                </p>
+            </header>
+
+            <hr class="hairline my-8 reveal" style="animation-delay: 120ms" />
+
+            <form @submit.prevent="handleLogin" class="space-y-7 reveal" style="animation-delay: 200ms">
+
+                <Alert v-if="errorMsg" variant="destructive">
+                    {{ errorMsg }}
+                </Alert>
+
+                <div>
+                    <Label for="identifier">
+                        <span class="text-primary mr-1.5"></span> Usuario o correo electrónico
+                    </Label>
+                    <Input id="identifier" type="text" v-model="identifier"
+                        placeholder="ejemplo@artec.es" required autocomplete="username" />
+                </div>
+
+                <div>
+                    <Label for="password">
+                        <span class="text-primary mr-1.5"></span> Contraseña
+                    </Label>
+                    <Input id="password" type="password" v-model="password" placeholder="••••••••••••" required
+                        autocomplete="current-password" />
+                </div>
+
+                <Button type="submit" :disabled="loading" size="lg" class="w-full group">
+                    {{ loading ? 'Entrando…' : 'Entrar' }}
+                    <span v-if="!loading" class="transition-transform group-hover:translate-x-1">&rarr;</span>
+                </Button>
+            </form>
+
+            <hr class="hairline my-8 reveal" style="animation-delay: 280ms" />
+
+            <p class="text-sm text-muted-foreground reveal" style="animation-delay: 320ms">
+                <router-link to="/forgot-password"
+                    class="text-foreground underline decoration-border decoration-1 underline-offset-4 hover:decoration-primary transition-colors">
+                    ¿Olvidaste tu contraseña?
                 </router-link>
-                <h2 class="text-3xl font-extrabold text-foreground tracking-tight mb-2">Acceder</h2>
-                <p class="text-muted-foreground">Inicia sesión en tu cuenta de Artec</p>
-            </div>
-
-            <Card class="px-8 py-10 rounded-3xl shadow-[0_8px_30px_rgba(0,0,0,0.04)]">
-                <CardContent class="p-0">
-                    <form @submit.prevent="handleLogin" class="space-y-6">
-
-                        <Alert v-if="errorMsg" variant="destructive">
-                            {{ errorMsg }}
-                        </Alert>
-
-                        <div>
-                            <Label for="identifier">Usuario o correo electrónico</Label>
-                            <Input id="identifier" type="text" v-model="identifier"
-                                placeholder="username o email@ejemplo.com" required autocomplete="username" />
-                        </div>
-
-                        <div>
-                            <Label for="password">Contraseña</Label>
-                            <Input id="password" type="password" v-model="password" placeholder="••••••••" required
-                                autocomplete="current-password" />
-                        </div>
-
-                        <Button type="submit" :disabled="loading" class="w-full rounded-full">
-                            {{ loading ? 'Entrando...' : 'Entrar' }}
-                        </Button>
-
-                        <p class="text-center text-sm text-muted-foreground">
-                            <router-link to="/forgot-password" class="text-primary hover:underline">
-                                ¿Olvidaste tu contraseña?
-                            </router-link>
-                        </p>
-                    </form>
-                </CardContent>
-            </Card>
+            </p>
 
         </div>
     </div>

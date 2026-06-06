@@ -1,14 +1,16 @@
 <script setup>
 import { ref, onMounted, onUnmounted } from 'vue';
-import { useRouter } from 'vue-router';
-import { useAuthStore } from '@/stores/auth';
-import { Button } from '@/components/ui/button';
-
-const router = useRouter();
-const authStore = useAuthStore();
+import { MapPin, MessageCircle, Users, ArrowRight, ChevronDown } from 'lucide-vue-next';
 
 const videoRef = ref(null);
 const containerRef = ref(null);
+
+const BENEFITS = [
+    { icon: MapPin, title: 'No te pierdas', desc: 'Llega a todas las exposiciones y zonas de interés de manera directa, sin mirar mapas complicados.' },
+    { icon: MessageCircle, title: 'Respuestas rápidas', desc: 'A través de la interfaz móvil, el robot puede responder dudas básicas sobre lo que estás viendo.' },
+    { icon: Users, title: 'Convive con visitantes', desc: 'Se mueve a una velocidad cómoda y se detiene automáticamente si la sala está abarrotada.' },
+    { icon: ArrowRight, title: 'Rutas temáticas', desc: 'Dile "Sorpréndeme" o pide una ruta en concreto y disfruta del recorrido curado por expertos.' },
+];
 
 const handleScroll = () => {
     if (!videoRef.value || !containerRef.value) return;
@@ -27,129 +29,87 @@ onUnmounted(() => window.removeEventListener('scroll', handleScroll));
 
 <template>
     <div>
-        <!-- ════════════════════════════════════════════
-       HERO — Scroll-driven video
-       ════════════════════════════════════════════ -->
+        <!-- HERO — Scroll-driven video -->
         <div ref="containerRef" class="scroll-container">
             <div class="sticky-wrapper">
                 <video ref="videoRef" src="/output.mp4" preload="auto" muted playsinline class="video-bg" />
                 <div class="video-overlay" />
 
-                <div class="hero-content">
-
-                    <h1 class="hero-title">
-                        Descubre cada rincón con
-                        <span class="hero-title-accent">ArTEC</span>
+                <div class="relative z-10 text-center max-w-3xl px-6 text-foreground">
+                    <h1 class="font-display text-[clamp(2.8rem,7.5vw,5.5rem)] font-medium tracking-tight leading-[0.97] mb-5 reveal"
+                        style="animation-delay: 40ms">
+                        Descubre cada rincón con <span class="text-primary">ArTEC</span>
                     </h1>
 
-                    <p class="hero-subtitle">
+                    <p class="text-[clamp(1.05rem,2vw,1.2rem)] text-muted-foreground max-w-xl mx-auto mb-8 leading-relaxed reveal"
+                        style="animation-delay: 120ms">
                         Explora exposiciones, museos y galerías de arte con nuestro asistente.
                     </p>
 
-                    <div class="mt-4">
-                        <p class="text-sm md:text-base text-muted-foreground bg-background/50 backdrop-blur-sm p-4 rounded-xl border border-border inline-block">
-                            Para iniciar tu visita, escanea el código QR ubicado en el robot.
-                        </p>
-                    </div>
+                    <p class="inline-block text-sm text-muted-foreground bg-background/60 backdrop-blur-sm border border-border rounded-sm px-4 py-3 reveal"
+                        style="animation-delay: 200ms">
+                        Para iniciar tu visita, escanea el código QR ubicado en el robot.
+                    </p>
                 </div>
 
                 <div class="scroll-hint">
                     <span>Desplázate</span>
-                    <svg class="scroll-chevron" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
-                    </svg>
+                    <ChevronDown class="w-4 h-4" />
                 </div>
             </div>
         </div>
 
-        <!-- ════════════════════════════════════════════
-       SECTION USUARIOS — friendly, no-tech
-       ════════════════════════════════════════════ -->
-        <section id="usuario" class="user-section">
-            <div class="section-inner">
+        <!-- SECCIÓN USUARIOS — amable, sin tecnicismos -->
+        <section id="usuario" class="bg-background px-6 py-32">
+            <div class="max-w-[68rem] mx-auto">
 
-                <!-- Intro -->
-                <div class="section-header">
-                    <span class="section-tag">Empieza tu visita</span>
-                    <h2 class="section-title">Tu acompañante de exposición</h2>
-                    <p class="section-desc">
-                        Interactuar con nuestro guía robótico es tan sencillo como usar tu teléfono móvil. Sin apps
-                        adicionales.
+                <header class="text-center max-w-xl mx-auto mb-20 reveal">
+                    <p class="eyebrow mb-4">Empieza tu visita</p>
+                    <h2 class="font-display text-[clamp(2.2rem,5vw,3.25rem)] font-medium tracking-tight leading-[1.05] mb-4">
+                        Tu acompañante de exposición
+                    </h2>
+                    <p class="text-muted-foreground text-lg leading-relaxed">
+                        Interactuar con nuestro guía robótico es tan sencillo como usar tu teléfono móvil. Sin apps adicionales.
                     </p>
+                </header>
+
+                <!-- Pasos -->
+                <div class="grid gap-px bg-border border border-border mb-24 sm:grid-cols-3">
+                    <div class="bg-background p-8 reveal" style="animation-delay: 80ms">
+                        <p class="font-display text-4xl font-medium text-primary mb-6 leading-none">01</p>
+                        <h3 class="font-medium text-foreground text-lg mb-2 tracking-tight">Escanea su código</h3>
+                        <p class="text-muted-foreground text-[0.95rem] leading-relaxed">
+                            Acércate al robot y enfoca con la cámara de tu móvil el <b class="text-foreground font-medium">código QR</b>.
+                        </p>
+                    </div>
+                    <div class="bg-background p-8 reveal" style="animation-delay: 160ms">
+                        <p class="font-display text-4xl font-medium text-primary mb-6 leading-none">02</p>
+                        <h3 class="font-medium text-foreground text-lg mb-2 tracking-tight">Chatea con él</h3>
+                        <p class="text-muted-foreground text-[0.95rem] leading-relaxed">
+                            Se abrirá un chat interactivo. Pídele que te lleve a una exposición específica, como
+                            "La Sala de Da Vinci", o a los aseos más cercanos.
+                            <b class="text-foreground font-medium">Pregunta lo que quieras!</b>
+                        </p>
+                    </div>
+                    <div class="bg-background p-8 reveal" style="animation-delay: 240ms">
+                        <p class="font-display text-4xl font-medium text-primary mb-6 leading-none">03</p>
+                        <h3 class="font-medium text-foreground text-lg mb-2 tracking-tight">Sigue la ruta</h3>
+                        <p class="text-muted-foreground text-[0.95rem] leading-relaxed">
+                            El robot iniciará su marcha adaptándose a tu paso, esquivando a otras personas y
+                            llevándote directamente <b class="text-foreground font-medium">a tu destino</b>.
+                        </p>
+                    </div>
                 </div>
 
-                <!-- Steps -->
-                <div class="steps-grid">
-                    <div class="step-card bg-white">
-                        <div class="step-num">01</div>
-                        <h3>Escanea su código</h3>
-                        <p>Acércate al robot y enfoca con la cámara de tu móvil el <b>código QR</b>.</p>
-                    </div>
-                    <div class="step-card bg-white">
-                        <div class="step-num">02</div>
-                        <h3>Chatea con él</h3>
-                        <p>Se abrirá un chat interactivo. Pídele que te lleve a una exposición específica, como "La Sala
-                            de
-                            Da Vinci", o a los aseos más cercanos. <b>Pregunta lo que quieras!</b></p>
-                    </div>
-                    <div class="step-card bg-white">
-                        <div class="step-num">03</div>
-                        <h3>Sigue la ruta</h3>
-                        <p>El robot iniciará su marcha adaptándose a tu paso, esquivando a otras personas y llevándote
-                            directamente <b>a tu destino</b>.</p>
-                    </div>
-                </div>
-
-                <div class="benefits-row">
-                    <div class="benefit-item">
-                        <div class="benefit-icon">
-                            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
-                                    d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z">
-                                </path>
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
-                                    d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"></path>
-                            </svg>
+                <!-- Beneficios -->
+                <div class="grid gap-10 sm:grid-cols-2 lg:grid-cols-4">
+                    <div v-for="(benefit, i) in BENEFITS" :key="benefit.title" class="text-center reveal"
+                        :style="{ animationDelay: `${320 + i * 80}ms` }">
+                        <div class="w-12 h-12 mx-auto mb-5 border border-border rounded-sm flex items-center justify-center text-primary">
+                            <component :is="benefit.icon" class="w-5 h-5" />
                         </div>
-                        <h4>No te pierdas</h4>
-                        <p>Llega a todas las exposiciones y zonas de interés de manera directa, sin mirar mapas
-                            complicados.
-                        </p>
-                    </div>
-                    <div class="benefit-item">
-                        <div class="benefit-icon">
-                            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
-                                    d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z">
-                                </path>
-                            </svg>
-                        </div>
-                        <h4>Respuestas rápidas</h4>
-                        <p>A través de la interfaz movil, el robot puede responder dudas básicas sobre lo que estas
-                            viendo
-                        </p>
-                    </div>
-                    <div class="benefit-item">
-                        <div class="benefit-icon">
-                            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
-                                    d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z">
-                                </path>
-                            </svg>
-                        </div>
-                        <h4>Convive con visitantes</h4>
-                        <p>Se mueve a una velocidad cómoda y se detiene automáticamente si la sala está abarrotada.</p>
-                    </div>
-                    <div class="benefit-item">
-                        <div class="benefit-icon">
-                            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
-                                    d="M5 12h14M12 5l7 7-7 7"></path>
-                            </svg>
-                        </div>
-                        <h4>Rutas temáticas</h4>
-                        <p>Dile "Sorpréndeme" o pide una ruta en concreto y disfruta del recorrido curado por expertos.
-                        </p>
+                        <h4 class="font-medium text-foreground mb-1.5">{{ benefit.title }}</h4>
+                        <p class="text-muted-foreground text-sm leading-relaxed">{{ benefit.desc }}</p>
                     </div>
                 </div>
             </div>
@@ -158,7 +118,8 @@ onUnmounted(() => window.removeEventListener('scroll', handleScroll));
 </template>
 
 <style scoped>
-/* ─────────────────────────────── HERO / VIDEO ─── */
+/* Scroll-driven hero video — kept as scoped CSS for the sticky/overlay
+   mechanics that Tailwind utilities can't express cleanly. */
 .scroll-container {
     height: 350vh;
     background: var(--color-background);
@@ -182,102 +143,15 @@ onUnmounted(() => window.removeEventListener('scroll', handleScroll));
     height: 100%;
     object-fit: cover;
     opacity: 0.85;
-    /* Lighten the video to fit white theme */
 }
 
-/* Light gradient overlay to ensure text is readable but kept luminous */
 .video-overlay {
     position: absolute;
     inset: 0;
     background: linear-gradient(to bottom,
-            rgba(255, 255, 255, 0.2) 0%,
-            rgba(255, 255, 255, 0.7) 60%,
-            rgba(255, 255, 255, 1) 100%);
-}
-
-:is(.dark) .video-overlay {
-    background: linear-gradient(to bottom,
-            rgba(2, 6, 23, 0.2) 0%,
-            rgba(2, 6, 23, 0.7) 60%,
-            rgba(2, 6, 23, 1) 100%);
-}
-
-.hero-content {
-    position: relative;
-    z-index: 10;
-    text-align: center;
-    max-width: 56rem;
-    padding: 0 1.5rem;
-    color: var(--color-foreground);
-}
-
-.hero-eyebrow {
-    text-transform: uppercase;
-    letter-spacing: .18em;
-    font-size: .8rem;
-    font-weight: 700;
-    color: var(--color-blue-600);
-    margin-bottom: 1rem;
-}
-
-.hero-title {
-    font-size: clamp(2.8rem, 7.5vw, 5.5rem);
-    font-weight: 800;
-    letter-spacing: -0.04em;
-    line-height: 1.04;
-    margin-bottom: 1.25rem;
-}
-
-.hero-title-accent {
-    color: var(--color-blue-600);
-}
-
-.hero-subtitle {
-    font-size: clamp(1.1rem, 2vw, 1.3rem);
-    color: var(--color-muted-foreground);
-    max-width: 38rem;
-    margin: 0 auto 2.5rem;
-    line-height: 1.6;
-    font-weight: 500;
-}
-
-.hero-actions {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 1rem;
-    justify-content: center;
-}
-
-.btn-primary {
-    display: inline-flex;
-    align-items: center;
-    gap: .5rem;
-    padding: 0.9rem 2rem;
-    background: var(--color-blue-600);
-    color: #fff;
-    font-weight: 600;
-    font-size: 1.05rem;
-    border-radius: 9999px;
-    /* Pill shape like Apple/Google */
-    text-decoration: none;
-    transition: all .2s ease;
-    box-shadow: 0 4px 14px 0 rgba(37, 99, 235, 0.39);
-}
-
-.btn-primary:hover {
-    background: #1d4ed8;
-    transform: translateY(-2px);
-    box-shadow: 0 6px 20px rgba(37, 99, 235, 0.45);
-}
-
-.btn-arrow {
-    width: 1.1rem;
-    height: 1.1rem;
-    transition: transform .2s;
-}
-
-.btn-primary:hover .btn-arrow {
-    transform: translateX(4px);
+            color-mix(in srgb, var(--color-background) 20%, transparent) 0%,
+            color-mix(in srgb, var(--color-background) 70%, transparent) 60%,
+            var(--color-background) 100%);
 }
 
 .scroll-hint {
@@ -290,16 +164,11 @@ onUnmounted(() => window.removeEventListener('scroll', handleScroll));
     flex-direction: column;
     align-items: center;
     gap: .25rem;
-    color: var(--color-slate-400);
+    color: var(--color-muted-foreground);
     font-size: .75rem;
     font-weight: 600;
     letter-spacing: .05em;
     animation: scrollBounce 2s ease-in-out infinite;
-}
-
-.scroll-chevron {
-    width: 1.2rem;
-    height: 1.2rem;
 }
 
 @keyframes scrollBounce {
@@ -312,138 +181,5 @@ onUnmounted(() => window.removeEventListener('scroll', handleScroll));
     50% {
         transform: translateX(-50%) translateY(7px);
     }
-}
-
-/* ────────────────────────────── SHARED LAYOUT ─── */
-.section-inner {
-    max-width: 68rem;
-    margin: 0 auto;
-}
-
-.section-header {
-    text-align: center;
-    margin-bottom: 5rem;
-}
-
-.section-tag {
-    display: inline-block;
-    background: var(--color-blue-50);
-    color: var(--color-blue-700);
-    font-size: .75rem;
-    font-weight: 700;
-    letter-spacing: .12em;
-    text-transform: uppercase;
-    padding: .4rem 1rem;
-    border-radius: 9999px;
-    margin-bottom: 1.5rem;
-}
-
-.section-title {
-    font-size: clamp(2.2rem, 5vw, 3.5rem);
-    font-weight: 800;
-    letter-spacing: -0.03em;
-    color: var(--color-foreground);
-    margin-bottom: 1rem;
-    line-height: 1.1;
-}
-
-.section-desc {
-    color: var(--color-muted-foreground);
-    font-size: 1.2rem;
-    max-width: 42rem;
-    margin: 0 auto;
-    line-height: 1.6;
-}
-
-/* ─────────────────────────── SECTION USUARIOS ─── */
-.user-section {
-    background: var(--color-background);
-    padding: 8rem 1.5rem;
-}
-
-.steps-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-    gap: 2rem;
-    margin-bottom: 6rem;
-}
-
-.step-card {
-    background: var(--color-card);
-    border: 1px solid var(--color-border);
-    border-radius: 1.5rem;
-    padding: 2.5rem;
-    transition: all .3s cubic-bezier(0.4, 0, 0.2, 1);
-    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.02), 0 2px 4px -1px rgba(0, 0, 0, 0.01);
-}
-
-.step-card:hover {
-    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.05), 0 10px 10px -5px rgba(0, 0, 0, 0.02);
-    transform: translateY(-4px);
-    border-color: var(--color-blue-100);
-}
-
-.step-num {
-    font-size: 3rem;
-    font-weight: 800;
-    letter-spacing: -0.05em;
-    color: var(--color-blue-600);
-    line-height: 1;
-    margin-bottom: 1.5rem;
-}
-
-.step-card h3 {
-    font-size: 1.35rem;
-    font-weight: 700;
-    color: var(--color-foreground);
-    margin-bottom: 0.75rem;
-    letter-spacing: -0.02em;
-}
-
-.step-card p {
-    color: var(--color-muted-foreground);
-    font-size: 1.05rem;
-    line-height: 1.6;
-}
-
-.benefits-row {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-    gap: 3rem;
-}
-
-.benefit-item {
-    text-align: center;
-}
-
-.benefit-icon {
-    width: 4rem;
-    height: 4rem;
-    background: var(--color-blue-50);
-    border-radius: 1rem;
-    /* Squircle look */
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    margin: 0 auto 1.5rem;
-    color: var(--color-blue-600);
-}
-
-.benefit-icon svg {
-    width: 2rem;
-    height: 2rem;
-}
-
-.benefit-item h4 {
-    font-weight: 700;
-    font-size: 1.1rem;
-    color: var(--color-foreground);
-    margin-bottom: 0.5rem;
-}
-
-.benefit-item p {
-    color: var(--color-muted-foreground);
-    font-size: 0.95rem;
-    line-height: 1.6;
 }
 </style>

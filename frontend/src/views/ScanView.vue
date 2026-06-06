@@ -3,6 +3,10 @@ import { onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { authService } from '@/services/authService'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { Alert } from '@/components/ui/alert'
 
 const route     = useRoute()
 const router    = useRouter()
@@ -91,78 +95,72 @@ const startChat = async () => {
 </script>
 
 <template>
-  <div class="min-h-screen flex items-center justify-center p-6 bg-background">
+  <div class="min-h-screen flex items-center justify-center bg-background px-6 py-12">
+    <div class="w-full max-w-[26rem]">
 
-    <!-- Checking robot availability -->
-    <div v-if="checking" class="flex flex-col items-center gap-4">
-      <div class="h-10 w-10 rounded-full border-4 border-t-primary animate-spin"></div>
-      <p class="text-lg animate-pulse text-muted-foreground">Comprobando el robot...</p>
-    </div>
-
-    <!-- Error -->
-    <div v-else-if="error" class="text-destructive font-semibold bg-destructive/10 p-6 rounded-2xl w-full max-w-sm text-center">
-      <p>{{ error }}</p>
-      <router-link to="/" class="mt-4 block text-primary underline">Volver al inicio</router-link>
-    </div>
-
-    <!-- Form -->
-    <div v-else-if="showNamePrompt" class="w-full max-w-sm flex flex-col gap-6">
-
-      <!-- Name card -->
-      <div class="bg-card p-8 rounded-3xl shadow-lg border">
-        <h1 class="text-2xl font-bold mb-1 text-foreground">¡Hola!</h1>
-        <p class="text-muted-foreground mb-5 text-sm">¿Cómo te llamas? El robot te llamará por tu nombre.</p>
-        <input
-          v-model="visitorName"
-          type="text"
-          placeholder="Tu nombre (ej. María)"
-          class="w-full p-4 rounded-xl border bg-background outline-none focus:ring-2 focus:ring-primary text-foreground"
-          @keyup.enter="startChat"
-          autofocus
-        />
+      <!-- Checking robot availability -->
+      <div v-if="checking" class="flex flex-col items-center gap-4 text-center reveal">
+        <div class="h-9 w-9 rounded-full border-4 border-primary/30 border-t-primary animate-spin"></div>
+        <p class="text-muted-foreground text-[0.95rem]">Comprobando el robot…</p>
       </div>
 
-      <!-- Expertise card -->
-      <div class="bg-card p-6 rounded-3xl shadow-lg border">
-        <p class="text-sm font-semibold text-foreground mb-1">¿Cuánto sabes sobre arte?</p>
-        <p class="text-xs text-muted-foreground mb-4">El robot adaptará sus explicaciones a tu nivel.</p>
+      <!-- Error -->
+      <div v-else-if="error" class="reveal" style="animation-delay: 40ms">
+        <header class="mb-8">
+          <p class="eyebrow text-destructive mb-3">Acceso no disponible</p>
+          <h1 class="font-display text-4xl font-medium tracking-tight leading-[0.95]">Inténtalo de nuevo</h1>
+        </header>
+        <Alert variant="destructive">{{ error }}</Alert>
+        <p class="mt-6 text-sm text-muted-foreground">
+          <router-link to="/" class="text-foreground underline decoration-border decoration-1 underline-offset-4 hover:decoration-primary transition-colors">&larr; Volver al inicio</router-link>
+        </p>
+      </div>
 
-        <div class="flex flex-col gap-2">
-          <button
-            v-for="lvl in LEVELS"
-            :key="lvl.id"
-            @click="expertiseLevel = lvl.id"
-            :class="[
-              'flex items-center gap-3 p-3 rounded-xl border-2 text-left transition-all',
-              expertiseLevel === lvl.id
-                ? 'border-primary bg-primary/10'
-                : 'border-border hover:border-primary/50 hover:bg-muted'
-            ]"
-          >
-            <span class="text-2xl leading-none">{{ lvl.emoji }}</span>
-            <span class="flex flex-col">
-              <span class="text-sm font-semibold text-foreground">{{ lvl.label }}</span>
-              <span class="text-xs text-muted-foreground">{{ lvl.desc }}</span>
-            </span>
-            <span v-if="expertiseLevel === lvl.id" class="ml-auto text-primary text-lg">✓</span>
-          </button>
+      <!-- Form -->
+      <div v-else-if="showNamePrompt">
+        <header class="reveal" style="animation-delay: 40ms">
+          <h1 class="font-display text-5xl font-medium tracking-tight leading-[0.95] mb-3">¡Hola!</h1>
+          <p class="text-muted-foreground text-[0.95rem] leading-relaxed">¿Cómo te llamas? El robot te llamará por tu nombre.</p>
+        </header>
+
+        <hr class="hairline my-8 reveal" style="animation-delay: 120ms" />
+
+        <div class="space-y-7 reveal" style="animation-delay: 200ms">
+          <div>
+            <Label for="visitor-name">Tu nombre</Label>
+            <Input id="visitor-name" v-model="visitorName" type="text" placeholder="Ej. María"
+              autofocus @keyup.enter="startChat" />
+          </div>
+
+          <div>
+            <p class="eyebrow mb-3">¿Cuánto sabes sobre arte?</p>
+            <div class="space-y-2">
+              <button v-for="lvl in LEVELS" :key="lvl.id" type="button" @click="expertiseLevel = lvl.id"
+                class="w-full flex items-center gap-3 px-4 py-3 text-left border rounded-sm transition-colors"
+                :class="expertiseLevel === lvl.id ? 'border-primary bg-primary/5' : 'border-border hover:border-primary/40'">
+                <span class="text-xl leading-none">{{ lvl.emoji }}</span>
+                <span class="flex flex-col flex-1 min-w-0">
+                  <span class="text-sm font-medium text-foreground">{{ lvl.label }}</span>
+                  <span class="text-xs text-muted-foreground">{{ lvl.desc }}</span>
+                </span>
+                <span v-if="expertiseLevel === lvl.id" class="text-primary text-sm">&check;</span>
+              </button>
+            </div>
+          </div>
+
+          <Button @click="startChat" size="lg" class="w-full group">
+            Empezar la visita
+            <span class="transition-transform group-hover:translate-x-1">&rarr;</span>
+          </Button>
         </div>
       </div>
 
-      <!-- CTA -->
-      <button
-        @click="startChat"
-        class="w-full p-4 bg-primary text-primary-foreground rounded-xl font-semibold shadow-md active:scale-95 transition-transform"
-      >
-        Empezar la visita
-      </button>
-    </div>
+      <!-- Loading -->
+      <div v-else-if="loading" class="flex flex-col items-center gap-4 text-center reveal">
+        <div class="h-9 w-9 rounded-full border-4 border-primary/30 border-t-primary animate-spin"></div>
+        <p class="text-muted-foreground text-[0.95rem]">Estableciendo conexión…</p>
+      </div>
 
-    <!-- Loading -->
-    <div v-else-if="loading" class="flex flex-col items-center gap-4">
-      <div class="h-10 w-10 rounded-full border-4 border-t-primary animate-spin"></div>
-      <p class="text-lg animate-pulse text-muted-foreground">Estableciendo conexión...</p>
     </div>
-
   </div>
 </template>

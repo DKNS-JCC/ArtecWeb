@@ -402,6 +402,60 @@ class RosService extends EventEmitter {
         return robot.latestScan ?? null;
     }
 
+    // ── Session active signal ─────────────────────────────────────────────────
+
+    /**
+     * Publishes std_msgs/Bool to /session_active on the robot.
+     * true  → a visitor session has started (wake LEDs).
+     * false → session ended or expired (LEDs go to standby).
+     */
+    publishSessionActive(robotId, isActive) {
+        const robot = this.robots.get(robotId);
+        if (!robot || !robot.isConnected) return;
+        if (!robot.topics.sessionActive) {
+            robot.topics.sessionActive = new ROSLIB.Topic({
+                ros:         robot.ros,
+                name:        '/session_active',
+                messageType: 'std_msgs/Bool',
+            });
+        }
+        robot.topics.sessionActive.publish({ data: isActive });
+        console.log(`[ROS] /session_active → ${isActive} (robot ${robotId})`);
+    }
+
+    // ── Session expiry monitor ────────────────────────────────────────────────
+
+    /**
+     * Runs every 60 s. If a robot's visitor lock has expired but the DB still
+     * shows an active visitor (ping stopped — user left without ending session),
+     * publish session_active=false and clean up the DB row.
+     */
+    _startSessionMonitor() {
+        setInterval(() => {
+            db.all(
+                `SELECT id FROM robots
+                 WHERE current_visitor_id IS NOT NULL
+                   AND (locked_until IS NULL OR locked_until < datetime('now'))`,
+                [],
+                (err, rows) => {
+                    if (err || !rows || !rows.length) return;
+                    rows.forEach(row => {
+                        console.log(`[ROS] Session expired for robot ${row.id} — standby`);
+                        this.publishSessionActive(row.id, false);
+                        db.run(
+                            `UPDATE robots SET locked_until = NULL, current_visitor_id = NULL WHERE id = ?`,
+                            [row.id]
+                        );
+                        db.run(
+                            `UPDATE visitors SET ended_at = CURRENT_TIMESTAMP WHERE robot_id = ? AND ended_at IS NULL`,
+                            [row.id]
+                        );
+                    });
+                }
+            );
+        }, 60_000);
+    }
+
     _requireConnected(robotId) {
         const robot = this.robots.get(robotId);
         if (!robot || !robot.isConnected) {
@@ -411,4 +465,6 @@ class RosService extends EventEmitter {
     }
 }
 
-module.exports = new RosService();
+const service = new RosService();
+service._startSessionMonitor();
+module.exports = service;

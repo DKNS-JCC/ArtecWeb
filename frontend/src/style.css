@@ -1,77 +1,91 @@
 @import "tailwindcss";
 
+/* ════════════════════════════════════════════════════════════════════
+   ARTEC — "Cartela de galería"
+   Editorial / curatorial design language.
+   Display: Fraunces (optical serif). Body/UI: Hanken Grotesk.
+   Palette: warm bone paper, ink, single terracotta accent.
+   Forms: near-square corners, hairline rules, no soft glows.
+   ════════════════════════════════════════════════════════════════════ */
+
 @theme {
-  --color-border: var(--color-slate-200);
-  --color-input: var(--color-slate-200);
-  --color-ring: var(--color-blue-600);
+  /* Type */
+  --font-sans: "Hanken Grotesk", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Fraunces", Georgia, "Times New Roman", serif;
 
-  --color-background: #ffffff;
-  --color-foreground: var(--color-slate-900);
+  /* Structure — sharp, editorial radii */
+  --color-border: #D8D1C2;
+  --color-input: #D8D1C2;
+  --color-ring: #B0461E;
 
-  --color-primary: var(--color-blue-600);
-  --color-primary-foreground: #ffffff;
+  --color-background: #F4F1EA;
+  --color-foreground: #1A1A1A;
 
-  --color-secondary: var(--color-slate-100);
-  --color-secondary-foreground: var(--color-slate-900);
+  /* Single warm accent — used sparingly */
+  --color-primary: #B0461E;
+  --color-primary-foreground: #F7F4EC;
 
-  --color-muted: var(--color-slate-100);
-  --color-muted-foreground: var(--color-slate-500);
+  --color-secondary: #E9E4D8;
+  --color-secondary-foreground: #2A2622;
 
-  --color-accent: var(--color-slate-100);
-  --color-accent-foreground: var(--color-slate-900);
+  --color-muted: #E9E4D8;
+  --color-muted-foreground: #6B6358;
 
-  --color-destructive: var(--color-red-500);
-  --color-destructive-foreground: #ffffff;
+  --color-accent: #E9E4D8;
+  --color-accent-foreground: #1A1A1A;
 
-  --color-card: #ffffff;
-  --color-card-foreground: var(--color-slate-900);
+  --color-destructive: #A3361F;
+  --color-destructive-foreground: #F7F4EC;
 
-  --color-popover: #ffffff;
-  --color-popover-foreground: var(--color-slate-900);
+  --color-card: #FBF9F3;
+  --color-card-foreground: #1A1A1A;
 
-  --radius-lg: 1rem;
-  --radius-md: 0.75rem;
-  --radius-sm: 0.5rem;
+  --color-popover: #FBF9F3;
+  --color-popover-foreground: #1A1A1A;
+
+  --radius-lg: 0.375rem;
+  --radius-md: 0.25rem;
+  --radius-sm: 0.125rem;
 }
 
 @custom-variant dark (&:is(.dark *));
 
 @layer base {
   :root {
-    --color-background: #ffffff;
-    --color-foreground: var(--color-slate-900);
+    --color-background: #F4F1EA;
+    --color-foreground: #1A1A1A;
+    --radius: 0.25rem;
   }
 
   .dark {
-    --color-background: var(--color-slate-950);
-    --color-foreground: var(--color-slate-50);
-    --color-border: var(--color-slate-800);
-    --color-input: var(--color-slate-800);
+    --color-background: #161412;
+    --color-foreground: #EDE8DE;
+    --color-border: #322D27;
+    --color-input: #322D27;
+    --color-ring: #D9743E;
 
-    --color-secondary: var(--color-slate-800);
-    --color-secondary-foreground: var(--color-slate-100);
+    --color-primary: #D9743E;
+    --color-primary-foreground: #161412;
 
-    --color-muted: var(--color-slate-800);
-    --color-muted-foreground: var(--color-slate-400);
+    --color-secondary: #2A2622;
+    --color-secondary-foreground: #EDE8DE;
 
-    --color-accent: var(--color-slate-800);
-    --color-accent-foreground: var(--color-slate-100);
+    --color-muted: #2A2622;
+    --color-muted-foreground: #A39B8D;
 
-    --color-card: var(--color-slate-900);
-    --color-card-foreground: var(--color-slate-50);
+    --color-accent: #2A2622;
+    --color-accent-foreground: #EDE8DE;
 
-    --color-popover: var(--color-slate-900);
-    --color-popover-foreground: var(--color-slate-50);
+    --color-destructive: #D9743E;
+    --color-destructive-foreground: #161412;
+
+    --color-card: #1E1B18;
+    --color-card-foreground: #EDE8DE;
+
+    --color-popover: #1E1B18;
+    --color-popover-foreground: #EDE8DE;
   }
 }
-
-/* Base custom styles that used to be in @layer base */
-@layer base {
-  :root {
-    --radius: 0.5rem;
-  }
-}
-
 
 @layer base {
   * {
@@ -81,6 +95,9 @@
   body {
     background-color: var(--color-background);
     color: var(--color-foreground);
+    font-family: var(--font-sans);
+    /* Subtle paper grain so the bone never reads as flat white. */
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.025'/%3E%3C/svg%3E");
   }
 
   *:not(input):not(textarea):not([contenteditable]) {
@@ -91,5 +108,58 @@
   textarea,
   [contenteditable] {
     caret-color: auto;
+  }
+}
+
+/* ─────────────────────────────────────────────────────────────
+   Editorial helpers
+   ───────────────────────────────────────────────────────────── */
+@layer components {
+
+  /* Display serif — for titles, place names, the brand mark. */
+  .font-display {
+    font-family: var(--font-display);
+    font-optical-sizing: auto;
+  }
+
+  /* Museum-label eyebrow: small caps, wide tracking, like a wall card. */
+  .eyebrow {
+    font-size: 0.6875rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.18em;
+    color: var(--color-muted-foreground);
+  }
+
+  /* Hairline rule — the editorial divider. */
+  .hairline {
+    border: none;
+    border-top: 1px solid var(--color-border);
+  }
+}
+
+/* ─────────────────────────────────────────────────────────────
+   Staggered page-load reveal
+   ───────────────────────────────────────────────────────────── */
+@keyframes editorial-rise {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.reveal {
+  opacity: 0;
+  animation: editorial-rise 0.7s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .reveal {
+    opacity: 1;
+    animation: none;
   }
 }

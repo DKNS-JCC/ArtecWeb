@@ -27,6 +27,12 @@ const emit = defineEmits(['refresh'])
 
 // ── Map ──────────────────────────────────────────────────────────────────────
 
+// Brand terracotta accent for the live pose arrow — mirrors the light-theme
+// value of --color-primary. Canvas fillStyle/strokeStyle need a literal color
+// (CSS custom properties aren't resolved in the 2D context), and the darker
+// shade reads better against the occupancy grid's white/grey/black palette.
+const ROBOT_COLOR = '#B0461E'
+
 const mapCanvas  = ref(null)
 const mapLoading = ref(false)
 const mapError   = ref(null)
@@ -130,8 +136,8 @@ const drawCanvas = () => {
 
         const arrowLen = 12
         ctx.save()
-        ctx.fillStyle   = '#2563eb'
-        ctx.strokeStyle = '#1d4ed8'
+        ctx.fillStyle   = ROBOT_COLOR
+        ctx.strokeStyle = ROBOT_COLOR
         ctx.lineWidth   = 2
         ctx.beginPath()
         ctx.arc(cx, cy, 5, 0, 2 * Math.PI)
@@ -420,7 +426,7 @@ const currentLocation = computed(() => props.robot.current_location?.name || nul
             </p>
 
             <!-- Mode hint -->
-            <p v-if="mapMode !== 'none'" class="text-xs px-2 py-1 rounded"
+            <p v-if="mapMode !== 'none'" class="text-xs px-2 py-1 rounded-sm"
                 :class="mapMode === 'nav-goal' ? 'bg-green-500/10 text-green-700 dark:text-green-400' : 'bg-amber-500/10 text-amber-700 dark:text-amber-400'">
                 {{ mapModeLabel }}
             </p>

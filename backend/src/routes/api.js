@@ -687,6 +687,9 @@ router.post('/robots/:id/initial-pose', authMiddleware, adminMiddleware, (req, r
     });
 });
 
+// POST /api/robots/:id/capture-map  — subscribe to /map once, convert to PNG, persist
+router.post('/robots/:id/capture-map', authMiddleware, adminMiddleware, mapController.captureMapFromRobot);
+
 // GET /api/robots/:id/map  — get latest occupancy grid
 router.get('/robots/:id/map', authMiddleware, adminMiddleware, (req, res) => {
     const robotId = req.params.id;

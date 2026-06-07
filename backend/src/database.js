@@ -102,10 +102,9 @@ function initializeDatabase() {
                 FOREIGN KEY(robot_id) REFERENCES robots(id)
             )
         `);
-        // Migration: add expertise_level to existing databases that lack it
-        db.run(`ALTER TABLE visitors ADD COLUMN expertise_level TEXT DEFAULT 'general'`, () => {
-            // Silently ignore SQLITE_ERROR if column already exists
-        });
+        // Migrations: silently ignored if column already exists
+        db.run(`ALTER TABLE visitors ADD COLUMN expertise_level TEXT DEFAULT 'general'`, () => {});
+        db.run(`ALTER TABLE visitors ADD COLUMN deleted_at DATETIME`, () => {});
 
         // 6. Zones — belong to a map (not a robot)
         //    Zones are unique per map; different maps have independent zones
@@ -165,6 +164,10 @@ function initializeDatabase() {
         db.run(`CREATE INDEX IF NOT EXISTS idx_visitors_session_id ON visitors(session_id)`);
         db.run(`CREATE INDEX IF NOT EXISTS idx_chat_messages_session ON chat_messages(session_id)`);
         db.run(`CREATE INDEX IF NOT EXISTS idx_chat_messages_visitor ON chat_messages(visitor_id)`);
+        db.run(`CREATE INDEX IF NOT EXISTS idx_chat_messages_session_time ON chat_messages(session_id, created_at)`);
+        db.run(`CREATE INDEX IF NOT EXISTS idx_chat_messages_created_at ON chat_messages(created_at)`);
+        db.run(`CREATE INDEX IF NOT EXISTS idx_visitors_ended_at ON visitors(ended_at)`);
+        db.run(`CREATE INDEX IF NOT EXISTS idx_visitors_deleted_at ON visitors(deleted_at)`);
     });
 }
 

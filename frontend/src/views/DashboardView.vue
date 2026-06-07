@@ -1,6 +1,5 @@
 <script setup>
 import { ref, onMounted, onUnmounted, computed } from 'vue'
-import { api } from '@/services/api'
 import { robotService } from '@/services/robotService'
 import { authService } from '@/services/authService'
 import { museumService } from '@/services/museumService'
@@ -13,6 +12,7 @@ import { Alert } from '@/components/ui/alert'
 import { RefreshCw, Zap, MapPin, Plus, X, Building2, Users, BarChart3, Clock, Settings, Wifi, Search, Pencil, Eye, EyeOff, Trash2, ShieldAlert, Map, Bot, History, Navigation, Loader2 } from 'lucide-vue-next'
 import MapTab             from '@/components/MapTab.vue'
 import ChatHistoryTab     from '@/components/ChatHistoryTab.vue'
+import StatsTab           from '@/components/StatsTab.vue'
 import QRCode             from 'qrcode'
 
 const authStore = useAuthStore()
@@ -329,36 +329,20 @@ const handleCreateMuseum = async () => {
 }
 
 // ---------------- STATS ----------------
-const stats = ref({
-    totalRobots: 0,
-    activeRobots: 0,
-    totalVisitors: 0,
-    avgSessionTime: 0,
-    totalMuseums: 0
-})
-
-const fetchStats = async () => {
-    try {
-        const data = await api.get('/admin/stats')
-        stats.value = data
-    } catch (e) {
-        console.error("Error fetching stats:", e)
-    }
-}
+const statsTabRef = ref(null)
 
 // ---------------- GLOBAL TAB REFRESH ----------------
 const refreshCurrentTab = () => {
-    if (activeTab.value === 'robots') fetchRobots()   // manual one-shot after mutations
-    if (activeTab.value === 'staff') fetchStaff()
+    if (activeTab.value === 'robots')  fetchRobots()
+    if (activeTab.value === 'staff')   fetchStaff()
     if (activeTab.value === 'museums') fetchMuseums()
-    if (activeTab.value === 'stats') fetchStats()
+    if (activeTab.value === 'stats')   statsTabRef.value?.refresh()
 }
 
 onMounted(() => {
     startRobotStream()
     if (isMuseumAdmin.value || isPlatformAdmin.value) fetchStaff()
     if (isPlatformAdmin.value) fetchMuseums()
-    fetchStats()
 })
 
 onUnmounted(() => {
@@ -731,78 +715,9 @@ onUnmounted(() => {
 
         <!-- TAB: STATS -->
         <div v-show="activeTab === 'stats'">
-            <div class="flex justify-between items-center mb-6">
-                <h2 class="font-display text-xl font-medium tracking-tight text-foreground">Estadísticas del Sistema</h2>
-                <Button @click="fetchStats" variant="outline" size="sm" class="gap-2">
-                    <RefreshCw class="w-4 h-4" /> Recargar
-                </Button>
-            </div>
-            
-            <div class="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
-                <Card v-if="isPlatformAdmin">
-                    <CardHeader class="flex flex-row items-center justify-between pb-2 space-y-0">
-                        <div class="text-sm font-medium">Museos Registrados</div>
-                        <Building2 class="w-4 h-4 text-muted-foreground" />
-                    </CardHeader>
-                    <CardContent>
-                        <div class="font-display text-2xl font-medium">{{ stats.totalMuseums || 0 }}</div>
-                        <p class="text-xs text-muted-foreground mt-1">Activos en la plataforma</p>
-                    </CardContent>
-                </Card>
-
-                <Card>
-                    <CardHeader class="flex flex-row items-center justify-between pb-2 space-y-0">
-                        <div class="text-sm font-medium">Total de Robots</div>
-                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-4 h-4 text-muted-foreground"><path d="M12 8V4H8"/><rect width="16" height="12" x="4" y="8" rx="2"/><path d="M2 14h2"/><path d="M20 14h2"/><path d="M15 13v2"/><path d="M9 13v2"/></svg>
-                    </CardHeader>
-                    <CardContent>
-                        <div class="font-display text-2xl font-medium">{{ stats.totalRobots || 0 }}</div>
-                        <p class="text-xs text-muted-foreground mt-1">
-                            <span class="text-green-600 dark:text-green-400 font-medium">{{ stats.activeRobots || 0 }} en operación</span>
-                        </p>
-                    </CardContent>
-                </Card>
-
-                <Card>
-                    <CardHeader class="flex flex-row items-center justify-between pb-2 space-y-0">
-                        <div class="text-sm font-medium">Total Visitantes</div>
-                        <Users class="w-4 h-4 text-muted-foreground" />
-                    </CardHeader>
-                    <CardContent>
-                        <div class="font-display text-2xl font-medium">{{ stats.totalVisitors || 0 }}</div>
-                        <p class="text-xs text-muted-foreground mt-1">Interacciones registradas</p>
-                    </CardContent>
-                </Card>
-
-                <Card>
-                    <CardHeader class="flex flex-row items-center justify-between pb-2 space-y-0">
-                        <div class="text-sm font-medium">Tiempo Promedio</div>
-                        <Clock class="w-4 h-4 text-muted-foreground" />
-                    </CardHeader>
-                    <CardContent>
-                        <div class="font-display text-2xl font-medium">{{ stats.avgSessionTime > 0 ? stats.avgSessionTime + ' min' : '0 min' }}</div>
-                        <p class="text-xs text-muted-foreground mt-1">Duración de visita x interacción</p>
-                    </CardContent>
-                </Card>
-            </div>
-            
-            <div class="mt-8">
-                <Card>
-                    <CardHeader>
-                        <h3 class="font-display text-lg font-medium tracking-tight">Resumen Rápido</h3>
-                    </CardHeader>
-                    <CardContent>
-                        <p class="text-muted-foreground text-sm">
-                            Este panel te permite monitorizar el estado general. Los datos provienen en tiempo real de las bases de datos de sesión.
-                            <template v-if="isPlatformAdmin">Como Super Administrador, ves las métricas globales para mejorar la escalabilidad del sistema y entender el retorno de inversión.</template>
-                            <template v-else>Como Administrador de Museo, puedes ver las métricas relativas a la interacción de los robots dentro de tu propio emplazamiento.</template>
-                        </p>
-                    </CardContent>
-                </Card>
-            </div>
+            <StatsTab ref="statsTabRef" />
         </div>
 
-        <!-- MODALS (Rendered outside normal flow) -->
 
         <!-- EDIT ROBOT MODAL -->
         <div v-if="showEditRobotModal"

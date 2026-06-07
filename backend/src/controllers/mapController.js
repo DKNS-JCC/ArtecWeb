@@ -3,6 +3,7 @@ const fs = require('fs');
 const path = require('path');
 const sharp = require('sharp');
 const db = require('../database');
+const rosService = require('../services/rosService');
 const zoneCache = require('../utils/zoneCache');
 const { BASE_CATEGORY } = require('../utils/geo');
 
@@ -96,7 +97,77 @@ function parsePgm(buffer) {
     return { width, height, data };
 }
 
+const UPLOAD_DIR = path.join(__dirname, '../../uploads/maps');
+
 // ─── MAP CRUD ─────────────────────────────────────────────────
+
+/**
+ * POST /api/robots/:id/capture-map
+ * Subscribes to /map once via rosbridge, converts the OccupancyGrid to PNG,
+ * and persists it as a new map record for the robot's museum.
+ */
+exports.captureMapFromRobot = async (req, res) => {
+    const robotId = req.params.id;
+    const { name } = req.body;
+    const isSuperAdmin = req.user.role === 'platform_admin';
+
+    if (!name || !name.trim()) {
+        return res.status(400).json({ error: 'El nombre del mapa es obligatorio' });
+    }
+
+    try {
+        const robot = await dbGet('SELECT * FROM robots WHERE id = ?', [robotId]);
+        if (!robot) return res.status(404).json({ error: 'Robot no encontrado' });
+        if (!isSuperAdmin && req.user.museum_id !== robot.museum_id) {
+            return res.status(403).json({ error: 'No tienes acceso a este robot' });
+        }
+
+        const rosMap = await rosService.captureMap(robotId);
+
+        const { resolution, width, height, origin } = rosMap.info;
+        const origin_x = origin.position?.x ?? 0;
+        const origin_y = origin.position?.y ?? 0;
+
+        // OccupancyGrid rows start at the bottom of the world frame; PNG rows start
+        // at the top, so we flip vertically — same as what map_saver_cli does.
+        const buf = Buffer.alloc(width * height);
+        for (let row = 0; row < height; row++) {
+            const srcRow = height - 1 - row;
+            for (let col = 0; col < width; col++) {
+                const v = rosMap.data[srcRow * width + col];
+                let pixel;
+                if (v === -1)      pixel = 205;                              // unknown → gray
+                else if (v === 0)  pixel = 254;                              // free → near-white
+                else               pixel = Math.round(255 * (1 - v / 100)); // occupied → dark
+                buf[row * width + col] = pixel;
+            }
+        }
+
+        const filename = `map-${robot.museum_id}-${Date.now()}.png`;
+        const filepath = path.join(UPLOAD_DIR, filename);
+        await sharp(buf, { raw: { width, height, channels: 1 } }).png().toFile(filepath);
+
+        const imagePath = `/uploads/maps/${filename}`;
+        const id = crypto.randomUUID();
+        await dbRun(
+            `INSERT INTO maps (id, museum_id, name, image_path, resolution, origin_x, origin_y, origin_theta, width, height)
+             VALUES (?,?,?,?,?,?,?,?,?,?)`,
+            [id, robot.museum_id, name.trim(), imagePath, resolution, origin_x, origin_y, 0, width, height]
+        );
+
+        const map = await dbGet('SELECT * FROM maps WHERE id = ?', [id]);
+        res.status(201).json({ message: 'Mapa capturado correctamente', map });
+    } catch (err) {
+        console.error('[Map] Capture error:', err);
+        if (/no está conectado/i.test(err.message)) {
+            return res.status(503).json({ error: 'El robot no está conectado. Conéctalo desde el panel de control primero.' });
+        }
+        if (/timeout/i.test(err.message)) {
+            return res.status(504).json({ error: err.message });
+        }
+        res.status(500).json({ error: 'Error al capturar el mapa' });
+    }
+};
 
 /**
  * POST /api/museums/:museum_id/maps

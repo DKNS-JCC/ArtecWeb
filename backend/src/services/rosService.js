@@ -329,6 +329,47 @@ class RosService extends EventEmitter {
         return robot.latestMap || null;
     }
 
+    /**
+     * Subscribes to /map once, resolves with the full OccupancyGrid message,
+     * or rejects after timeoutMs if no message arrives.
+     */
+    captureMap(robotId, timeoutMs = 20000) {
+        const robot = this._requireConnected(robotId);
+        return new Promise((resolve, reject) => {
+            let settled = false;
+            const finish = (result, err) => {
+                if (settled) return;
+                settled = true;
+                clearTimeout(timer);
+                try { topic.unsubscribe(); } catch (_) {}
+                if (err) reject(err);
+                else resolve(result);
+            };
+
+            const timer = setTimeout(
+                () => finish(null, new Error('Timeout: el robot no publicó el mapa en el tiempo esperado. ¿Está activo el map_server o SLAM?')),
+                timeoutMs
+            );
+
+            const topic = new ROSLIB.Topic({
+                ros:         robot.ros,
+                name:        '/map',
+                messageType: 'nav_msgs/OccupancyGrid',
+            });
+            topic.subscribe((message) => {
+                finish({
+                    info: {
+                        resolution: message.info.resolution,
+                        width:      message.info.width,
+                        height:     message.info.height,
+                        origin:     message.info.origin,
+                    },
+                    data: message.data,
+                });
+            });
+        });
+    }
+
     getPose(robotId) {
         return this.robots.get(robotId)?.latestPose ?? null;
     }

@@ -82,6 +82,9 @@ const editForm = ref({ name: '', description: '', category: 'exhibit' })
 
 const hoveredZone = ref(null)
 const showUploadPanel = ref(false)
+const showCapturePanel = ref(false)
+const capturing = ref(false)
+const captureForm = ref({ name: '', robotId: '' })
 
 const museumOptions = computed(() => {
     const unique = new Map()
@@ -584,6 +587,38 @@ async function handleUpload() {
     }
 }
 
+async function handleCapture() {
+    if (!captureForm.value.robotId) {
+        error.value = 'Selecciona un robot'
+        return
+    }
+    if (!captureForm.value.name.trim()) {
+        error.value = 'El nombre del mapa es obligatorio'
+        return
+    }
+
+    capturing.value = true
+    error.value = null
+
+    try {
+        const response = await mapService.captureFromRobot(captureForm.value.robotId, captureForm.value.name.trim())
+        success.value = 'Mapa capturado correctamente'
+        captureForm.value.name = ''
+        showCapturePanel.value = false
+
+        const robot = robotsData.value.find(r => r.id === captureForm.value.robotId)
+        const museumId = robot?.museum_id || selectedMuseumId.value
+        if (museumId) await fetchMaps(museumId)
+        if (response?.map?.id) selectedMapId.value = response.map.id
+
+        setTimeout(() => { success.value = null }, 3000)
+    } catch (err) {
+        error.value = err.message
+    } finally {
+        capturing.value = false
+    }
+}
+
 async function handleDeleteMap() {
     if (!selectedMapId.value) return
     if (!confirm('Eliminar este mapa? Tambien se eliminaran sus zonas y se desasignara de los robots.')) return
@@ -783,13 +818,23 @@ onUnmounted(() => {
 
                     <!-- Actions -->
                     <Button
-                        @click="showUploadPanel = !showUploadPanel"
+                        @click="showCapturePanel = !showCapturePanel; showUploadPanel = false"
+                        :variant="showCapturePanel ? 'default' : 'outline'"
+                        size="sm"
+                        class="gap-1.5"
+                    >
+                        <Bot class="w-4 h-4" />
+                        {{ showCapturePanel ? 'Cerrar' : 'Capturar de robot' }}
+                    </Button>
+
+                    <Button
+                        @click="showUploadPanel = !showUploadPanel; showCapturePanel = false"
                         :variant="showUploadPanel ? 'default' : 'outline'"
                         size="sm"
                         class="gap-1.5"
                     >
                         <Upload class="w-4 h-4" />
-                        {{ showUploadPanel ? 'Cerrar' : 'Nuevo mapa' }}
+                        {{ showUploadPanel ? 'Cerrar' : 'Subir mapa' }}
                     </Button>
 
                     <Button
@@ -802,6 +847,39 @@ onUnmounted(() => {
                     >
                         <Trash2 class="w-4 h-4" />
                         Eliminar
+                    </Button>
+                </div>
+            </CardContent>
+        </Card>
+
+        <!-- Capture from Robot Panel -->
+        <Card v-if="showCapturePanel">
+            <CardContent class="p-4">
+                <p class="text-xs text-muted-foreground mb-4">
+                    El backend se suscribe al topic <code class="font-mono">/map</code> del robot y persiste el OccupancyGrid como PNG. El robot debe estar conectado y con el map_server o SLAM activo.
+                </p>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                        <Label>Nombre del mapa *</Label>
+                        <Input v-model="captureForm.name" placeholder="Ej: Planta baja" class="mt-1" />
+                    </div>
+                    <div>
+                        <Label>Robot *</Label>
+                        <select
+                            v-model="captureForm.robotId"
+                            class="mt-1 flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                        >
+                            <option value="" disabled>Selecciona un robot</option>
+                            <option v-for="r in robotsForMuseum" :key="r.id" :value="r.id">
+                                {{ r.name }}
+                            </option>
+                        </select>
+                    </div>
+                </div>
+                <div class="flex justify-end mt-4">
+                    <Button @click="handleCapture" :disabled="capturing || !selectedMuseumId" class="gap-2">
+                        <Bot class="w-4 h-4" />
+                        {{ capturing ? 'Capturando…' : 'Capturar mapa' }}
                     </Button>
                 </div>
             </CardContent>

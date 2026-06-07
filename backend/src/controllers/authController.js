@@ -111,6 +111,9 @@ exports.createVisitor = (req, res) => {
                                 token,
                                 visitor: { id: visitorId, session_id: sessionId, role: 'visitor', robot_id: robot.id, robot_name: robot.name, name: visitorName, expertise_level: visitorExpertise }
                             });
+
+                            // Wake the robot LEDs — a visitor is now active
+                            rosService.publishSessionActive(robot.id, true);
                         });
                     }
                 );
@@ -158,6 +161,9 @@ exports.endVisitor = (req, res) => {
         // Registrar fin de la sesión del visitante
         db.run('UPDATE visitors SET ended_at = CURRENT_TIMESTAMP WHERE id = ?', [visitorId], (err2) => {
             if (err2) console.error('Error updating visitor ended_at', err2);
+
+            // Put LEDs into standby — no active session
+            rosService.publishSessionActive(robotId, false);
 
             // Send the robot home to its base point (best-effort — never blocks end).
             navService.sendRobotToBase(robotId).catch(() => {});

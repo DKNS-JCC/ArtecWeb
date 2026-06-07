@@ -274,9 +274,10 @@ router.get('/visitor/map', authMiddleware, (req, res) => {
 });
 
 // ─── CHAT HISTORY Routes (admin only) ────────────────────────
-router.get('/chat-history/robots',                       authMiddleware, adminMiddleware, chatHistoryController.listRobotsForFilter);
-router.get('/chat-history/sessions',                     authMiddleware, adminMiddleware, chatHistoryController.listSessions);
-router.get('/chat-history/sessions/:session_id/messages', authMiddleware, adminMiddleware, chatHistoryController.getSessionMessages);
+router.get   ('/chat-history/robots',                        authMiddleware, adminMiddleware, chatHistoryController.listRobotsForFilter);
+router.get   ('/chat-history/sessions',                      authMiddleware, adminMiddleware, chatHistoryController.listSessions);
+router.get   ('/chat-history/sessions/:session_id/messages', authMiddleware, adminMiddleware, chatHistoryController.getSessionMessages);
+router.delete('/chat-history/sessions/:session_id',          authMiddleware, adminMiddleware, chatHistoryController.deleteSession);
 
 // ─── ADMIN-ONLY Routes ────────────────────────────────────────
 // adminMiddleware allows both admin and superadmin
@@ -797,79 +798,76 @@ router.post('/robots/:id/force-end', authMiddleware, adminMiddleware, (req, res)
 });
 
 // --- STATS ENDPOINT ---
-router.get('/admin/stats', authMiddleware, adminMiddleware, (req, res) => {
+router.get('/admin/stats', authMiddleware, adminMiddleware, async (req, res) => {
     const isSuperAdmin = req.user.role === 'platform_admin';
     const museumId = req.user.museum_id;
+    const p = isSuperAdmin ? [] : [museumId];
 
-    // We'll run a few queries in parallel
-    const queries = {};
-    const params = [];
+    const qGet = (sql, params) => new Promise((resolve, reject) =>
+        db.get(sql, params, (err, row) => err ? reject(err) : resolve(row || {}))
+    );
+    const qAll = (sql, params) => new Promise((resolve, reject) =>
+        db.all(sql, params, (err, rows) => err ? reject(err) : resolve(rows || []))
+    );
 
-    if (isSuperAdmin) {
-        // Platform Admin stats
-        queries.totalMuseums = `SELECT COUNT(*) as count FROM museums`;
-        queries.totalRobots = `SELECT COUNT(*) as count FROM robots`;
-        queries.totalVisitors = `SELECT COUNT(*) as count FROM visitors`;
-        // Average session time for completed sessions
-        queries.avgSessionTime = `
-            SELECT AVG(
-                (julianday(ended_at) - julianday(created_at)) * 24 * 60
-            ) as avgMinutes 
-            FROM visitors 
-            WHERE ended_at IS NOT NULL
-        `;
-        queries.activeRobots = `SELECT COUNT(*) as count FROM robots WHERE status != 'idle'`;
-    } else {
-        // Museum Admin stats
-        params.push(museumId);
-        queries.totalRobots = `SELECT COUNT(*) as count FROM robots WHERE museum_id = ?`;
-        queries.activeRobots = `SELECT COUNT(*) as count FROM robots WHERE museum_id = ? AND status != 'idle'`;
-        
-        // Visitors for robots in this museum
-        queries.totalVisitors = `
-            SELECT COUNT(v.id) as count 
-            FROM visitors v
-            JOIN robots r ON v.robot_id = r.id
-            WHERE r.museum_id = ?
-        `;
-        
-        queries.avgSessionTime = `
-            SELECT AVG(
-                (julianday(v.ended_at) - julianday(v.created_at)) * 24 * 60
-            ) as avgMinutes 
-            FROM visitors v
-            JOIN robots r ON v.robot_id = r.id
-            WHERE v.ended_at IS NOT NULL AND r.museum_id = ?
-        `;
-    }
+    try {
+        const [
+            totVisitors, avgSession, totRobots, activeRobots, totMuseums,
+            visitorsByDay, expertiseDist, intentDist, robotActivity
+        ] = await Promise.all([
+            // 1. Total visitors
+            qGet(isSuperAdmin
+                ? `SELECT COUNT(*) AS count FROM visitors`
+                : `SELECT COUNT(v.id) AS count FROM visitors v JOIN robots r ON r.id=v.robot_id WHERE r.museum_id=?`, p),
+            // 2. Avg session time (minutes)
+            qGet(isSuperAdmin
+                ? `SELECT AVG((julianday(ended_at)-julianday(created_at))*1440) AS avg FROM visitors WHERE ended_at IS NOT NULL`
+                : `SELECT AVG((julianday(v.ended_at)-julianday(v.created_at))*1440) AS avg FROM visitors v JOIN robots r ON r.id=v.robot_id WHERE v.ended_at IS NOT NULL AND r.museum_id=?`, p),
+            // 3. Total robots
+            qGet(isSuperAdmin
+                ? `SELECT COUNT(*) AS count FROM robots`
+                : `SELECT COUNT(*) AS count FROM robots WHERE museum_id=?`, p),
+            // 4. Active robots
+            qGet(isSuperAdmin
+                ? `SELECT COUNT(*) AS count FROM robots WHERE status!='idle'`
+                : `SELECT COUNT(*) AS count FROM robots WHERE museum_id=? AND status!='idle'`, p),
+            // 5. Museums (superadmin only)
+            isSuperAdmin
+                ? qGet(`SELECT COUNT(*) AS count FROM museums`, [])
+                : Promise.resolve({ count: null }),
+            // 6. Visitors per day — last 7 days
+            qAll(isSuperAdmin
+                ? `SELECT date(created_at) AS day, COUNT(*) AS count FROM visitors WHERE created_at >= date('now','-6 days') GROUP BY date(created_at) ORDER BY day`
+                : `SELECT date(v.created_at) AS day, COUNT(*) AS count FROM visitors v JOIN robots r ON r.id=v.robot_id WHERE r.museum_id=? AND v.created_at >= date('now','-6 days') GROUP BY date(v.created_at) ORDER BY day`, p),
+            // 7. Expertise distribution
+            qAll(isSuperAdmin
+                ? `SELECT expertise_level AS level, COUNT(*) AS count FROM visitors GROUP BY expertise_level ORDER BY count DESC`
+                : `SELECT v.expertise_level AS level, COUNT(*) AS count FROM visitors v JOIN robots r ON r.id=v.robot_id WHERE r.museum_id=? GROUP BY v.expertise_level ORDER BY count DESC`, p),
+            // 8. Top intents (exclude utility)
+            qAll(isSuperAdmin
+                ? `SELECT intent, COUNT(*) AS count FROM chat_messages WHERE role='assistant' AND intent IS NOT NULL AND intent NOT IN ('none','greet','farewell') GROUP BY intent ORDER BY count DESC LIMIT 5`
+                : `SELECT cm.intent, COUNT(*) AS count FROM chat_messages cm JOIN visitors v ON v.session_id=cm.session_id JOIN robots r ON r.id=v.robot_id WHERE r.museum_id=? AND cm.role='assistant' AND cm.intent IS NOT NULL AND cm.intent NOT IN ('none','greet','farewell') GROUP BY cm.intent ORDER BY count DESC LIMIT 5`, p),
+            // 9. Robot activity ranking
+            qAll(isSuperAdmin
+                ? `SELECT r.name AS robot_name, COUNT(v.id) AS count FROM robots r LEFT JOIN visitors v ON v.robot_id=r.id GROUP BY r.id ORDER BY count DESC LIMIT 6`
+                : `SELECT r.name AS robot_name, COUNT(v.id) AS count FROM robots r LEFT JOIN visitors v ON v.robot_id=r.id WHERE r.museum_id=? GROUP BY r.id ORDER BY count DESC LIMIT 6`, p),
+        ]);
 
-    const results = {};
-    let pending = Object.keys(queries).length;
-
-    if (pending === 0) return res.json(results);
-
-    Object.keys(queries).forEach(key => {
-        // The first argument to db.get for each query needs an array of parameters.
-        // For isSuperAdmin, no params are needed so we pass []. 
-        // For museum admin, the query usually needs 'museumId'.
-        const queryParams = isSuperAdmin ? [] : queries[key].includes('?') ? [museumId] : [];
-
-        db.get(queries[key], queryParams, (err, row) => {
-            if (err) {
-                console.error(`Error querying ${key}:`, err);
-                results[key] = 0;
-            } else {
-                // If it's a count query or single value
-                results[key] = row.count !== undefined ? row.count : 
-                               row.avgMinutes !== undefined ? Math.round(row.avgMinutes * 10) / 10 : 0;
-            }
-
-            pending--;
-            if (pending === 0) {
-                res.json(results);
-            }
+        res.json({
+            totalRobots:    totRobots.count    || 0,
+            activeRobots:   activeRobots.count || 0,
+            totalVisitors:  totVisitors.count  || 0,
+            avgSessionTime: Math.round((avgSession.avg || 0) * 10) / 10,
+            totalMuseums:   totMuseums.count   ?? null,
+            visitorsByDay,
+            expertiseDist,
+            intentDist,
+            robotActivity,
         });
-    });
+    } catch (err) {
+        console.error('[Stats] Error:', err);
+        res.status(500).json({ error: 'Error fetching stats' });
+    }
 });
 
 module.exports = router;

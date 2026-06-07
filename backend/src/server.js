@@ -7,6 +7,7 @@ dotenv.config({ path: path.resolve(__dirname, '../../.env.local') });
 const express = require('express');
 const cors = require('cors');
 const apiRoutes = require('./routes/api');
+const cleanupService = require('./services/cleanupService');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -46,6 +47,7 @@ if (process.env.NODE_ENV !== 'test') {
   app.listen(PORT, "0.0.0.0", () => {
     console.log(`Preparen sus roombas que el backend esta on fire`);
   });
+  cleanupService.start();
 }
 
 module.exports = app;

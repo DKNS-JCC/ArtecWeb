@@ -14,25 +14,50 @@ function dbGet(sql, params) {
     );
 }
 
+function dbRun(sql, params) {
+    return new Promise((resolve, reject) =>
+        db.run(sql, params, function (err) { err ? reject(err) : resolve(this); })
+    );
+}
+
 // ─── GET /api/chat-history/sessions ──────────────────────────────────────────
-// Lists all sessions across the admin's robots, newest first.
-// Query params: robot_id (filter), limit (default 30), offset (default 0)
+// Lists sessions (soft-deleted excluded). Supports robot_id, date_from, date_to filters.
 
 exports.listSessions = async (req, res) => {
     const isSuperAdmin = req.user.role === 'platform_admin';
     const museumId     = req.user.museum_id;
-    const robotFilter  = req.query.robot_id || null;
+    const robotFilter  = req.query.robot_id  || null;
+    const dateFrom     = req.query.date_from || null;  // 'YYYY-MM-DD'
+    const dateTo       = req.query.date_to   || null;  // 'YYYY-MM-DD'
     const limit        = Math.min(parseInt(req.query.limit)  || 30, 100);
     const offset       = Math.max(parseInt(req.query.offset) || 0,  0);
 
     try {
-        let where = isSuperAdmin ? '1=1' : 'r.museum_id = ?';
-        const params = isSuperAdmin ? [] : [museumId];
+        const conditions = [];
+        const params     = [];
+
+        if (!isSuperAdmin) {
+            conditions.push('r.museum_id = ?');
+            params.push(museumId);
+        }
+
+        // Soft-delete: hide deleted sessions from history
+        conditions.push('v.deleted_at IS NULL');
 
         if (robotFilter) {
-            where += ' AND r.id = ?';
+            conditions.push('r.id = ?');
             params.push(robotFilter);
         }
+        if (dateFrom) {
+            conditions.push('v.created_at >= ?');
+            params.push(dateFrom);
+        }
+        if (dateTo) {
+            conditions.push("v.created_at < date(?, '+1 day')");
+            params.push(dateTo);
+        }
+
+        const where = conditions.join(' AND ');
 
         const sessions = await dbAll(`
             SELECT
@@ -68,7 +93,6 @@ exports.listSessions = async (req, res) => {
             LIMIT  ? OFFSET ?
         `, [...params, limit, offset]);
 
-        // Total count for pagination
         const countRow = await dbGet(`
             SELECT COUNT(DISTINCT v.session_id) AS total
             FROM   visitors v
@@ -84,7 +108,7 @@ exports.listSessions = async (req, res) => {
 };
 
 // ─── GET /api/chat-history/sessions/:session_id/messages ─────────────────────
-// Returns the full ordered conversation for one session.
+// Returns the ordered conversation for one session (paginated, max 500).
 
 exports.getSessionMessages = async (req, res) => {
     const isSuperAdmin = req.user.role === 'platform_admin';
@@ -92,7 +116,6 @@ exports.getSessionMessages = async (req, res) => {
     const { session_id } = req.params;
 
     try {
-        // Access control: verify the session belongs to an authorised robot
         const session = await dbGet(`
             SELECT v.session_id, v.name AS visitor_name, v.expertise_level,
                    v.created_at AS started_at, v.ended_at,
@@ -100,6 +123,7 @@ exports.getSessionMessages = async (req, res) => {
             FROM   visitors v
             JOIN   robots   r ON r.id = v.robot_id
             WHERE  v.session_id = ?
+              AND  v.deleted_at IS NULL
               AND  (? OR r.museum_id = ?)
         `, [session_id, isSuperAdmin ? 1 : 0, museumId]);
 
@@ -107,17 +131,60 @@ exports.getSessionMessages = async (req, res) => {
             return res.status(404).json({ error: 'Sesión no encontrada o sin acceso' });
         }
 
+        const limit  = Math.min(parseInt(req.query.limit)  || 200, 500);
+        const offset = Math.max(parseInt(req.query.offset) || 0,   0);
+
+        const countRow = await dbGet(
+            `SELECT COUNT(*) AS total FROM chat_messages WHERE session_id = ?`,
+            [session_id]
+        );
+
         const messages = await dbAll(`
             SELECT role, content, intent, created_at
             FROM   chat_messages
             WHERE  session_id = ?
             ORDER  BY created_at ASC
-        `, [session_id]);
+            LIMIT  ? OFFSET ?
+        `, [session_id, limit, offset]);
 
-        res.json({ session, messages });
+        res.json({ session, messages, total: countRow?.total || 0, limit, offset });
     } catch (err) {
         console.error('[ChatHistory] getSessionMessages error:', err);
         res.status(500).json({ error: 'Error cargando mensajes de sesión' });
+    }
+};
+
+// ─── DELETE /api/chat-history/sessions/:session_id ───────────────────────────
+// Soft-deletes a session: hidden in history, still counted in stats.
+
+exports.deleteSession = async (req, res) => {
+    const isSuperAdmin = req.user.role === 'platform_admin';
+    const museumId     = req.user.museum_id;
+    const { session_id } = req.params;
+
+    try {
+        // Verify the session belongs to an authorised robot
+        const session = await dbGet(`
+            SELECT v.session_id FROM visitors v
+            JOIN   robots r ON r.id = v.robot_id
+            WHERE  v.session_id = ?
+              AND  v.deleted_at IS NULL
+              AND  (? OR r.museum_id = ?)
+        `, [session_id, isSuperAdmin ? 1 : 0, museumId]);
+
+        if (!session) {
+            return res.status(404).json({ error: 'Sesión no encontrada o sin acceso' });
+        }
+
+        await dbRun(
+            `UPDATE visitors SET deleted_at = CURRENT_TIMESTAMP WHERE session_id = ?`,
+            [session_id]
+        );
+
+        res.json({ ok: true });
+    } catch (err) {
+        console.error('[ChatHistory] deleteSession error:', err);
+        res.status(500).json({ error: 'Error al eliminar la sesión' });
     }
 };
 

@@ -23,10 +23,10 @@ const messages        = ref([])     // messages for selected session
 // ─── Expertise label map ───────────────────────────────────────────────────────
 
 const EXPERTISE = {
-    nino:       { label: 'Niño',       color: 'bg-yellow-100 text-yellow-800' },
-    general:    { label: 'General',    color: 'bg-blue-100   text-blue-800'   },
-    estudiante: { label: 'Estudiante', color: 'bg-purple-100 text-purple-800' },
-    experto:    { label: 'Experto',    color: 'bg-green-100  text-green-800'  },
+    nino:       { label: 'Niño',       color: 'bg-yellow-50 dark:bg-yellow-950/30 text-yellow-700 dark:text-yellow-400 border-yellow-200 dark:border-yellow-800' },
+    general:    { label: 'General',    color: 'bg-blue-50 dark:bg-blue-950/30 text-blue-700 dark:text-blue-400 border-blue-200 dark:border-blue-800' },
+    estudiante: { label: 'Estudiante', color: 'bg-purple-50 dark:bg-purple-950/30 text-purple-700 dark:text-purple-400 border-purple-200 dark:border-purple-800' },
+    experto:    { label: 'Experto',    color: 'bg-green-50 dark:bg-green-950/30 text-green-700 dark:text-green-400 border-green-200 dark:border-green-800' },
 }
 
 const INTENT_LABEL = {
@@ -58,7 +58,7 @@ function formatDuration(mins) {
 }
 
 function expertiseBadge(level) {
-    return EXPERTISE[level] || { label: level || 'General', color: 'bg-gray-100 text-gray-700' }
+    return EXPERTISE[level] || { label: level || 'General', color: 'bg-muted text-muted-foreground border-border' }
 }
 
 // ─── Fetch ────────────────────────────────────────────────────────────────────
@@ -112,7 +112,7 @@ onMounted(async () => {
 <template>
   <div>
     <div class="flex justify-between items-center mb-6">
-      <h2 class="text-xl font-semibold text-foreground">Historial de Conversaciones</h2>
+      <h2 class="font-display text-xl font-medium tracking-tight text-foreground">Historial de Conversaciones</h2>
       <Button @click="fetchSessions(true)" variant="outline" size="sm" class="gap-2">
           <RefreshCw class="w-4 h-4" /> Recargar
       </Button>
@@ -124,7 +124,7 @@ onMounted(async () => {
         <Bot class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
         <select
           v-model="robotFilter"
-          class="w-full border rounded-lg pl-9 pr-3 py-2 text-sm bg-background text-foreground outline-none focus:ring-2 focus:ring-primary appearance-none"
+          class="w-full h-10 rounded-sm border border-input bg-background pl-9 pr-3 text-sm text-foreground focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none appearance-none"
         >
           <option value="">Todos los robots</option>
           <option v-for="r in robots" :key="r.id" :value="r.id">{{ r.name }}</option>
@@ -147,7 +147,7 @@ onMounted(async () => {
           Cargando sesiones…
         </p>
 
-        <p v-else-if="sessions.length === 0" class="text-sm text-muted-foreground text-center py-10 border border-dashed rounded-xl border-border bg-card/50">
+        <p v-else-if="sessions.length === 0" class="text-sm text-muted-foreground text-center py-10 border border-dashed rounded-md border-border bg-card/50">
           No hay conversaciones registradas.
         </p>
 
@@ -156,7 +156,7 @@ onMounted(async () => {
           :key="s.session_id"
           @click="selectSession(s)"
           :class="[
-            'w-full text-left rounded-xl border p-4 transition-all hover:border-primary/60',
+            'w-full text-left rounded-md border p-4 transition-all hover:border-primary/60',
             selectedSession?.session_id === s.session_id
               ? 'border-primary bg-primary/5 shadow-sm ring-1 ring-primary/20'
               : 'border-border bg-card'
@@ -170,7 +170,7 @@ onMounted(async () => {
               </span>
               {{ s.visitor_name }}
             </span>
-            <span :class="['text-[10px] font-bold px-2 py-0.5 rounded-full whitespace-nowrap border', expertiseBadge(s.expertise_level).color, expertiseBadge(s.expertise_level).color.replace('bg-', 'border-').replace('100', '200')]">
+            <span :class="['text-[10px] font-bold px-2 py-0.5 rounded-full whitespace-nowrap border', expertiseBadge(s.expertise_level).color]">
               {{ expertiseBadge(s.expertise_level).label }}
             </span>
           </div>
@@ -203,7 +203,7 @@ onMounted(async () => {
       </div>
 
       <!-- ── Conversation panel (right) ─────────────────────────── -->
-      <div class="hidden md:flex flex-1 flex-col border border-border shadow-sm rounded-2xl bg-card overflow-hidden">
+      <div class="hidden md:flex flex-1 flex-col border border-border shadow-sm rounded-md bg-card overflow-hidden">
 
         <!-- Empty state -->
         <div v-if="!selectedSession" class="flex-1 flex flex-col items-center justify-center text-muted-foreground gap-3 p-8 text-center bg-muted/10">
@@ -222,7 +222,7 @@ onMounted(async () => {
                  {{ selectedSession.visitor_name.charAt(0) }}
               </div>
               <div>
-                <p class="font-bold text-sm text-foreground">{{ selectedSession.visitor_name }}</p>
+                <p class="font-semibold text-sm text-foreground">{{ selectedSession.visitor_name }}</p>
                 <div class="flex items-center gap-2 text-xs text-muted-foreground mt-0.5">
                    <span class="flex items-center gap-1"><Bot class="w-3 h-3" /> {{ selectedSession.robot_name }}</span>
                    <span class="opacity-50">•</span>
@@ -231,7 +231,7 @@ onMounted(async () => {
               </div>
             </div>
             <div class="text-right">
-                <span :class="['text-[11px] font-bold px-2.5 py-1 rounded-full border', expertiseBadge(selectedSession.expertise_level).color, expertiseBadge(selectedSession.expertise_level).color.replace('bg-', 'border-').replace('100', '200')]">
+                <span :class="['text-[11px] font-bold px-2.5 py-1 rounded-full border', expertiseBadge(selectedSession.expertise_level).color]">
                   Perfil: {{ expertiseBadge(selectedSession.expertise_level).label }}
                 </span>
                 <p class="text-[10px] text-muted-foreground mt-1.5 flex items-center justify-end gap-1">

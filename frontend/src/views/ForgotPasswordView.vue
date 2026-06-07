@@ -1,7 +1,6 @@
 <script setup>
 import { ref } from 'vue'
 import { authService } from '@/services/authService'
-import { Card, CardContent } from '@/components/ui/card'
 import { Input }  from '@/components/ui/input'
 import { Label }  from '@/components/ui/label'
 import { Button } from '@/components/ui/button'
@@ -32,54 +31,57 @@ const handleSubmit = async () => {
 </script>
 
 <template>
-    <div class="min-h-screen flex items-center justify-center bg-background px-4 py-12">
-        <div class="max-w-md w-full">
+    <div class="min-h-screen flex items-center justify-center bg-background px-6 py-12">
+        <div class="w-full max-w-[26rem]">
 
-            <div class="text-center mb-10">
-                <router-link to="/" class="inline-block mb-6 transition-transform hover:scale-105">
-                    <img src="/icon.ico" alt="Artec" class="w-14 h-14 rounded-2xl shadow-[0_4px_20px_rgba(37,99,235,0.25)] object-contain" />
+            <!-- Masthead, like the head of a catalogue entry -->
+            <header class="reveal" style="animation-delay: 40ms">
+                <h1 class="font-display text-5xl font-medium tracking-tight leading-[0.95] mb-3">
+                    Recuperar contraseña
+                </h1>
+                <p class="text-muted-foreground text-[0.95rem] leading-relaxed">
+                    Te enviaremos un enlace para restablecerla por correo electrónico.
+                </p>
+            </header>
+
+            <hr class="hairline my-8 reveal" style="animation-delay: 120ms" />
+
+            <!-- Success state -->
+            <div v-if="sent" class="space-y-7 reveal" style="animation-delay: 200ms">
+                <p class="text-foreground leading-relaxed">
+                    Si <strong>{{ email }}</strong> está registrado, recibirás un enlace en los próximos minutos.
+                    Revisa también tu carpeta de spam.
+                </p>
+                <router-link to="/login">
+                    <Button variant="outline" size="lg" class="w-full">Volver al inicio de sesión</Button>
                 </router-link>
-                <h2 class="text-3xl font-extrabold text-foreground tracking-tight mb-2">Recuperar contraseña</h2>
-                <p class="text-muted-foreground">Te enviaremos un enlace para restablecerla</p>
             </div>
 
-            <Card class="px-8 py-10 rounded-3xl shadow-[0_8px_30px_rgba(0,0,0,0.04)]">
-                <CardContent class="p-0">
+            <!-- Form state -->
+            <form v-else @submit.prevent="handleSubmit" class="space-y-7 reveal" style="animation-delay: 200ms">
+                <Alert v-if="error" variant="destructive">{{ error }}</Alert>
 
-                    <!-- Success state -->
-                    <div v-if="sent" class="text-center space-y-4">
-                        <div class="text-5xl">📬</div>
-                        <p class="font-semibold text-foreground">¡Correo enviado!</p>
-                        <p class="text-sm text-muted-foreground">
-                            Si <strong>{{ email }}</strong> está registrado, recibirás un enlace en los próximos minutos.<br>
-                            Revisa también tu carpeta de spam.
-                        </p>
-                        <router-link to="/login">
-                            <Button variant="outline" class="w-full mt-4 rounded-full">Volver al inicio de sesión</Button>
-                        </router-link>
-                    </div>
+                <div>
+                    <Label for="email">Correo electrónico</Label>
+                    <Input id="email" type="email" v-model="email"
+                        placeholder="tu@correo.com" autocomplete="email" autofocus />
+                </div>
 
-                    <!-- Form state -->
-                    <form v-else @submit.prevent="handleSubmit" class="space-y-6">
-                        <Alert v-if="error" variant="destructive">{{ error }}</Alert>
+                <Button type="submit" :disabled="loading" size="lg" class="w-full group">
+                    {{ loading ? 'Enviando…' : 'Enviar enlace' }}
+                    <span v-if="!loading" class="transition-transform group-hover:translate-x-1">&rarr;</span>
+                </Button>
+            </form>
 
-                        <div>
-                            <Label for="email">Correo electrónico</Label>
-                            <Input id="email" type="email" v-model="email"
-                                placeholder="tu@correo.com" autocomplete="email" autofocus />
-                        </div>
+            <hr class="hairline my-8 reveal" style="animation-delay: 280ms" />
 
-                        <Button type="submit" :disabled="loading" class="w-full rounded-full">
-                            {{ loading ? 'Enviando...' : 'Enviar enlace' }}
-                        </Button>
+            <p class="text-sm text-muted-foreground reveal" style="animation-delay: 320ms">
+                <router-link to="/login"
+                    class="text-foreground underline decoration-border decoration-1 underline-offset-4 hover:decoration-primary transition-colors">
+                    ← Volver al inicio de sesión
+                </router-link>
+            </p>
 
-                        <p class="text-center text-sm text-muted-foreground">
-                            <router-link to="/login" class="text-primary hover:underline">← Volver al inicio de sesión</router-link>
-                        </p>
-                    </form>
-
-                </CardContent>
-            </Card>
         </div>
     </div>
 </template>

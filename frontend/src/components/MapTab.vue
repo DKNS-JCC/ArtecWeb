@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Alert } from '@/components/ui/alert'
 import { Card, CardContent, CardHeader } from '@/components/ui/card'
+import { CATEGORIES, BASE_CATEGORY, categoryColor, categoryLabel } from '@/lib/mapCategories'
 import {
     Upload,
     Trash2,
@@ -36,30 +37,6 @@ const props = defineProps({
 })
 
 const API_ROOT = (import.meta.env.VITE_API_URL || '').replace('/api', '')
-
-const CATEGORIES = [
-    { value: 'exhibit', label: 'Exhibición' },
-    { value: 'obra', label: 'Obra' },
-    { value: 'entrance', label: 'Entrada' },
-    { value: 'exit', label: 'Salida' },
-    { value: 'restroom', label: 'Baños' },
-    { value: 'other', label: 'Otro' },
-]
-
-// Internal robot home/return point. Not a visitor-facing category, so it lives
-// outside CATEGORIES (the dropdown) — it's managed via its own controls.
-const BASE_CATEGORY = 'base'
-const BASE_COLOR = '#0ea5e9'
-
-const CATEGORY_COLORS = {
-    exhibit: '#3b82f6',
-    obra: '#f59e0b',
-    entrance: '#22c55e',
-    exit: '#ef4444',
-    restroom: '#8b5cf6',
-    other: '#6b7280',
-    base: BASE_COLOR,
-}
 
 const loading = ref(true)
 const error = ref(null)
@@ -294,7 +271,7 @@ function draw() {
 function drawMarker(ctx, zone, isHovered) {
     if (!mapData.value) return
     const { x, y } = worldToPixel(zone.map_x, zone.map_y)
-    const color = CATEGORY_COLORS[zone.category] || CATEGORY_COLORS.other
+    const color = categoryColor(zone.category)
     const radius = isHovered ? 10 : 7
 
     ctx.beginPath()
@@ -770,7 +747,7 @@ onUnmounted(() => {
                         <Label class="text-xs text-muted-foreground whitespace-nowrap shrink-0">Museo</Label>
                         <select
                             v-model="selectedMuseumId"
-                            class="h-9 rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                            class="h-9 rounded-sm border border-input bg-background px-3 text-sm text-foreground focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none"
                         >
                             <option value="" disabled>Selecciona...</option>
                             <option v-for="museum in museumOptions" :key="museum.id" :value="museum.id">
@@ -788,7 +765,7 @@ onUnmounted(() => {
                         <select
                             v-model="selectedMapId"
                             :disabled="!selectedMuseumId || maps.length === 0"
-                            class="h-9 rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50"
+                            class="h-9 rounded-sm border border-input bg-background px-3 text-sm text-foreground focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none disabled:opacity-50"
                         >
                             <option value="">{{ maps.length ? 'Selecciona un mapa...' : 'Sin mapas' }}</option>
                             <option v-for="map in maps" :key="map.id" :value="map.id">{{ map.name }}</option>
@@ -886,11 +863,11 @@ onUnmounted(() => {
         <div v-else class="flex flex-col gap-4">
         <!-- Mandatory base warning -->
         <div v-if="!baseZone"
-            class="flex items-start gap-3 rounded-xl border border-amber-300 dark:border-amber-700/40 bg-amber-50 dark:bg-amber-900/20 px-4 py-3">
-            <AlertTriangle class="w-5 h-5 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
+            class="flex items-start gap-3 rounded-sm border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/30 px-4 py-3">
+            <AlertTriangle class="w-5 h-5 text-amber-700 dark:text-amber-400 shrink-0 mt-0.5" />
             <div class="flex-1 min-w-0">
                 <p class="text-sm font-semibold text-amber-800 dark:text-amber-300">Este mapa no tiene punto base</p>
-                <p class="text-xs text-amber-700 dark:text-amber-400/80 mt-0.5">
+                <p class="text-xs text-amber-700/80 dark:text-amber-400/80 mt-0.5">
                     El punto base es a donde vuelve el robot al terminar. Es obligatorio para poder asignar este mapa a un robot.
                 </p>
             </div>
@@ -905,10 +882,10 @@ onUnmounted(() => {
             <Card class="flex-1 overflow-hidden relative">
                 <!-- Top-left: map name + zone count + add-zone button -->
                 <div class="absolute top-3 left-3 z-10 flex items-center gap-2 flex-wrap">
-                    <span class="text-sm font-semibold bg-background/90 backdrop-blur-sm px-3 py-1.5 rounded-lg border border-border shadow-sm">
+                    <span class="text-sm font-semibold bg-background/90 backdrop-blur-sm px-3 py-1.5 rounded-sm border border-border shadow-sm">
                         {{ mapData?.name }}
                     </span>
-                    <span class="text-xs text-muted-foreground bg-background/90 backdrop-blur-sm px-2.5 py-1.5 rounded-lg border border-border shadow-sm">
+                    <span class="text-xs text-muted-foreground bg-background/90 backdrop-blur-sm px-2.5 py-1.5 rounded-sm border border-border shadow-sm">
                         {{ regularZones.length }} zona{{ regularZones.length !== 1 ? 's' : '' }}
                     </span>
                     <Button
@@ -938,7 +915,7 @@ onUnmounted(() => {
                 <!-- Placing mode banner (centered top overlay) -->
                 <div
                     v-if="isPlacingMode || placingBase"
-                    class="absolute top-3 left-1/2 -translate-x-1/2 z-10 flex items-center gap-2 px-4 py-2 rounded-xl shadow-lg text-sm font-medium whitespace-nowrap"
+                    class="absolute top-3 left-1/2 -translate-x-1/2 z-10 flex items-center gap-2 px-4 py-2 rounded-sm shadow-sm text-sm font-medium whitespace-nowrap"
                     :class="placingBase ? 'bg-sky-500 text-white' : 'bg-primary text-primary-foreground'"
                 >
                     <Crosshair class="w-4 h-4 animate-pulse shrink-0" />
@@ -986,11 +963,11 @@ onUnmounted(() => {
                             >
                                 <div
                                     class="w-2.5 h-2.5 rounded-full shrink-0"
-                                    :style="{ backgroundColor: CATEGORY_COLORS[zone.category] || CATEGORY_COLORS.other }"
+                                    :style="{ backgroundColor: categoryColor(zone.category) }"
                                 ></div>
                                 <div class="min-w-0 flex-1">
                                     <p class="text-sm font-medium text-foreground truncate">{{ zone.name }}</p>
-                                    <p class="text-xs text-muted-foreground">{{ CATEGORIES.find(c => c.value === zone.category)?.label || zone.category }}</p>
+                                    <p class="text-xs text-muted-foreground">{{ categoryLabel(zone.category) }}</p>
                                 </div>
                                 <Pencil class="w-3.5 h-3.5 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity shrink-0" />
                             </div>
@@ -1009,12 +986,12 @@ onUnmounted(() => {
                         <p class="text-xs text-muted-foreground">
                             Punto interno (no visible para visitantes) al que vuelve el robot al terminar.
                         </p>
-                        <div v-if="baseZone" class="flex items-center gap-2 rounded-lg border border-sky-500/30 bg-sky-500/5 px-3 py-2">
+                        <div v-if="baseZone" class="flex items-center gap-2 rounded-sm border border-sky-500/30 bg-sky-500/5 px-3 py-2">
                             <span class="w-2.5 h-2.5 rounded-full bg-sky-500 shrink-0"></span>
                             <span class="text-sm font-medium flex-1">Definido</span>
                             <span class="text-[0.7rem] font-mono text-muted-foreground">({{ baseZone.map_x }}, {{ baseZone.map_y }})</span>
                         </div>
-                        <div v-else class="text-xs text-amber-600 dark:text-amber-400 flex items-center gap-1.5">
+                        <div v-else class="text-xs text-amber-700 dark:text-amber-400 flex items-center gap-1.5">
                             <AlertTriangle class="w-3.5 h-3.5 shrink-0" /> Sin definir
                         </div>
                         <div class="flex gap-2">
@@ -1040,7 +1017,7 @@ onUnmounted(() => {
                             <select
                                 v-model="selectedRobotToAssign"
                                 :disabled="!baseZone"
-                                class="flex h-9 flex-1 rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50"
+                                class="flex h-9 flex-1 rounded-sm border border-input bg-background px-3 text-sm text-foreground focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none disabled:opacity-50"
                             >
                                 <option value="">Selecciona un robot...</option>
                                 <option v-for="robot in robotsAvailableForAssignment" :key="robot.id" :value="robot.id">
@@ -1052,7 +1029,7 @@ onUnmounted(() => {
                                 Asignar
                             </Button>
                         </div>
-                        <p v-if="!baseZone" class="text-xs text-amber-600 dark:text-amber-400">
+                        <p v-if="!baseZone" class="text-xs text-amber-700 dark:text-amber-400">
                             Define el punto base para poder asignar robots.
                         </p>
 
@@ -1064,7 +1041,7 @@ onUnmounted(() => {
                             <div
                                 v-for="robot in robotsAssignedToMap"
                                 :key="robot.id"
-                                class="flex items-center justify-between gap-2 rounded-lg border border-border px-3 py-2"
+                                class="flex items-center justify-between gap-2 rounded-sm border border-border px-3 py-2"
                             >
                                 <div class="min-w-0 flex items-center gap-2">
                                     <Bot class="w-4 h-4 text-muted-foreground shrink-0" />
@@ -1094,15 +1071,15 @@ onUnmounted(() => {
                 class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm"
                 @click.self="cancelPlacement"
             >
-                <div class="bg-background border border-border rounded-2xl shadow-xl w-full max-w-md mx-4 p-6 space-y-4">
+                <div class="bg-card border border-border rounded-md w-full max-w-md mx-4 p-6 space-y-4">
                     <div class="flex justify-between items-center">
-                        <h3 class="text-lg font-semibold">Nueva zona</h3>
+                        <h3 class="font-display text-lg font-medium tracking-tight">Nueva zona</h3>
                         <button @click="cancelPlacement" class="text-muted-foreground hover:text-foreground">
                             <X class="w-5 h-5" />
                         </button>
                     </div>
 
-                    <div class="text-xs text-muted-foreground bg-muted rounded-lg px-3 py-2">
+                    <div class="text-xs text-muted-foreground bg-muted rounded-sm px-3 py-2">
                         Posición en mapa: ({{ pendingZone?.map_x }}, {{ pendingZone?.map_y }})
                     </div>
 
@@ -1119,7 +1096,7 @@ onUnmounted(() => {
                             <Label>Categoría</Label>
                             <select
                                 v-model="zoneForm.category"
-                                class="mt-1 w-full h-10 rounded-lg border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                                class="mt-1 w-full h-10 rounded-sm border border-input bg-background px-3 text-sm text-foreground focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none"
                             >
                                 <option v-for="cat in CATEGORIES" :key="cat.value" :value="cat.value">{{ cat.label }}</option>
                             </select>
@@ -1143,9 +1120,9 @@ onUnmounted(() => {
                 class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm"
                 @click.self="showEditForm = false"
             >
-                <div class="bg-background border border-border rounded-2xl shadow-xl w-full max-w-md mx-4 p-6 space-y-4">
+                <div class="bg-card border border-border rounded-md w-full max-w-md mx-4 p-6 space-y-4">
                     <div class="flex justify-between items-center">
-                        <h3 class="text-lg font-semibold">Editar zona</h3>
+                        <h3 class="font-display text-lg font-medium tracking-tight">Editar zona</h3>
                         <button @click="showEditForm = false" class="text-muted-foreground hover:text-foreground">
                             <X class="w-5 h-5" />
                         </button>
@@ -1164,7 +1141,7 @@ onUnmounted(() => {
                             <Label>Categoría</Label>
                             <select
                                 v-model="editForm.category"
-                                class="mt-1 w-full h-10 rounded-lg border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                                class="mt-1 w-full h-10 rounded-sm border border-input bg-background px-3 text-sm text-foreground focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none"
                             >
                                 <option v-for="cat in CATEGORIES" :key="cat.value" :value="cat.value">{{ cat.label }}</option>
                             </select>

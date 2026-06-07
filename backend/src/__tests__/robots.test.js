@@ -10,6 +10,7 @@ const {
 jest.mock('../services/rosService', () => ({
     connect:            jest.fn(),
     disconnect:         jest.fn(),
+    waitForConnection:  jest.fn().mockResolvedValue(true),
     getConnectionState: jest.fn().mockReturnValue(false),
     move:               jest.fn(),
     sendNavGoal:        jest.fn(),

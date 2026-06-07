@@ -5,6 +5,7 @@ import { useDark, useToggle } from '@vueuse/core'
 import { Sun, Moon, User } from 'lucide-vue-next'
 import { useAuthStore } from '@/stores/auth'
 import { Button } from '@/components/ui/button'
+import Logo from '@/components/Logo.vue'
 
 const isDark = useDark()
 const toggleDark = useToggle(isDark)
@@ -48,10 +49,8 @@ router.afterEach(() => {
 
     <!-- Minimal Logo (Fixed Top Left) -->
     <div v-show="route.name !== 'chat'" class="fixed top-6 left-6 z-40">
-      <router-link to="/" class="flex items-center gap-3 group">
-        <img src="/icon.ico" alt="Artec"
-          class="w-10 h-10 rounded-xl shadow-[0_4px_14px_rgba(37,99,235,0.3)] transition-transform group-hover:scale-105 object-contain" />
-        <span class="font-bold text-xl tracking-tight text-foreground drop-shadow-sm">Artec</span>
+      <router-link to="/" class="flex items-center group transition-transform hover:scale-[1.02]" aria-label="Artec — inicio">
+        <Logo :size="40" wordmark />
       </router-link>
     </div>
 

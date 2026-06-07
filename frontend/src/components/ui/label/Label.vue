@@ -9,7 +9,7 @@ const props = defineProps({
 
 const classes = computed(() =>
     cn(
-        'block text-sm font-semibold text-foreground mb-2 leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70',
+        'block text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground mb-2 leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70',
         props.class
     )
 )

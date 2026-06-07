@@ -5,7 +5,7 @@ import { cn } from '@/lib/utils'
 import { CircleAlert, TriangleAlert, Info } from 'lucide-vue-next'
 
 const alertVariants = cva(
-    'relative w-full rounded-xl border p-4 text-sm font-medium flex items-center gap-3',
+    'relative w-full rounded-sm border p-4 text-sm font-medium flex items-center gap-3',
     {
         variants: {
             variant: {

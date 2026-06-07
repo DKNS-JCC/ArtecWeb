@@ -3,7 +3,7 @@ import { ref, onMounted, onUnmounted, computed, nextTick } from 'vue';
 import { useRouter } from 'vue-router';
 import { useAuthStore } from '@/stores/auth';
 import { chatService } from '@/services/chatService';
-import { Send, LogOut, Bot, Clock, Navigation, Check, X, Loader2, Map as MapIcon, Settings, ChevronRight, Mic, Volume2, VolumeX } from 'lucide-vue-next';
+import { Send, LogOut, Bot, Clock, Navigation, Check, X, Loader2, Map as MapIcon, Settings, ChevronRight, Mic, Volume2, VolumeX, AlertTriangle } from 'lucide-vue-next';
 import VisitorMap from '@/components/VisitorMap.vue';
 import { useTextToSpeech } from '@/composables/useTextToSpeech';
 import { useSpeechToText } from '@/composables/useSpeechToText';
@@ -15,9 +15,18 @@ const authStore = useAuthStore();
 const tts = useTextToSpeech();
 const stt = useSpeechToText();
 
+/** One-time onboarding hint for the (non-obvious) hold-to-talk gesture. */
+const showMicHint = ref(false);
+let micHintTimer  = null;
+const dismissMicHint = () => {
+    showMicHint.value = false;
+    if (micHintTimer) { clearTimeout(micHintTimer); micHintTimer = null; }
+};
+
 /** Hold-to-talk: record while pressed, transcribe on release, then send. */
 const handleMicDown = async () => {
     if (isSending.value || stt.isTranscribing.value) return;
+    dismissMicHint();
     tts.cancel();                       // don't capture the robot's own voice
     await stt.start();
 };
@@ -31,8 +40,9 @@ const handleMicUp = async () => {
     }
 };
 
-const STORAGE_KEY       = 'artec_chat_messages';
-const MAX_MESSAGE_LENGTH = 500;
+const STORAGE_KEY          = 'artec_chat_messages';
+const MAX_MESSAGE_LENGTH   = 500;
+const EXCLUSIVITY_TIME_SEC = 600;
 
 const robotName   = computed(() => authStore.user?.robot_name || 'Robot Guía');
 const visitorName = computed(() => authStore.user?.name || 'Amigo');
@@ -44,9 +54,17 @@ const showForcedEndModal = ref(false);
 const welcomeMessage = {
     id:     1,
     sender: 'robot',
-    text:   `¡Hola ${visitorName.value}! Soy ${robotName.value}, tu guía robótico. ¿En qué te puedo ayudar?`,
+    text:   `¡Hola ${visitorName.value}! Soy ${robotName.value}, tu guía robótico. Tienes ${EXCLUSIVITY_TIME_SEC / 60} minutos para preguntarme lo que quieras o pedirme que te lleve a cualquier rincón del museo.`,
     time:   new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
 };
+
+/** Starter prompts shown until the visitor sends their first message — removes blank-page friction. */
+const SUGGESTED_PROMPTS = [
+    '¿Qué puedo ver por aquí?',
+    'Llévame a la siguiente sala',
+    'Cuéntame algo curioso sobre esta zona',
+    '¿Cuánto dura la visita?',
+];
 
 // ── Message persistence ───────────────────────────────────────────────────────
 
@@ -69,6 +87,9 @@ function saveMessages() {
 
 const messages  = ref(loadMessages());
 const showMap   = ref(false);
+
+/** First-time guidance: suggested prompts vanish once the conversation actually starts. */
+const showSuggestions = computed(() => messages.value.length === 1 && !isSending.value);
 
 // ── Expertise level ───────────────────────────────────────────────────────────
 const showExpertiseModal  = ref(false);
@@ -170,7 +191,6 @@ const handleCancelNav = () => {
 
 // ── Session timer (10 min) ────────────────────────────────────────────────────
 
-const EXCLUSIVITY_TIME_SEC = 600;
 const timeLeft = ref(EXCLUSIVITY_TIME_SEC);
 let timerInterval = null;
 
@@ -300,22 +320,34 @@ const sendMessage = async () => {
     }
 };
 
+/** Fires a starter prompt as if the visitor had typed and sent it themselves. */
+const sendSuggestion = (prompt) => {
+    if (isSending.value) return;
+    messageText.value = prompt;
+    sendMessage();
+};
+
 onMounted(() => {
     startTimer();
     scrollToBottom();
+    if (stt.supported) {
+        showMicHint.value = true;
+        micHintTimer = setTimeout(dismissMicHint, 7000);
+    }
 });
 
 onUnmounted(() => {
     if (timerInterval) clearInterval(timerInterval);
+    if (micHintTimer) clearTimeout(micHintTimer);
 });
 </script>
 
 <template>
-    <div class="chat-layout bg-[#f2f2f7] dark:bg-black font-sans min-h-[100dvh] flex flex-col fixed inset-0 z-[100] sm:relative sm:z-auto sm:max-w-md sm:mx-auto sm:border-x sm:shadow-2xl">
+    <div class="bg-background font-sans min-h-[100dvh] flex flex-col fixed inset-0 z-[100] sm:relative sm:z-auto sm:max-w-md sm:mx-auto sm:border-x">
 
         <!-- HEADER -->
-        <header class="glass-header z-10 flex-shrink-0 flex items-center justify-between px-4 py-3 border-b border-black/5 dark:border-white/10">
-            <button @click="handleEndSession" class="flex flex-col items-center justify-center text-[#ff3b30] hover:opacity-80 active:scale-95 transition-all">
+        <header class="glass-header z-10 flex-shrink-0 flex items-center justify-between px-4 py-3 border-b border-foreground/5">
+            <button @click="handleEndSession" class="flex flex-col items-center justify-center text-destructive hover:opacity-80 active:scale-95 transition-all">
                 <LogOut class="w-5 h-5 mb-0.5" />
                 <span class="text-[0.65rem] font-medium leading-none uppercase tracking-wider">Finalizar</span>
             </button>
@@ -325,7 +357,7 @@ onUnmounted(() => {
                     <Bot class="w-6 h-6" />
                 </div>
                 <button @click="showExpertiseModal = true" class="flex items-center gap-1 group">
-                    <h1 class="text-sm font-semibold text-black dark:text-white">{{ robotName }}</h1>
+                    <h1 class="text-sm font-semibold text-foreground">{{ robotName }}</h1>
                     <Settings class="w-3 h-3 text-muted-foreground group-hover:text-foreground transition-colors" />
                 </button>
             </div>
@@ -335,14 +367,14 @@ onUnmounted(() => {
                 <button v-if="tts.supported" @click="tts.toggleAutoSpeak()"
                     class="w-9 h-9 rounded-full flex items-center justify-center transition-all active:scale-95"
                     :class="tts.autoSpeak.value
-                        ? 'bg-[#007aff]/15 text-[#007aff] ring-1 ring-[#007aff]/30'
-                        : 'bg-black/5 dark:bg-white/10 text-muted-foreground'"
+                        ? 'bg-primary/15 text-primary ring-1 ring-primary/30'
+                        : 'bg-foreground/5 text-muted-foreground'"
                     :title="tts.autoSpeak.value ? 'Voz activada — el robot lee sus respuestas' : 'Voz silenciada'">
                     <Volume2 v-if="tts.autoSpeak.value" class="w-4 h-4" :class="{ 'animate-pulse': tts.isSpeaking.value }" />
                     <VolumeX v-else class="w-4 h-4" />
                 </button>
 
-                <div class="flex flex-col items-center justify-center bg-black/5 dark:bg-white/10 px-2 py-1.5 rounded-lg border border-transparent transition-colors"
+                <div class="flex flex-col items-center justify-center bg-foreground/5 px-2 py-1.5 rounded-sm border border-transparent transition-colors"
                     :class="{'animate-pulse border-red-500/50 bg-red-500/10 text-red-600 dark:text-red-400': isTimeExpiring}">
                     <Clock class="w-4 h-4 mb-0.5" :class="isTimeExpiring ? 'text-red-500' : 'text-muted-foreground'" />
                     <span class="font-mono text-xs font-bold tabular-nums tracking-tighter"
@@ -363,7 +395,7 @@ onUnmounted(() => {
                 </div>
                 <button @click="resetTimer()"
                     class="text-xs font-semibold text-amber-700 dark:text-amber-300 bg-amber-100 dark:bg-amber-800/40 px-3 py-1.5 rounded-full active:scale-95 transition-all whitespace-nowrap">
-                    Extender
+                    Seguir 10 min más
                 </button>
             </div>
         </Transition>
@@ -374,8 +406,16 @@ onUnmounted(() => {
         <!-- CHAT MESSAGES -->
         <main v-else ref="chatContainer" class="flex-1 overflow-y-auto p-4 space-y-4 scroll-smooth overscroll-y-contain pb-[140px]">
 
-            <div class="text-center text-xs text-muted-foreground mb-6 font-medium uppercase tracking-wider bg-black/5 dark:bg-white/5 mx-auto rounded-full py-1.5 px-4 w-fit">
-                Conectado
+            <div class="flex flex-col items-center gap-2 mb-6">
+                <div class="text-center text-xs text-muted-foreground font-medium uppercase tracking-wider bg-foreground/5 rounded-full py-1.5 px-4 w-fit">
+                    Conectado
+                </div>
+                <!-- Sets expectations before the robot speaks aloud for the first time -->
+                <div v-if="tts.supported && tts.autoSpeak.value"
+                    class="flex items-center gap-1.5 text-center text-xs text-muted-foreground font-medium bg-foreground/5 rounded-full py-1.5 px-4 w-fit">
+                    <Volume2 class="w-3.5 h-3.5 flex-shrink-0" />
+                    El robot lee sus respuestas en voz alta — toca el altavoz para silenciar
+                </div>
             </div>
 
             <div v-for="msg in messages" :key="msg.id" class="flex flex-col w-full"
@@ -393,14 +433,14 @@ onUnmounted(() => {
                 <div class="relative max-w-[80%] rounded-2xl px-4 py-2.5 shadow-sm text-[0.95rem] leading-snug break-words"
                     :class="[
                         msg.sender === 'user'
-                            ? 'bg-[#007aff] text-white rounded-br-sm'
-                            : 'bg-white dark:bg-[#262628] text-black dark:text-white rounded-bl-sm border border-black/5 dark:border-white/5',
+                            ? 'bg-primary text-primary-foreground rounded-br-sm'
+                            : 'bg-card text-foreground rounded-bl-sm border border-foreground/5',
                         msg.isError ? 'border-red-300 dark:border-red-500/30' : ''
                     ]">
                     <div v-if="msg.isTyping" class="flex space-x-1.5 px-1 py-1">
-                        <span class="w-2 h-2 bg-gray-400 dark:bg-gray-500 rounded-full animate-bounce" style="animation-delay:0ms"></span>
-                        <span class="w-2 h-2 bg-gray-400 dark:bg-gray-500 rounded-full animate-bounce" style="animation-delay:150ms"></span>
-                        <span class="w-2 h-2 bg-gray-400 dark:bg-gray-500 rounded-full animate-bounce" style="animation-delay:300ms"></span>
+                        <span class="w-2 h-2 bg-muted-foreground/50 rounded-full animate-bounce" style="animation-delay:0ms"></span>
+                        <span class="w-2 h-2 bg-muted-foreground/50 rounded-full animate-bounce" style="animation-delay:150ms"></span>
+                        <span class="w-2 h-2 bg-muted-foreground/50 rounded-full animate-bounce" style="animation-delay:300ms"></span>
                     </div>
                     <template v-else>{{ msg.text }}</template>
                 </div>
@@ -410,7 +450,7 @@ onUnmounted(() => {
                     <!-- Per-message replay (text-to-speech) on robot bubbles -->
                     <button v-if="tts.supported && msg.sender === 'robot' && msg.text"
                         @click="tts.speakingId.value === msg.id ? tts.cancel() : tts.speak(msg.text, msg.id)"
-                        class="text-muted-foreground hover:text-[#007aff] transition-colors active:scale-90"
+                        class="text-muted-foreground hover:text-primary transition-colors active:scale-90"
                         :title="tts.speakingId.value === msg.id ? 'Detener' : 'Escuchar'">
                         <VolumeX v-if="tts.speakingId.value === msg.id" class="w-3.5 h-3.5" />
                         <Volume2 v-else class="w-3.5 h-3.5" />
@@ -418,19 +458,34 @@ onUnmounted(() => {
                 </div>
             </div>
 
-
+            <!-- Starter prompts: removes blank-page friction on first contact -->
+            <div v-if="showSuggestions" class="flex flex-wrap gap-2 pl-1">
+                <button v-for="prompt in SUGGESTED_PROMPTS" :key="prompt"
+                    type="button" @click="sendSuggestion(prompt)"
+                    class="text-sm text-foreground bg-card border border-foreground/10 rounded-full px-3.5 py-2 shadow-sm hover:border-primary/40 hover:text-primary active:scale-95 transition-all">
+                    {{ prompt }}
+                </button>
+            </div>
 
         </main>
 
         <!-- INPUT FOOTER: absolute only in chat mode (map mode uses normal flow so the sheet isn't hidden) -->
-        <footer class="glass-footer p-3 sm:pb-3 pb-safe border-t border-black/5 dark:border-white/10 flex-shrink-0"
+        <footer class="glass-footer p-3 sm:pb-3 pb-safe border-t border-foreground/5 flex-shrink-0"
             :class="showMap ? 'relative' : 'absolute bottom-0 left-0 right-0'">
 
-            <!-- Voice status banner (recording / transcribing) -->
+            <!-- One-time hint: hold-to-talk isn't an obvious gesture on a phone -->
             <Transition name="banner">
-                <div v-if="stt.isRecording.value || stt.isTranscribing.value"
+                <p v-if="showMicHint && !stt.isRecording.value && !stt.isTranscribing.value && !messageText.trim()"
+                    class="text-center text-[0.7rem] text-muted-foreground pb-1.5">
+                    Consejo: mantén pulsado el micrófono para hablar con tu guía
+                </p>
+            </Transition>
+
+            <!-- Voice status banner (recording / transcribing / mic error) -->
+            <Transition name="banner">
+                <div v-if="stt.isRecording.value || stt.isTranscribing.value || stt.error.value"
                     class="flex items-center justify-center gap-2 pb-2.5 text-sm font-medium"
-                    :class="stt.isRecording.value ? 'text-red-500' : 'text-[#007aff]'">
+                    :class="stt.isRecording.value ? 'text-red-500' : (stt.error.value ? 'text-red-600 dark:text-red-400' : 'text-primary')">
                     <template v-if="stt.isRecording.value">
                         <span class="relative flex h-2.5 w-2.5">
                             <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
@@ -438,18 +493,22 @@ onUnmounted(() => {
                         </span>
                         Escuchando… suelta para enviar
                     </template>
-                    <template v-else>
+                    <template v-else-if="stt.isTranscribing.value">
                         <Loader2 class="w-4 h-4 animate-spin" />
                         Transcribiendo…
+                    </template>
+                    <template v-else>
+                        <AlertTriangle class="w-4 h-4 flex-shrink-0" />
+                        {{ stt.error.value }}
                     </template>
                 </div>
             </Transition>
 
             <form @submit.prevent="sendMessage"
-                class="flex items-end gap-2 p-1 bg-white dark:bg-[#1c1c1e] border border-black/10 dark:border-white/10 rounded-3xl shadow-sm focus-within:ring-2 focus-within:ring-primary/20 transition-all">
+                class="flex items-end gap-2 p-1 bg-card border border-foreground/10 rounded-3xl shadow-sm focus-within:ring-2 focus-within:ring-primary/20 transition-all">
                 <button type="button" @click="showMap = !showMap"
                     class="w-9 h-9 m-1 rounded-full flex flex-shrink-0 items-center justify-center transition-all"
-                    :class="showMap ? 'bg-[#007aff] text-white' : 'bg-gray-100 dark:bg-gray-800 text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'"
+                    :class="showMap ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground hover:text-foreground'"
                     title="Ver mapa">
                     <MapIcon class="w-4 h-4" />
                 </button>
@@ -459,7 +518,7 @@ onUnmounted(() => {
                     :maxlength="MAX_MESSAGE_LENGTH"
                     :disabled="isSending"
                     placeholder="Pregunta a tu guía..."
-                    class="flex-1 bg-transparent border-0 focus:ring-0 resize-none px-4 py-2.5 max-h-32 min-h-[44px] text-base placeholder:text-muted-foreground self-center outline-none scrollbar-hide text-black dark:text-white disabled:opacity-50"
+                    class="flex-1 bg-transparent border-0 focus:ring-0 resize-none px-4 py-2.5 max-h-32 min-h-[44px] text-base placeholder:text-muted-foreground self-center outline-none scrollbar-hide text-foreground disabled:opacity-50"
                     @keydown.enter.prevent="sendMessage"
                 ></textarea>
 
@@ -474,7 +533,7 @@ onUnmounted(() => {
                     class="w-9 h-9 m-1 rounded-full flex flex-shrink-0 items-center justify-center transition-all select-none touch-none disabled:opacity-50"
                     :class="stt.isRecording.value
                         ? 'bg-red-500 text-white scale-110 ring-4 ring-red-500/20'
-                        : 'bg-gray-100 dark:bg-gray-800 text-gray-500 hover:text-[#007aff] active:scale-95'"
+                        : 'bg-muted text-muted-foreground hover:text-primary active:scale-95'"
                     title="Mantén pulsado para hablar">
                     <Loader2 v-if="stt.isTranscribing.value" class="w-4 h-4 animate-spin" />
                     <Mic v-else class="w-4 h-4" />
@@ -485,19 +544,19 @@ onUnmounted(() => {
                     type="submit"
                     :disabled="!messageText.trim() || isSending"
                     class="w-9 h-9 m-1 rounded-full flex flex-shrink-0 items-center justify-center transition-all"
-                    :class="messageText.trim() && !isSending ? 'bg-[#007aff] text-white hover:scale-105 active:scale-95' : 'bg-gray-100 dark:bg-gray-800 text-gray-400 cursor-not-allowed'">
+                    :class="messageText.trim() && !isSending ? 'bg-primary text-primary-foreground hover:scale-105 active:scale-95' : 'bg-muted text-muted-foreground/50 cursor-not-allowed'">
                     <Send class="w-4 h-4 ml-0.5" />
                 </button>
             </form>
         </footer>
 
         <!-- FORCED END MODAL -->
-        <div v-if="showForcedEndModal" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-[200] flex items-center justify-center p-4">
-            <div class="bg-white dark:bg-[#1c1c1e] w-full max-w-sm rounded-[32px] p-8 text-center shadow-2xl">
+        <div v-if="showForcedEndModal" class="fixed inset-0 bg-foreground/40 backdrop-blur-sm z-[200] flex items-center justify-center p-4">
+            <div class="bg-card w-full max-w-sm rounded-[32px] p-8 text-center shadow-2xl">
                 <div class="w-16 h-16 bg-red-100 dark:bg-red-900/30 text-red-500 rounded-full flex items-center justify-center mx-auto mb-4">
                     <LogOut class="w-8 h-8" />
                 </div>
-                <h2 class="text-xl font-bold mb-2 text-foreground">Visita Finalizada</h2>
+                <h2 class="font-display text-xl font-medium tracking-tight mb-2 text-foreground">Visita Finalizada</h2>
                 <p class="text-sm text-muted-foreground mb-6">Tu sesión ha sido terminada por un administrador del museo.</p>
                 <div class="text-[0.65rem] uppercase tracking-widest text-muted-foreground font-semibold">Redirigiendo al inicio...</div>
             </div>
@@ -511,25 +570,25 @@ onUnmounted(() => {
 
                 <!-- Modal Card -->
                 <div class="nav-modal relative w-full max-w-xs rounded-[28px] overflow-hidden shadow-2xl">
-                    <!-- Gradient top accent -->
-                    <div class="h-1.5 bg-gradient-to-r from-blue-500 via-indigo-500 to-purple-500"></div>
+                    <!-- Accent bar -->
+                    <div class="h-1.5 bg-primary"></div>
 
-                    <div class="bg-white dark:bg-[#1c1c1e] px-6 pt-6 pb-5">
+                    <div class="bg-card px-6 pt-6 pb-5">
                         <!-- Icon -->
-                        <div class="w-14 h-14 rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center mx-auto mb-4">
-                            <Navigation class="w-7 h-7 text-blue-600 dark:text-blue-400" />
+                        <div class="w-14 h-14 rounded-full bg-primary/10 flex items-center justify-center mx-auto mb-4">
+                            <Navigation class="w-7 h-7 text-primary" />
                         </div>
 
                         <!-- Title -->
-                        <h2 class="text-lg font-bold text-center text-black dark:text-white mb-1">Confirmar destino</h2>
+                        <h2 class="font-display text-lg font-medium tracking-tight text-center text-foreground mb-1">Confirmar destino</h2>
 
                         <!-- Place name -->
-                        <p class="text-center text-blue-600 dark:text-blue-400 font-semibold text-base mb-3">
+                        <p class="text-center text-primary font-semibold text-base mb-3">
                             {{ pendingNav.place_name }}
                         </p>
 
                         <!-- Description -->
-                        <p class="text-center text-sm text-gray-500 dark:text-gray-400 mb-5 leading-relaxed">
+                        <p class="text-center text-sm text-muted-foreground mb-5 leading-relaxed">
                             ¿Quieres que el robot te lleve a este lugar?
                         </p>
 
@@ -538,7 +597,7 @@ onUnmounted(() => {
                             <button
                                 @click="handleConfirmNav"
                                 :disabled="isConfirming"
-                                class="w-full flex items-center justify-center gap-2 bg-[#007aff] hover:bg-[#0066d6] active:scale-[0.97] text-white text-[15px] font-semibold rounded-2xl py-3 transition-all disabled:opacity-60">
+                                class="w-full flex items-center justify-center gap-2 bg-primary hover:bg-primary/90 active:scale-[0.97] text-primary-foreground text-[15px] font-semibold rounded-2xl py-3 transition-all disabled:opacity-60">
                                 <Loader2 v-if="isConfirming" class="w-4.5 h-4.5 animate-spin" />
                                 <Check v-else class="w-4.5 h-4.5" />
                                 Sí, llevarme
@@ -546,7 +605,7 @@ onUnmounted(() => {
                             <button
                                 @click="handleCancelNav"
                                 :disabled="isConfirming"
-                                class="w-full flex items-center justify-center gap-2 bg-gray-100 dark:bg-[#2c2c2e] hover:bg-gray-200 dark:hover:bg-[#3a3a3c] active:scale-[0.97] text-gray-700 dark:text-gray-300 text-[15px] font-semibold rounded-2xl py-3 transition-all disabled:opacity-60">
+                                class="w-full flex items-center justify-center gap-2 bg-muted hover:bg-muted/70 active:scale-[0.97] text-foreground text-[15px] font-semibold rounded-2xl py-3 transition-all disabled:opacity-60">
                                 <X class="w-4.5 h-4.5" />
                                 No, cancelar
                             </button>
@@ -562,10 +621,10 @@ onUnmounted(() => {
             <div v-if="showExpertiseModal"
                 class="fixed inset-0 z-[300] flex items-end justify-center sm:items-center"
                 @click.self="showExpertiseModal = false">
-                <div class="absolute inset-0 bg-black/50 backdrop-blur-sm" @click="showExpertiseModal = false" />
-                <div class="relative w-full max-w-md bg-white dark:bg-[#1c1c1e] rounded-t-[32px] sm:rounded-[28px] px-5 pt-4 pb-8 shadow-2xl">
-                    <div class="w-10 h-1 bg-gray-300 dark:bg-gray-600 rounded-full mx-auto mb-5 sm:hidden" />
-                    <h2 class="text-lg font-bold text-black dark:text-white mb-0.5">Nivel de visita</h2>
+                <div class="absolute inset-0 bg-foreground/40 backdrop-blur-sm" @click="showExpertiseModal = false" />
+                <div class="relative w-full max-w-md bg-card rounded-t-[32px] sm:rounded-[28px] px-5 pt-4 pb-8 shadow-2xl">
+                    <div class="w-10 h-1 bg-foreground/20 rounded-full mx-auto mb-5 sm:hidden" />
+                    <h2 class="font-display text-lg font-medium tracking-tight text-foreground mb-0.5">Nivel de visita</h2>
                     <p class="text-sm text-muted-foreground mb-4">El robot adapta sus explicaciones a tu nivel.</p>
                     <div class="space-y-2">
                         <button v-for="opt in EXPERTISE_OPTIONS" :key="opt.value"
@@ -573,8 +632,8 @@ onUnmounted(() => {
                             :disabled="isUpdatingExpertise"
                             class="w-full flex items-center justify-between px-4 py-3.5 rounded-2xl border transition-all active:scale-[0.98] disabled:opacity-60"
                             :class="currentExpertise === opt.value
-                                ? 'bg-[#007aff]/10 border-[#007aff]/40 text-[#007aff] dark:border-[#007aff]/30'
-                                : 'bg-gray-50 dark:bg-[#2c2c2e] border-transparent text-black dark:text-white'">
+                                ? 'bg-primary/10 border-primary/40 text-primary'
+                                : 'bg-muted border-transparent text-foreground'">
                             <div class="text-left">
                                 <div class="font-semibold text-[15px]">{{ opt.label }}</div>
                                 <div class="text-xs text-muted-foreground mt-0.5">{{ opt.desc }}</div>
@@ -591,27 +650,17 @@ onUnmounted(() => {
 </template>
 
 <style scoped>
-.chat-layout {
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-}
-
 .glass-header {
-    background: rgba(255, 255, 255, 0.75);
+    background: color-mix(in srgb, var(--color-background) 75%, transparent);
     backdrop-filter: blur(20px);
     -webkit-backdrop-filter: blur(20px);
-}
-.dark .glass-header {
-    background: rgba(0, 0, 0, 0.75);
 }
 
 .glass-footer {
-    background: rgba(242, 242, 247, 0.85);
+    background: color-mix(in srgb, var(--color-background) 85%, transparent);
     backdrop-filter: blur(20px);
     -webkit-backdrop-filter: blur(20px);
     padding-bottom: env(safe-area-inset-bottom, 12px);
-}
-.dark .glass-footer {
-    background: rgba(0, 0, 0, 0.85);
 }
 
 .scrollbar-hide::-webkit-scrollbar { display: none; }

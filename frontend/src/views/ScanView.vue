@@ -23,25 +23,21 @@ const showNamePrompt = ref(false)
 const LEVELS = [
     {
         id:    'nino',
-        emoji: '🧒',
-        label: 'Soy un chaval',
-        desc:  'Explicaciones sencillas y divertidas'
+        label: 'Niño / Joven',
+        desc:  'Explicaciones sencillas y accesibles'
     },
     {
         id:    'general',
-        emoji: '😊',
         label: 'Público general',
         desc:  'Lenguaje claro, sin tecnicismos'
     },
     {
         id:    'estudiante',
-        emoji: '🎨',
         label: 'Estudiante / Aficionado',
-        desc:  'Algo de contexto técnico e histórico'
+        desc:  'Contexto técnico e histórico'
     },
     {
         id:    'experto',
-        emoji: '🎓',
         label: 'Experto / Licenciado',
         desc:  'Terminología especializada, análisis profundo'
     }
@@ -136,9 +132,8 @@ const startChat = async () => {
             <p class="eyebrow mb-3">¿Cuánto sabes sobre arte?</p>
             <div class="space-y-2">
               <button v-for="lvl in LEVELS" :key="lvl.id" type="button" @click="expertiseLevel = lvl.id"
-                class="w-full flex items-center gap-3 px-4 py-3 text-left border rounded-sm transition-colors"
+                class="w-full flex items-center px-4 py-3 text-left border rounded-sm transition-colors"
                 :class="expertiseLevel === lvl.id ? 'border-primary bg-primary/5' : 'border-border hover:border-primary/40'">
-                <span class="text-xl leading-none">{{ lvl.emoji }}</span>
                 <span class="flex flex-col flex-1 min-w-0">
                   <span class="text-sm font-medium text-foreground">{{ lvl.label }}</span>
                   <span class="text-xs text-muted-foreground">{{ lvl.desc }}</span>

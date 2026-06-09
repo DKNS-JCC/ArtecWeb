@@ -13,6 +13,7 @@ function decodeToken(token) {
 export const useAuthStore = defineStore('auth', () => {
     const token = ref(null)
     const user = ref(null)
+    const language = ref('es')
 
     const isAuthenticated = computed(() => !!token.value)
     const isMuseumAdmin = computed(() => user.value?.role === 'museum_admin' || user.value?.role === 'platform_admin')
@@ -28,9 +29,13 @@ export const useAuthStore = defineStore('auth', () => {
     function initFromStorage() {
         const savedToken = localStorage.getItem('artec_token')
         const savedUser = localStorage.getItem('artec_user')
+        const savedLanguage = localStorage.getItem('artec_language')
         if (savedToken) {
             token.value = savedToken
             user.value = savedUser ? JSON.parse(savedUser) : decodeToken(savedToken)
+        }
+        if (savedLanguage) {
+            language.value = savedLanguage
         }
     }
 
@@ -48,7 +53,7 @@ export const useAuthStore = defineStore('auth', () => {
     }
 
     async function createVisitor(robotId, name, expertiseLevel = 'general') {
-        const data = await authService.createVisitor(robotId, name, expertiseLevel)
+        const data = await authService.createVisitor(robotId, name, expertiseLevel, language.value)
         persist(data.token, data.visitor)
         return data
     }
@@ -98,9 +103,15 @@ export const useAuthStore = defineStore('auth', () => {
         localStorage.removeItem('artec_user')
     }
 
+    function setLanguage(lang) {
+        language.value = lang
+        localStorage.setItem('artec_language', lang)
+    }
+
     return {
         token,
         user,
+        language,
         isAuthenticated,
         isMuseumAdmin,
         isPlatformAdmin,
@@ -114,6 +125,7 @@ export const useAuthStore = defineStore('auth', () => {
         endVisitor,
         changePassword,
         updateUserAvatar,
+        setLanguage,
         logout,
     }
 })

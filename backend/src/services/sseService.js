@@ -1,5 +1,6 @@
 const db      = require('../database');
 const rosService = require('./rosService');
+const incidentService = require('./incidentService');
 const zoneCache = require('../utils/zoneCache');
 const { findNearestZone } = require('../utils/geo');
 
@@ -78,6 +79,8 @@ function formatRobot(row) {
         is_occupied:  isLocked,
         locked_until: row.locked_until,
         visitor_name: isLocked ? (row.visitor_name || 'Visitante Anónimo') : null,
+        last_nav_error_at:    row.last_nav_error_at    || null,
+        last_nav_error_place: row.last_nav_error_place || null,
     };
 }
 
@@ -127,6 +130,14 @@ async function broadcastPosition(robotId) {
     }
 }
 
+/** Push a navigation outcome (arrived / failed) to the visitor watching this robot. */
+function broadcastNav(robotId, payload) {
+    if (positionClients.size === 0) return;
+    for (const [res, meta] of positionClients) {
+        if (meta.robotId === robotId) send(res, 'nav', payload);
+    }
+}
+
 // ── rosService event listeners ────────────────────────────────────────────────
 
 rosService.on('robot:update', ({ robotId }) => {
@@ -140,6 +151,23 @@ rosService.on('robot:connect', ({ robotId }) => {
 
 rosService.on('robot:disconnect', ({ robotId }) => {
     broadcastRobot(robotId);
+});
+
+// A navigation goal reached a terminal state. On failure: log an incident and
+// refresh the admin dashboard (red state). For visitor-initiated goals, tell the
+// visitor's chat the outcome so it can confirm arrival or offer a retry.
+rosService.on('robot:nav_result', async ({ robotId, outcome, goal }) => {
+    if (outcome === 'aborted') {
+        await incidentService.recordNavFailure(robotId, goal);
+        broadcastRobot(robotId);
+    }
+    if (goal?.kind === 'visit' && outcome !== 'canceled') {
+        broadcastNav(robotId, {
+            outcome,                              // 'succeeded' | 'aborted'
+            place_name: goal.placeName || null,
+            place_id:   goal.placeId   || null,
+        });
+    }
 });
 
 // ── Public API ────────────────────────────────────────────────────────────────

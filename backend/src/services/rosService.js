@@ -9,9 +9,10 @@ let ROSLIB = null;
  * subscribe to real-time robot state changes without polling the database.
  *
  * Emitted events:
- *   'robot:update'  { robotId, field, value, timestamp }
- *   'robot:connect' { robotId }
+ *   'robot:update'     { robotId, fields, timestamp }
+ *   'robot:connect'    { robotId }
  *   'robot:disconnect' { robotId }
+ *   'robot:nav_result' { robotId, outcome: 'succeeded'|'canceled'|'aborted', goal }
  */
 class RosService extends EventEmitter {
     constructor() {
@@ -201,20 +202,29 @@ class RosService extends EventEmitter {
             name:        '/navigate_to_pose/_action/status',
             messageType: 'action_msgs/GoalStatusArray',
         });
-        const TERMINAL_GOAL_STATUSES = [4, 5, 6]; // SUCCEEDED, CANCELED, ABORTED
+        const GOAL_OUTCOMES = { 4: 'succeeded', 5: 'canceled', 6: 'aborted' };
         robotState.topics.navStatus.subscribe((message) => {
             const list = message.status_list || [];
             const last = list[list.length - 1];
-            if (!last || !TERMINAL_GOAL_STATUSES.includes(last.status)) return;
+            const outcome = last && GOAL_OUTCOMES[last.status];
+            if (!outcome) return;
 
-            const emitIdle = () => this.emit('robot:update', { robotId, fields: { status: 'idle' }, timestamp: Date.now() });
+            // Attribute the result to the goal we dispatched. No active goal means
+            // we already handled it (the status list keeps re-publishing) or it was
+            // fired outside this backend — either way, nothing to report.
+            const goal = robotState.activeGoal;
+            if (!goal) return;
+            // Guard against reading the *previous* goal's terminal status in the
+            // brief window before the new goal appears in the list.
+            if (Date.now() - goal.ts < 1500) return;
+            robotState.activeGoal = null;
+
             db.run(
                 `UPDATE robots SET status = 'idle', last_update = CURRENT_TIMESTAMP WHERE id = ? AND status = 'navigating'`,
-                [robotId],
-                function (err) {
-                    if (!err && this.changes > 0) emitIdle();
-                }
+                [robotId]
             );
+            this.emit('robot:update',     { robotId, fields: { status: 'idle' }, timestamp: Date.now() });
+            this.emit('robot:nav_result', { robotId, outcome, goal });
         });
 
         // Scan and map are heavy — they are fetched on-demand via HTTP endpoints
@@ -247,7 +257,12 @@ class RosService extends EventEmitter {
 
     // ── Navigation ────────────────────────────────────────────────────────────
 
-    sendNavGoal(robotId, x, y, qz, qw) {
+    /**
+     * Fire a Nav2 goal. `meta` (optional) describes the goal so the navStatus
+     * handler can report a meaningful outcome when it finishes/fails:
+     *   { kind: 'visit'|'base'|'admin', placeName, placeId, visitorId, sessionId, museumId }
+     */
+    sendNavGoal(robotId, x, y, qz, qw, meta = null) {
         const robot = this._requireConnected(robotId);
         if (!robot.topics.goalPose) {
             robot.topics.goalPose = new ROSLIB.Topic({
@@ -263,6 +278,12 @@ class RosService extends EventEmitter {
                 orientation: { x: 0.0, y: 0.0, z: qz, w: qw },
             },
         });
+        // Remember what this goal is for, so we can attribute the terminal result
+        // to it. `ts` lets the status handler ignore a stale terminal status from
+        // the *previous* goal that may still be the last list entry momentarily.
+        robot.activeGoal = { ...(meta || {}), x, y, ts: Date.now() };
+        // A fresh goal clears the previous failure marker shown on the dashboard.
+        db.run(`UPDATE robots SET last_nav_error_at = NULL, last_nav_error_place = NULL WHERE id = ?`, [robotId]);
     }
 
     cancelNavigation(robotId) {
@@ -329,6 +350,47 @@ class RosService extends EventEmitter {
         return robot.latestMap || null;
     }
 
+    /**
+     * Subscribes to /map once, resolves with the full OccupancyGrid message,
+     * or rejects after timeoutMs if no message arrives.
+     */
+    captureMap(robotId, timeoutMs = 20000) {
+        const robot = this._requireConnected(robotId);
+        return new Promise((resolve, reject) => {
+            let settled = false;
+            const finish = (result, err) => {
+                if (settled) return;
+                settled = true;
+                clearTimeout(timer);
+                try { topic.unsubscribe(); } catch (_) {}
+                if (err) reject(err);
+                else resolve(result);
+            };
+
+            const timer = setTimeout(
+                () => finish(null, new Error('Timeout: el robot no publicó el mapa en el tiempo esperado. ¿Está activo el map_server o SLAM?')),
+                timeoutMs
+            );
+
+            const topic = new ROSLIB.Topic({
+                ros:         robot.ros,
+                name:        '/map',
+                messageType: 'nav_msgs/OccupancyGrid',
+            });
+            topic.subscribe((message) => {
+                finish({
+                    info: {
+                        resolution: message.info.resolution,
+                        width:      message.info.width,
+                        height:     message.info.height,
+                        origin:     message.info.origin,
+                    },
+                    data: message.data,
+                });
+            });
+        });
+    }
+
     getPose(robotId) {
         return this.robots.get(robotId)?.latestPose ?? null;
     }
@@ -361,6 +423,60 @@ class RosService extends EventEmitter {
         return robot.latestScan ?? null;
     }
 
+    // ── Session active signal ─────────────────────────────────────────────────
+
+    /**
+     * Publishes std_msgs/Bool to /session_active on the robot.
+     * true  → a visitor session has started (wake LEDs).
+     * false → session ended or expired (LEDs go to standby).
+     */
+    publishSessionActive(robotId, isActive) {
+        const robot = this.robots.get(robotId);
+        if (!robot || !robot.isConnected) return;
+        if (!robot.topics.sessionActive) {
+            robot.topics.sessionActive = new ROSLIB.Topic({
+                ros:         robot.ros,
+                name:        '/session_active',
+                messageType: 'std_msgs/Bool',
+            });
+        }
+        robot.topics.sessionActive.publish({ data: isActive });
+        console.log(`[ROS] /session_active → ${isActive} (robot ${robotId})`);
+    }
+
+    // ── Session expiry monitor ────────────────────────────────────────────────
+
+    /**
+     * Runs every 60 s. If a robot's visitor lock has expired but the DB still
+     * shows an active visitor (ping stopped — user left without ending session),
+     * publish session_active=false and clean up the DB row.
+     */
+    _startSessionMonitor() {
+        setInterval(() => {
+            db.all(
+                `SELECT id FROM robots
+                 WHERE current_visitor_id IS NOT NULL
+                   AND (locked_until IS NULL OR locked_until < datetime('now'))`,
+                [],
+                (err, rows) => {
+                    if (err || !rows || !rows.length) return;
+                    rows.forEach(row => {
+                        console.log(`[ROS] Session expired for robot ${row.id} — standby`);
+                        this.publishSessionActive(row.id, false);
+                        db.run(
+                            `UPDATE robots SET locked_until = NULL, current_visitor_id = NULL WHERE id = ?`,
+                            [row.id]
+                        );
+                        db.run(
+                            `UPDATE visitors SET ended_at = CURRENT_TIMESTAMP WHERE robot_id = ? AND ended_at IS NULL`,
+                            [row.id]
+                        );
+                    });
+                }
+            );
+        }, 60_000);
+    }
+
     _requireConnected(robotId) {
         const robot = this.robots.get(robotId);
         if (!robot || !robot.isConnected) {
@@ -370,4 +486,6 @@ class RosService extends EventEmitter {
     }
 }
 
-module.exports = new RosService();
+const service = new RosService();
+service._startSessionMonitor();
+module.exports = service;

@@ -49,6 +49,10 @@ export const mapService = {
         return api.delete(`/maps/${mapId}/zones/${zoneId}`)
     },
 
+    captureFromRobot(robotId, name) {
+        return api.post(`/robots/${robotId}/capture-map`, { name })
+    },
+
     // ─── Robot map assignment ─────────────────────────────────
     assignMap(robotId, mapId) {
         return api.put(`/robots/${robotId}`, { map_id: mapId })

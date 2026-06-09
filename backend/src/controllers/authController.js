@@ -12,9 +12,10 @@ const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 // ──────── PUBLIC: Create Visitor Session ────────
 const VALID_EXPERTISE_LEVELS = ['nino', 'general', 'estudiante', 'experto'];
+const VALID_LANGUAGES = ['es', 'en', 'fr', 'de', 'it'];
 
 exports.createVisitor = (req, res) => {
-    const { robotId, name, expertiseLevel } = req.body;
+    const { robotId, name, expertiseLevel, language } = req.body;
 
     if (!robotId) {
         return res.status(400).json({ error: 'Se requiere el ID del robot leído del QR' });
@@ -22,6 +23,7 @@ exports.createVisitor = (req, res) => {
 
     const visitorName = name ? name.trim() : 'Visitante';
     const visitorExpertise = VALID_EXPERTISE_LEVELS.includes(expertiseLevel) ? expertiseLevel : 'general';
+    const visitorLanguage = VALID_LANGUAGES.includes(language) ? language : 'es';
     const visitorId = crypto.randomUUID();
     const sessionId = crypto.randomUUID();
     const now = new Date();
@@ -74,8 +76,8 @@ exports.createVisitor = (req, res) => {
                 }
 
                 db.run(
-                    `INSERT INTO visitors (id, session_id, robot_id, name, expertise_level) VALUES (?, ?, ?, ?, ?)`,
-                    [visitorId, sessionId, robot.id, visitorName, visitorExpertise],
+                    `INSERT INTO visitors (id, session_id, robot_id, name, expertise_level, language) VALUES (?, ?, ?, ?, ?, ?)`,
+                    [visitorId, sessionId, robot.id, visitorName, visitorExpertise, visitorLanguage],
                     function (insErr) {
                         if (insErr) {
                             return db.run('ROLLBACK', () => {
@@ -100,7 +102,8 @@ exports.createVisitor = (req, res) => {
                                     robot_name: robot.name,
                                     museum_id: robot.museum_id,
                                     name: visitorName,
-                                    expertise_level: visitorExpertise
+                                    expertise_level: visitorExpertise,
+                                    language: visitorLanguage
                                 },
                                 JWT_SECRET,
                                 { expiresIn: '12h' }
@@ -109,8 +112,11 @@ exports.createVisitor = (req, res) => {
                             res.status(201).json({
                                 message: 'Visitor session created',
                                 token,
-                                visitor: { id: visitorId, session_id: sessionId, role: 'visitor', robot_id: robot.id, robot_name: robot.name, name: visitorName, expertise_level: visitorExpertise }
+                                visitor: { id: visitorId, session_id: sessionId, role: 'visitor', robot_id: robot.id, robot_name: robot.name, name: visitorName, expertise_level: visitorExpertise, language: visitorLanguage }
                             });
+
+                            // Wake the robot LEDs — a visitor is now active
+                            rosService.publishSessionActive(robot.id, true);
                         });
                     }
                 );
@@ -158,6 +164,9 @@ exports.endVisitor = (req, res) => {
         // Registrar fin de la sesión del visitante
         db.run('UPDATE visitors SET ended_at = CURRENT_TIMESTAMP WHERE id = ?', [visitorId], (err2) => {
             if (err2) console.error('Error updating visitor ended_at', err2);
+
+            // Put LEDs into standby — no active session
+            rosService.publishSessionActive(robotId, false);
 
             // Send the robot home to its base point (best-effort — never blocks end).
             navService.sendRobotToBase(robotId).catch(() => {});

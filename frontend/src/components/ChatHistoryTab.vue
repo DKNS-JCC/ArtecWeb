@@ -3,7 +3,7 @@ import { ref, computed, onMounted, watch } from 'vue'
 import { api } from '@/services/api'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { MessagesSquare, Bot, Clock, MessageSquare, History, RefreshCw, Calendar, Tag } from 'lucide-vue-next'
+import { MessagesSquare, Bot, Clock, MessageSquare, History, RefreshCw, Calendar, Tag, Trash2, AlertTriangle, X } from 'lucide-vue-next'
 
 // ─── Data ─────────────────────────────────────────────────────────────────────
 
@@ -14,11 +14,17 @@ const offset       = ref(0)
 const LIMIT        = 20
 
 const robotFilter  = ref('')
+const dateFrom     = ref('')
+const dateTo       = ref('')
 const loading      = ref(false)
 const loadingMsgs  = ref(false)
 
-const selectedSession = ref(null)   // session metadata
-const messages        = ref([])     // messages for selected session
+const selectedSession = ref(null)
+const messages        = ref([])
+
+// session_id awaiting delete confirmation (null = none)
+const pendingDelete   = ref(null)
+const deleting        = ref(false)
 
 // ─── Expertise label map ───────────────────────────────────────────────────────
 
@@ -39,7 +45,8 @@ const INTENT_LABEL = {
 
 // ─── Computed ──────────────────────────────────────────────────────────────────
 
-const hasMore = computed(() => offset.value + LIMIT < total.value)
+const hasMore        = computed(() => offset.value + LIMIT < total.value)
+const hasDateFilter  = computed(() => dateFrom.value || dateTo.value)
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -61,6 +68,11 @@ function expertiseBadge(level) {
     return EXPERTISE[level] || { label: level || 'General', color: 'bg-muted text-muted-foreground border-border' }
 }
 
+function clearDates() {
+    dateFrom.value = ''
+    dateTo.value   = ''
+}
+
 // ─── Fetch ────────────────────────────────────────────────────────────────────
 
 async function fetchRobots() {
@@ -70,13 +82,23 @@ async function fetchRobots() {
 }
 
 async function fetchSessions(reset = false) {
-    if (reset) { offset.value = 0; sessions.value = []; selectedSession.value = null; messages.value = [] }
+    if (reset) {
+        offset.value = 0
+        sessions.value = []
+        selectedSession.value = null
+        messages.value = []
+        pendingDelete.value = null
+    }
     loading.value = true
     try {
-        const qs     = robotFilter.value ? `&robot_id=${robotFilter.value}` : ''
-        const data   = await api.get(`/chat-history/sessions?limit=${LIMIT}&offset=${offset.value}${qs}`)
+        const qs = new URLSearchParams({ limit: LIMIT, offset: offset.value })
+        if (robotFilter.value) qs.set('robot_id', robotFilter.value)
+        if (dateFrom.value)    qs.set('date_from', dateFrom.value)
+        if (dateTo.value)      qs.set('date_to',   dateTo.value)
+
+        const data = await api.get(`/chat-history/sessions?${qs}`)
         sessions.value = reset ? data.sessions : [...sessions.value, ...data.sessions]
-        total.value  = data.total
+        total.value    = data.total
     } finally {
         loading.value = false
     }
@@ -88,20 +110,54 @@ async function loadMore() {
 }
 
 async function selectSession(s) {
+    if (pendingDelete.value) return   // block selection while confirming delete
     selectedSession.value = s
     messages.value        = []
     loadingMsgs.value     = true
     try {
-        const data    = await api.get(`/chat-history/sessions/${s.session_id}/messages`)
+        const data     = await api.get(`/chat-history/sessions/${s.session_id}/messages`)
         messages.value = data.messages
     } finally {
         loadingMsgs.value = false
     }
 }
 
+// ─── Delete ───────────────────────────────────────────────────────────────────
+
+function requestDelete(e, sessionId) {
+    e.stopPropagation()
+    pendingDelete.value = sessionId
+}
+
+function cancelDelete(e) {
+    e?.stopPropagation()
+    pendingDelete.value = null
+}
+
+async function confirmDelete(e, sessionId) {
+    e.stopPropagation()
+    deleting.value = true
+    try {
+        await api.delete(`/chat-history/sessions/${sessionId}`)
+        sessions.value = sessions.value.filter(s => s.session_id !== sessionId)
+        total.value    = Math.max(0, total.value - 1)
+        if (selectedSession.value?.session_id === sessionId) {
+            selectedSession.value = null
+            messages.value = []
+        }
+    } catch (err) {
+        console.error('[History] Delete failed:', err)
+    } finally {
+        deleting.value      = false
+        pendingDelete.value = null
+    }
+}
+
 // ─── Watchers ─────────────────────────────────────────────────────────────────
 
 watch(robotFilter, () => fetchSessions(true))
+watch(dateFrom,    () => fetchSessions(true))
+watch(dateTo,      () => fetchSessions(true))
 
 onMounted(async () => {
     await fetchRobots()
@@ -120,20 +176,51 @@ onMounted(async () => {
 
     <!-- Filter bar -->
     <div class="flex flex-wrap items-center gap-3 mb-6">
-      <div class="relative flex-1 max-w-xs">
+      <!-- Robot filter -->
+      <div class="relative">
         <Bot class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
         <select
           v-model="robotFilter"
-          class="w-full h-10 rounded-sm border border-input bg-background pl-9 pr-3 text-sm text-foreground focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none appearance-none"
+          class="h-10 rounded-sm border border-input bg-background pl-9 pr-3 text-sm text-foreground focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none appearance-none"
         >
           <option value="">Todos los robots</option>
           <option v-for="r in robots" :key="r.id" :value="r.id">{{ r.name }}</option>
         </select>
       </div>
 
+      <!-- Date from -->
+      <div class="relative">
+        <Calendar class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
+        <input
+          v-model="dateFrom"
+          type="date"
+          :max="dateTo || undefined"
+          class="h-10 rounded-sm border border-input bg-background pl-9 pr-3 text-sm text-foreground focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none"
+        />
+      </div>
+
+      <span class="text-xs text-muted-foreground">—</span>
+
+      <!-- Date to -->
+      <div class="relative">
+        <Calendar class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
+        <input
+          v-model="dateTo"
+          type="date"
+          :min="dateFrom || undefined"
+          class="h-10 rounded-sm border border-input bg-background pl-9 pr-3 text-sm text-foreground focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none"
+        />
+      </div>
+
+      <!-- Clear dates -->
+      <Button v-if="hasDateFilter" @click="clearDates" variant="ghost" size="sm" class="gap-1.5 text-muted-foreground hover:text-foreground">
+        <X class="w-3.5 h-3.5" /> Limpiar fechas
+      </Button>
+
+      <!-- Session count -->
       <span class="text-sm text-muted-foreground ml-auto bg-muted/50 px-3 py-1.5 rounded-full border border-border">
         <History class="w-4 h-4 inline-block mr-1 align-text-bottom" />
-        {{ total }} sesión{{ total !== 1 ? 'es' : '' }} encontrada{{ total !== 1 ? 's' : '' }}
+        {{ total }} sesión{{ total !== 1 ? 'es' : '' }}
       </span>
     </div>
 
@@ -151,43 +238,92 @@ onMounted(async () => {
           No hay conversaciones registradas.
         </p>
 
-        <button
+        <div
           v-for="s in sessions"
           :key="s.session_id"
-          @click="selectSession(s)"
           :class="[
-            'w-full text-left rounded-md border p-4 transition-all hover:border-primary/60',
-            selectedSession?.session_id === s.session_id
-              ? 'border-primary bg-primary/5 shadow-sm ring-1 ring-primary/20'
-              : 'border-border bg-card'
+            'w-full text-left rounded-md border transition-all',
+            pendingDelete === s.session_id
+              ? 'border-destructive/60 bg-destructive/5'
+              : selectedSession?.session_id === s.session_id
+                ? 'border-primary bg-primary/5 shadow-sm ring-1 ring-primary/20 cursor-pointer hover:border-primary/60'
+                : 'border-border bg-card cursor-pointer hover:border-primary/60'
           ]"
         >
-          <!-- Row 1: name + badge -->
-          <div class="flex items-start justify-between gap-2 mb-2">
-            <span class="font-semibold text-sm text-foreground truncate flex items-center gap-1.5">
-              <span class="w-6 h-6 flex items-center justify-center bg-primary/10 text-primary rounded-full text-xs shrink-0 uppercase">
-                 {{ s.visitor_name.charAt(0) }}
+          <!-- Normal view -->
+          <div
+            v-if="pendingDelete !== s.session_id"
+            class="p-4"
+            @click="selectSession(s)"
+          >
+            <!-- Row 1: name + badge + delete button -->
+            <div class="flex items-start justify-between gap-2 mb-2">
+              <span class="font-semibold text-sm text-foreground truncate flex items-center gap-1.5">
+                <span class="w-6 h-6 flex items-center justify-center bg-primary/10 text-primary rounded-full text-xs shrink-0 uppercase">
+                   {{ s.visitor_name.charAt(0) }}
+                </span>
+                {{ s.visitor_name }}
               </span>
-              {{ s.visitor_name }}
-            </span>
-            <span :class="['text-[10px] font-bold px-2 py-0.5 rounded-full whitespace-nowrap border', expertiseBadge(s.expertise_level).color]">
-              {{ expertiseBadge(s.expertise_level).label }}
-            </span>
+              <div class="flex items-center gap-1.5 shrink-0">
+                <span :class="['text-[10px] font-bold px-2 py-0.5 rounded-full whitespace-nowrap border', expertiseBadge(s.expertise_level).color]">
+                  {{ expertiseBadge(s.expertise_level).label }}
+                </span>
+                <button
+                  @click.stop="requestDelete($event, s.session_id)"
+                  class="w-6 h-6 flex items-center justify-center rounded text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
+                  title="Eliminar sesión"
+                >
+                  <Trash2 class="w-3.5 h-3.5" />
+                </button>
+              </div>
+            </div>
+            <!-- Row 2: robot + date -->
+            <div class="text-xs text-muted-foreground mb-2 flex items-center gap-1">
+               <Bot class="w-3 h-3" /> {{ s.robot_name }}
+               <span class="mx-1 opacity-50">•</span>
+               <Calendar class="w-3 h-3" /> {{ formatDate(s.started_at) }}
+            </div>
+            <!-- Row 3: stats -->
+            <div class="flex items-center gap-3 text-xs font-medium text-muted-foreground bg-muted/30 p-1.5 rounded-md">
+              <span class="flex items-center gap-1"><Clock class="w-3 h-3" /> {{ formatDuration(s.duration_minutes) }}</span>
+              <span class="flex items-center gap-1"><MessageSquare class="w-3 h-3" /> {{ s.message_count }} msgs</span>
+              <span v-if="s.top_intent && INTENT_LABEL[s.top_intent]" class="flex items-center gap-1"><Tag class="w-3 h-3" /> {{ INTENT_LABEL[s.top_intent] }}</span>
+              <span v-if="!s.ended_at" class="ml-auto text-green-600 flex items-center gap-1"><span class="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse"></span> Activa</span>
+            </div>
           </div>
-          <!-- Row 2: robot + date -->
-          <div class="text-xs text-muted-foreground mb-2 flex items-center gap-1">
-             <Bot class="w-3 h-3" /> {{ s.robot_name }} 
-             <span class="mx-1 opacity-50">•</span> 
-             <Calendar class="w-3 h-3" /> {{ formatDate(s.started_at) }}
+
+          <!-- Delete confirmation view -->
+          <div v-else class="p-4 flex flex-col gap-3">
+            <div class="flex items-center gap-2 text-sm font-medium text-destructive">
+              <AlertTriangle class="w-4 h-4 shrink-0" />
+              ¿Eliminar sesión de <span class="font-bold truncate">{{ s.visitor_name }}</span>?
+            </div>
+            <p class="text-xs text-muted-foreground">
+              Se ocultará del historial pero seguirá contando en las estadísticas.
+            </p>
+            <div class="flex gap-2">
+              <Button
+                size="sm"
+                variant="destructive"
+                class="flex-1 gap-1.5"
+                :disabled="deleting"
+                @click="confirmDelete($event, s.session_id)"
+              >
+                <Trash2 class="w-3.5 h-3.5" />
+                {{ deleting ? 'Eliminando…' : 'Confirmar' }}
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                class="flex-1"
+                :disabled="deleting"
+                @click="cancelDelete($event)"
+              >
+                Cancelar
+              </Button>
+            </div>
           </div>
-          <!-- Row 3: stats -->
-          <div class="flex items-center gap-3 text-xs font-medium text-muted-foreground bg-muted/30 p-1.5 rounded-md">
-            <span class="flex items-center gap-1"><Clock class="w-3 h-3" /> {{ formatDuration(s.duration_minutes) }}</span>
-            <span class="flex items-center gap-1"><MessageSquare class="w-3 h-3" /> {{ s.message_count }} msgs</span>
-            <span v-if="s.top_intent && INTENT_LABEL[s.top_intent]" class="flex items-center gap-1"><Tag class="w-3 h-3" /> {{ INTENT_LABEL[s.top_intent] }}</span>
-            <span v-if="!s.ended_at" class="ml-auto text-green-600 flex items-center gap-1"><span class="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse"></span> Activa</span>
-          </div>
-        </button>
+        </div>
 
         <!-- Load more -->
         <Button

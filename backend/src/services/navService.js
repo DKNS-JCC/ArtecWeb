@@ -16,7 +16,7 @@ function dbGet(sql, params) {
  * @returns {Promise<{ ok: boolean, reason?: string, base?: object, error?: string }>}
  */
 async function sendRobotToBase(robotId) {
-    const robot = await dbGet('SELECT map_id FROM robots WHERE id = ?', [robotId]);
+    const robot = await dbGet('SELECT map_id, museum_id FROM robots WHERE id = ?', [robotId]);
     if (!robot?.map_id) return { ok: false, reason: 'no_map' };
 
     const base = await dbGet(
@@ -29,7 +29,11 @@ async function sendRobotToBase(robotId) {
 
     try {
         // qz=0, qw=1 → identity orientation (face map +X). Base only needs position.
-        rosService.sendNavGoal(robotId, base.map_x, base.map_y, 0, 1);
+        rosService.sendNavGoal(robotId, base.map_x, base.map_y, 0, 1, {
+            kind:      'base',
+            placeName: base.name,
+            museumId:  robot.museum_id,
+        });
         db.run(`UPDATE robots SET status = 'navigating', last_update = CURRENT_TIMESTAMP WHERE id = ?`, [robotId]);
         return { ok: true, base: { name: base.name, x: base.map_x, y: base.map_y } };
     } catch (e) {

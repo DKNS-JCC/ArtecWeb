@@ -111,7 +111,7 @@ router.get('/robots/:id/availability', (req, res) => {
 
         let online = rosService.getConnectionState(robot.id);
         if (!online && robot.ip) {
-            rosService.connect(robot.id, robot.ip);
+            await rosService.connect(robot.id, robot.ip);
             online = await rosService.waitForConnection(robot.id);
         }
 
@@ -190,8 +190,16 @@ router.post('/chat/confirm-nav', chatLimiter, authMiddleware, async (req, res) =
                 }
 
                 try {
-                    // Coordinates are stored in ROS world frame (meters) — send directly
-                    rosService.sendNavGoal(robot_id, zone.map_x, zone.map_y, 0, 1);
+                    // Coordinates are stored in ROS world frame (meters) — send directly.
+                    // Tag the goal so a failure can be reported to this visitor and logged.
+                    rosService.sendNavGoal(robot_id, zone.map_x, zone.map_y, 0, 1, {
+                        kind:      'visit',
+                        placeName: zone.name,
+                        placeId:   zone.id,
+                        visitorId,
+                        sessionId: session_id,
+                        museumId:  req.user.museum_id,
+                    });
                 } catch (e) {
                     return res.status(503).json({ error: e.message });
                 }
@@ -599,7 +607,10 @@ router.post('/robots/:id/nav-goal', authMiddleware, adminMiddleware, async (req,
         if (!robot) return res.status(404).json({ error: 'Robot not found or unauthorized' });
 
         try {
-            rosService.sendNavGoal(robotId, Number(x), Number(y), Number(qz), Number(qw));
+            rosService.sendNavGoal(robotId, Number(x), Number(y), Number(qz), Number(qw), {
+                kind:     'admin',
+                museumId: req.user.museum_id,
+            });
             res.json({ message: 'Navigation goal sent', x, y, qz, qw });
         } catch (e) {
             res.status(503).json({ error: e.message });
@@ -867,6 +878,39 @@ router.get('/admin/stats', authMiddleware, adminMiddleware, async (req, res) => 
     } catch (err) {
         console.error('[Stats] Error:', err);
         res.status(500).json({ error: 'Error fetching stats' });
+    }
+});
+
+// --- INCIDENTS (operational event log) ---
+const incidentService = require('../services/incidentService');
+
+// GET /api/admin/incidents — list nav failures etc., scoped to the museum.
+router.get('/admin/incidents', authMiddleware, adminMiddleware, async (req, res) => {
+    try {
+        const incidents = await incidentService.list({
+            isSuperAdmin: req.user.role === 'platform_admin',
+            museumId:     req.user.museum_id,
+        });
+        res.json(incidents);
+    } catch (err) {
+        console.error('[Incidents] List error:', err);
+        res.status(500).json({ error: 'Error fetching incidents' });
+    }
+});
+
+// PATCH /api/admin/incidents/:id/resolve — mark an incident as handled.
+router.patch('/admin/incidents/:id/resolve', authMiddleware, adminMiddleware, async (req, res) => {
+    try {
+        const result = await incidentService.resolve({
+            id:           req.params.id,
+            isSuperAdmin: req.user.role === 'platform_admin',
+            museumId:     req.user.museum_id,
+        });
+        if (result.changes === 0) return res.status(404).json({ error: 'Incident not found' });
+        res.json({ message: 'Incident resolved' });
+    } catch (err) {
+        console.error('[Incidents] Resolve error:', err);
+        res.status(500).json({ error: 'Error resolving incident' });
     }
 });
 

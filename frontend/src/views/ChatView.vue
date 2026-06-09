@@ -3,7 +3,7 @@ import { ref, onMounted, onUnmounted, computed, nextTick } from 'vue';
 import { useRouter } from 'vue-router';
 import { useAuthStore } from '@/stores/auth';
 import { chatService } from '@/services/chatService';
-import { Send, LogOut, Bot, Clock, Navigation, Check, X, Loader2, Map as MapIcon, Settings, ChevronRight, Mic, Volume2, VolumeX, AlertTriangle } from 'lucide-vue-next';
+import { Send, LogOut, Bot, Clock, Navigation, Check, X, Loader2, Map as MapIcon, MapPin, Settings, ChevronRight, Mic, Volume2, VolumeX, AlertTriangle, RotateCw } from 'lucide-vue-next';
 import VisitorMap from '@/components/VisitorMap.vue';
 import { useTextToSpeech } from '@/composables/useTextToSpeech';
 import { useSpeechToText } from '@/composables/useSpeechToText';
@@ -124,7 +124,7 @@ const updateExpertise = async (level) => {
 };
 
 // ── Map navigation handler ────────────────────────────────────────────────────
-const handleMapNavigated = (navMessage, zoneName, errMsg) => {
+const handleMapNavigated = (navMessage, zoneName, errMsg, coords) => {
     showMap.value = false;
     const mapMsgId = Date.now();
     const text = navMessage || errMsg || 'No pude iniciar la navegación.';
@@ -138,6 +138,10 @@ const handleMapNavigated = (navMessage, zoneName, errMsg) => {
         time:           new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
     });
     tts.speakIfAuto(text, mapMsgId);
+    // On a successful map-launched navigation, watch for the outcome too.
+    if (navMessage && coords) {
+        trackArrival({ place_id: coords.place_id, place_name: zoneName, map_x: coords.map_x, map_y: coords.map_y });
+    }
     saveMessages();
     nextTick(() => scrollToBottom());
 };
@@ -170,6 +174,8 @@ const handleConfirmNav = async () => {
             time:            new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
         });
         tts.speakIfAuto(data.nav_message, navMsgId);
+        // Watch for the outcome so we can tell the visitor when it arrives — or fails.
+        trackArrival({ place_id: nav.place_id, place_name: nav.place_name, map_x: nav.map_x, map_y: nav.map_y });
     } catch (err) {
         messages.value.push({
             id:      Date.now(),
@@ -187,6 +193,156 @@ const handleConfirmNav = async () => {
 
 const handleCancelNav = () => {
     pendingNav.value = null;
+};
+
+// ── Navigation outcome tracking ───────────────────────────────────────────────
+
+/**
+ * Once a navigation starts the visitor has no idea what happened. We open the
+ * live stream (same one the map overlay uses) and react to the outcome:
+ *   • The robot reports SUCCEEDED  → "I've arrived" + offer to talk about the place.
+ *   • The robot reports ABORTED    → "I couldn't get there" + a retry button.
+ * The authoritative signal is the server's `nav` event; proximity on the live
+ * pose is kept as a fallback in case that event is missed.
+ */
+const ARRIVAL_RADIUS_M   = 1.2;      // how close (meters) counts as "arrived" (fallback)
+const ARRIVAL_TIMEOUT_MS = 240_000;  // stop listening after 4 min as a safety net
+
+const arrivalTarget = ref(null);     // { place_id, place_name, map_x, map_y } | null
+let arrivalSource   = null;          // EventSource for the pose/nav stream
+let arrivalTimeout  = null;
+
+const stopArrivalTracking = () => {
+    if (arrivalSource)  { arrivalSource.close(); arrivalSource = null; }
+    if (arrivalTimeout) { clearTimeout(arrivalTimeout); arrivalTimeout = null; }
+    arrivalTarget.value = null;
+};
+
+const announceArrival = () => {
+    const target = arrivalTarget.value;
+    stopArrivalTracking();
+    if (!target) return;
+
+    const msgId = Date.now();
+    const text  = `¡He llegado a ${target.place_name}! ¿Quieres que te cuente algo sobre este lugar?`;
+    messages.value.push({
+        id:        msgId,
+        sender:    'robot',
+        text,
+        isArrival: true,
+        placeName: target.place_name,
+        time:      new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+    });
+    tts.speakIfAuto(text, msgId);
+    saveMessages();
+    nextTick(() => scrollToBottom());
+};
+
+const announceNavFailure = () => {
+    const target = arrivalTarget.value;
+    stopArrivalTracking();
+    if (!target) return;
+
+    const msgId = Date.now();
+    const text  = `No he podido llegar a ${target.place_name}. Puede que haya un obstáculo en el camino. ¿Quieres que lo intente de nuevo o prefieres avisar al personal del museo?`;
+    messages.value.push({
+        id:         msgId,
+        sender:     'robot',
+        text,
+        isNavError: true,
+        placeId:    target.place_id,
+        placeName:  target.place_name,
+        time:       new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+    });
+    tts.speakIfAuto(text, msgId);
+    saveMessages();
+    nextTick(() => scrollToBottom());
+};
+
+const trackArrival = (target) => {
+    // A new destination supersedes any in-flight tracking.
+    stopArrivalTracking();
+    if (!target || target.map_x == null || target.map_y == null) return;
+    arrivalTarget.value = target;
+
+    const token = localStorage.getItem('artec_token');
+    if (!token) return;
+    const API_BASE = import.meta.env.VITE_API_URL || '/api';
+    const url      = `${API_BASE}/robots/position-stream?token=${encodeURIComponent(token)}`;
+
+    arrivalSource = new EventSource(url);
+
+    // Authoritative outcome from the robot's Nav2 result.
+    arrivalSource.addEventListener('nav', (e) => {
+        if (!arrivalTarget.value) return;
+        let data;
+        try { data = JSON.parse(e.data); } catch { return; }
+        if (data.outcome === 'succeeded') announceArrival();
+        else if (data.outcome === 'aborted') announceNavFailure();
+    });
+
+    // Fallback: if we get close enough on the live pose, treat it as arrived.
+    arrivalSource.addEventListener('position', (e) => {
+        if (!arrivalTarget.value) return;
+        let pose;
+        try { pose = JSON.parse(e.data); } catch { return; }
+        if (pose.x == null || pose.y == null) return;
+        const dist = Math.hypot(pose.x - arrivalTarget.value.map_x, pose.y - arrivalTarget.value.map_y);
+        if (dist <= ARRIVAL_RADIUS_M) announceArrival();
+    });
+    // EventSource auto-reconnects on error; this feedback is best-effort.
+
+    arrivalTimeout = setTimeout(stopArrivalTracking, ARRIVAL_TIMEOUT_MS);
+};
+
+/** Re-issue a navigation to the same place after a failure (retry button). */
+const retryNav = async (msg) => {
+    if (!msg?.placeId || isConfirming.value) return;
+    isConfirming.value = true;
+    try {
+        const data = await chatService.confirmNav(msg.placeId);
+        const navMsgId = Date.now();
+        const place = data.place || { id: msg.placeId, name: msg.placeName };
+        messages.value.push({
+            id:             navMsgId,
+            sender:         'robot',
+            text:           data.nav_message,
+            isNavExecuting: true,
+            placeName:      place.name,
+            time:           new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+        });
+        tts.speakIfAuto(data.nav_message, navMsgId);
+        trackArrival({ place_id: place.id, place_name: place.name, map_x: place.map_x, map_y: place.map_y });
+    } catch (err) {
+        messages.value.push({
+            id:      Date.now(),
+            sender:  'robot',
+            text:    err.message || 'No pude iniciar la navegación. ¿El robot está conectado?',
+            isError: true,
+            time:    new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+        });
+    } finally {
+        isConfirming.value = false;
+        saveMessages();
+        scrollToBottom();
+    }
+};
+
+// ── Farewell confirmation state ───────────────────────────────────────────────
+
+/**
+ * Set when the AI detects a farewell intent. Offers to end the visit via a
+ * confirmation modal (same pattern as navigate_to) instead of closing abruptly.
+ */
+const pendingFarewell = ref(false);
+
+const handleConfirmFarewell = () => {
+    pendingFarewell.value = false;
+    handleEndSession();
+};
+
+const handleCancelFarewell = () => {
+    pendingFarewell.value = false;
 };
 
 // ── Session timer (10 min) ────────────────────────────────────────────────────
@@ -216,6 +372,7 @@ const startTimer = () => {
 
 const handleForcedEndSession = () => {
     if (timerInterval) clearInterval(timerInterval);
+    stopArrivalTracking();
     showForcedEndModal.value = true;
     sessionStorage.removeItem(STORAGE_KEY);
     authStore.logout();
@@ -230,6 +387,7 @@ const resetTimer = () => {
 
 const handleEndSession = async () => {
     if (timerInterval) clearInterval(timerInterval);
+    stopArrivalTracking();
     sessionStorage.removeItem(STORAGE_KEY);
     await authStore.endVisitor();
     router.push('/');
@@ -296,6 +454,11 @@ const sendMessage = async () => {
             pendingNav.value = null;
         }
 
+        // ── Farewell gate: offer to end the visit (same modal pattern as nav) ─
+        if (data.intent === 'farewell') {
+            pendingFarewell.value = true;
+        }
+
     } catch (err) {
         const idx = messages.value.findIndex(m => m.id === typingId);
         if (idx !== -1) messages.value.splice(idx, 1);
@@ -339,6 +502,7 @@ onMounted(() => {
 onUnmounted(() => {
     if (timerInterval) clearInterval(timerInterval);
     if (micHintTimer) clearTimeout(micHintTimer);
+    stopArrivalTracking();
 });
 </script>
 
@@ -429,13 +593,29 @@ onUnmounted(() => {
                     </div>
                 </div>
 
+                <!-- Arrival badge -->
+                <div v-if="msg.isArrival" class="max-w-[85%] mb-1">
+                    <div class="flex items-center gap-1.5 bg-primary/10 border border-primary/30 text-primary text-xs font-semibold px-3 py-1.5 rounded-full">
+                        <MapPin class="w-3.5 h-3.5 flex-shrink-0" />
+                        Has llegado → {{ msg.placeName }}
+                    </div>
+                </div>
+
+                <!-- Navigation-failure badge -->
+                <div v-if="msg.isNavError" class="max-w-[85%] mb-1">
+                    <div class="flex items-center gap-1.5 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-700/40 text-red-700 dark:text-red-300 text-xs font-semibold px-3 py-1.5 rounded-full">
+                        <AlertTriangle class="w-3.5 h-3.5 flex-shrink-0" />
+                        No se pudo llegar → {{ msg.placeName }}
+                    </div>
+                </div>
+
                 <!-- Bubble -->
                 <div class="relative max-w-[80%] rounded-2xl px-4 py-2.5 shadow-sm text-[0.95rem] leading-snug break-words"
                     :class="[
                         msg.sender === 'user'
                             ? 'bg-primary text-primary-foreground rounded-br-sm'
                             : 'bg-card text-foreground rounded-bl-sm border border-foreground/5',
-                        msg.isError ? 'border-red-300 dark:border-red-500/30' : ''
+                        (msg.isError || msg.isNavError) ? 'border-red-300 dark:border-red-500/30' : ''
                     ]">
                     <div v-if="msg.isTyping" class="flex space-x-1.5 px-1 py-1">
                         <span class="w-2 h-2 bg-muted-foreground/50 rounded-full animate-bounce" style="animation-delay:0ms"></span>
@@ -444,6 +624,16 @@ onUnmounted(() => {
                     </div>
                     <template v-else>{{ msg.text }}</template>
                 </div>
+
+                <!-- Retry action after a navigation failure -->
+                <button v-if="msg.isNavError && msg.placeId"
+                    @click="retryNav(msg)"
+                    :disabled="isConfirming"
+                    class="mt-2 flex items-center gap-1.5 bg-primary hover:bg-primary/90 active:scale-[0.97] text-primary-foreground text-sm font-semibold rounded-full px-4 py-2 transition-all disabled:opacity-60">
+                    <Loader2 v-if="isConfirming" class="w-4 h-4 animate-spin" />
+                    <RotateCw v-else class="w-4 h-4" />
+                    Intentar de nuevo
+                </button>
 
                 <div v-if="!msg.isTyping" class="flex items-center gap-1.5 mt-1 mx-1">
                     <span class="text-[0.65rem] text-muted-foreground">{{ msg.time }}</span>
@@ -615,6 +805,52 @@ onUnmounted(() => {
             </div>
         </Transition>
         <!-- ── END NAVIGATION CONFIRMATION MODAL ─────────────────────────── -->
+
+        <!-- ── FAREWELL (END VISIT) CONFIRMATION MODAL ────────────────────── -->
+        <Transition name="modal">
+            <div v-if="pendingFarewell" class="fixed inset-0 z-[300] flex items-center justify-center p-4" @click.self="handleCancelFarewell">
+                <!-- Backdrop -->
+                <div class="absolute inset-0 bg-black/50 backdrop-blur-sm"></div>
+
+                <!-- Modal Card -->
+                <div class="nav-modal relative w-full max-w-xs rounded-[28px] overflow-hidden shadow-2xl">
+                    <!-- Accent bar -->
+                    <div class="h-1.5 bg-destructive"></div>
+
+                    <div class="bg-card px-6 pt-6 pb-5">
+                        <!-- Icon -->
+                        <div class="w-14 h-14 rounded-full bg-destructive/10 flex items-center justify-center mx-auto mb-4">
+                            <LogOut class="w-7 h-7 text-destructive" />
+                        </div>
+
+                        <!-- Title -->
+                        <h2 class="font-display text-lg font-medium tracking-tight text-center text-foreground mb-3">¿Terminar la visita?</h2>
+
+                        <!-- Description -->
+                        <p class="text-center text-sm text-muted-foreground mb-5 leading-relaxed">
+                            Parece que te estás despidiendo. ¿Quieres finalizar tu visita y cerrar el chat?
+                        </p>
+
+                        <!-- Actions -->
+                        <div class="flex flex-col gap-2.5">
+                            <button
+                                @click="handleConfirmFarewell"
+                                class="w-full flex items-center justify-center gap-2 bg-destructive hover:bg-destructive/90 active:scale-[0.97] text-white text-[15px] font-semibold rounded-2xl py-3 transition-all">
+                                <LogOut class="w-4.5 h-4.5" />
+                                Sí, finalizar
+                            </button>
+                            <button
+                                @click="handleCancelFarewell"
+                                class="w-full flex items-center justify-center gap-2 bg-muted hover:bg-muted/70 active:scale-[0.97] text-foreground text-[15px] font-semibold rounded-2xl py-3 transition-all">
+                                <X class="w-4.5 h-4.5" />
+                                No, seguir aquí
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </Transition>
+        <!-- ── END FAREWELL CONFIRMATION MODAL ────────────────────────────── -->
 
         <!-- ── EXPERTISE LEVEL MODAL ──────────────────────────────────────── -->
         <Transition name="modal">

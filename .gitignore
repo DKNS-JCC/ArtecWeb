@@ -33,3 +33,5 @@ uploads/maps/*
 database/*.sqlite
 database/*.sqlite-*
 !database/.gitkeep
+
+/docs

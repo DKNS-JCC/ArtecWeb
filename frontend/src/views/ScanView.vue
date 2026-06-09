@@ -1,5 +1,5 @@
 <script setup>
-import { onMounted, ref } from 'vue'
+import { onMounted, ref, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { authService } from '@/services/authService'
@@ -20,28 +20,130 @@ const visitorName    = ref('')
 const expertiseLevel = ref('general')
 const showNamePrompt = ref(false)
 
-const LEVELS = [
-    {
-        id:    'nino',
-        label: 'Niño / Joven',
-        desc:  'Explicaciones sencillas y accesibles'
-    },
-    {
-        id:    'general',
-        label: 'Público general',
-        desc:  'Lenguaje claro, sin tecnicismos'
-    },
-    {
-        id:    'estudiante',
-        label: 'Estudiante / Aficionado',
-        desc:  'Contexto técnico e histórico'
-    },
-    {
-        id:    'experto',
-        label: 'Experto / Licenciado',
-        desc:  'Terminología especializada, análisis profundo'
-    }
+const LANGUAGES = [
+    { id: 'es', name: 'Español', flag: '🇪🇸' },
+    { id: 'en', name: 'English', flag: '🇬🇧' },
+    { id: 'fr', name: 'Français', flag: '🇫🇷' },
+    { id: 'de', name: 'Deutsch', flag: '🇩🇪' },
+    { id: 'it', name: 'Italiano', flag: '🇮🇹' }
 ]
+
+const TRANSLATIONS = {
+    es: {
+        checking_robot: 'Comprobando el robot…',
+        access_unavailable: 'Acceso no disponible',
+        try_again: 'Inténtalo de nuevo',
+        back_home: 'Volver al inicio',
+        greeting: 'Hola!',
+        greeting_question: 'Cuentanos un poco sobre ti',
+        your_name: 'Tu nombre',
+        name_placeholder: 'Ej. María',
+        expertise_question: '¿Cuánto sabes sobre arte?',
+        start_visit: 'Empezar la visita',
+        establishing_connection: 'Estableciendo conexión…',
+        enter_name: 'Por favor, ingresa tu nombre',
+        error_generic: 'Error al conectar con el robot',
+        levels: {
+            nino: { label: 'Niño / Joven', desc: 'Explicaciones sencillas y accesibles' },
+            general: { label: 'Público general', desc: 'Lenguaje claro, sin tecnicismos' },
+            estudiante: { label: 'Estudiante / Aficionado', desc: 'Contexto técnico e histórico' },
+            experto: { label: 'Experto / Licenciado', desc: 'Terminología especializada, análisis profundo' }
+        }
+    },
+    en: {
+        checking_robot: 'Checking robot…',
+        access_unavailable: 'Access not available',
+        try_again: 'Try again',
+        back_home: 'Back to home',
+        greeting: 'Hello!',
+        greeting_question: 'Tell us a bit about yourself',
+        your_name: 'Your name',
+        name_placeholder: 'E.g. John',
+        expertise_question: 'How much do you know about art?',
+        start_visit: 'Start your visit',
+        establishing_connection: 'Establishing connection…',
+        enter_name: 'Please enter your name',
+        error_generic: 'Error connecting to the robot',
+        levels: {
+            nino: { label: 'Child / Young', desc: 'Simple, accessible explanations' },
+            general: { label: 'General audience', desc: 'Clear language, no jargon' },
+            estudiante: { label: 'Student / Enthusiast', desc: 'Technical and historical context' },
+            experto: { label: 'Expert / Graduate', desc: 'Specialized terminology, deep analysis' }
+        }
+    },
+    fr: {
+        checking_robot: 'Vérification du robot…',
+        access_unavailable: 'Accès non disponible',
+        try_again: 'Réessayez',
+        back_home: '← Retour à l\'accueil',
+        greeting: 'Bonjour !',
+        greeting_question: 'Parlez-nous un peu de vous',
+        your_name: 'Ton nom',
+        name_placeholder: 'Ex. Marie',
+        expertise_question: 'Combien en sais-tu sur l\'art ?',
+        start_visit: 'Commencer la visite',
+        establishing_connection: 'Établissement de la connexion…',
+        enter_name: 'Veuillez entrer votre nom',
+        error_generic: 'Erreur lors de la connexion au robot',
+        levels: {
+            nino: { label: 'Enfant / Jeune', desc: 'Explications simples et accessibles' },
+            general: { label: 'Grand public', desc: 'Langage clair, sans jargon' },
+            estudiante: { label: 'Étudiant / Amateur', desc: 'Contexte technique et historique' },
+            experto: { label: 'Expert / Diplômé', desc: 'Terminologie spécialisée, analyse approfondie' }
+        }
+    },
+    de: {
+        checking_robot: 'Roboter wird überprüft…',
+        access_unavailable: 'Zugriff nicht verfügbar',
+        try_again: 'Versuchen Sie es erneut',
+        back_home: 'Zurück zur Startseite',
+        greeting: 'Hallo!',
+        greeting_question: 'Erzähl uns ein wenig über dich!',
+        your_name: 'Dein Name',
+        name_placeholder: 'Z.B. Klaus',
+        expertise_question: 'Wie viel weißt du über Kunst?',
+        start_visit: 'Besuch starten',
+        establishing_connection: 'Verbindung wird aufgebaut…',
+        enter_name: 'Bitte geben Sie Ihren Namen ein',
+        error_generic: 'Fehler beim Verbinden mit dem Roboter',
+        levels: {
+            nino: { label: 'Kind / Jugendlich', desc: 'Einfache, verständliche Erklärungen' },
+            general: { label: 'Allgemeine Öffentlichkeit', desc: 'Klare Sprache, keine Fachbegriffe' },
+            estudiante: { label: 'Student / Enthusiast', desc: 'Technischer und historischer Kontext' },
+            experto: { label: 'Experte / Absolvent', desc: 'Fachterminologie, tiefgreifende Analyse' }
+        }
+    },
+    it: {
+        checking_robot: 'Controllo del robot…',
+        access_unavailable: 'Accesso non disponibile',
+        try_again: 'Riprova',
+        back_home: 'Torna alla home',
+        greeting: 'Ciao!',
+        greeting_question: 'Parlaci un po\' di te!',
+        your_name: 'Il tuo nome',
+        name_placeholder: 'Es. Mario',
+        expertise_question: 'Quanto sai dell\'arte?',
+        start_visit: 'Inizia la visita',
+        establishing_connection: 'Connessione in corso…',
+        enter_name: 'Per favore, inserisci il tuo nome',
+        error_generic: 'Errore di connessione al robot',
+        levels: {
+            nino: { label: 'Bambino / Giovane', desc: 'Spiegazioni semplici e accessibili' },
+            general: { label: 'Pubblico generale', desc: 'Linguaggio chiaro, senza gergo' },
+            estudiante: { label: 'Studente / Appassionato', desc: 'Contesto tecnico e storico' },
+            experto: { label: 'Esperto / Laureato', desc: 'Terminologia specializzata, analisi approfondita' }
+        }
+    }
+}
+
+const t = computed(() => TRANSLATIONS[authStore.language] || TRANSLATIONS.es)
+
+const LEVELS = computed(() => [
+    { id: 'nino', ...t.value.levels.nino },
+    { id: 'general', ...t.value.levels.general },
+    { id: 'estudiante', ...t.value.levels.estudiante },
+    { id: 'experto', ...t.value.levels.experto }
+])
 
 onMounted(async () => {
     robotId.value = route.params.id
@@ -50,9 +152,6 @@ onMounted(async () => {
         checking.value = false
         return
     }
-
-    // Verify the robot is reachable BEFORE prompting — an offline or occupied
-    // robot is reported here instead of failing later during navigation.
     try {
         const status = await authService.checkRobotAvailability(robotId.value)
         if (status.occupied) {
@@ -71,7 +170,7 @@ onMounted(async () => {
 
 const startChat = async () => {
     if (!visitorName.value.trim()) {
-        alert('Por favor, ingresa tu nombre')
+        alert(t.value.enter_name)
         return
     }
 
@@ -83,7 +182,7 @@ const startChat = async () => {
         await authStore.createVisitor(robotId.value, visitorName.value.trim(), expertiseLevel.value)
         router.push('/chat')
     } catch (err) {
-        error.value          = err.response?.data?.error || err.message || 'Error al conectar con el robot'
+        error.value          = err.response?.data?.error || err.message || t.value.error_generic
         loading.value        = false
         showNamePrompt.value = true
     }
@@ -94,42 +193,55 @@ const startChat = async () => {
   <div class="min-h-screen flex items-center justify-center bg-background px-6 py-12">
     <div class="w-full max-w-[26rem]">
 
+      <!-- Language selector (always visible) -->
+      <div class="flex justify-center gap-2 mb-8">
+        <button v-for="lang in LANGUAGES" :key="lang.id" @click="authStore.setLanguage(lang.id)"
+          type="button" class="flex items-center gap-1 px-3 py-2 text-sm rounded-sm transition-all border"
+          :class="authStore.language === lang.id 
+            ? 'border-primary bg-primary/10 text-primary' 
+            : 'border-border text-muted-foreground hover:border-primary hover:text-foreground'"
+          :title="lang.name">
+          <span>{{ lang.flag }}</span>
+          <span class="hidden sm:inline">{{ lang.id.toUpperCase() }}</span>
+        </button>
+      </div>
+
       <!-- Checking robot availability -->
       <div v-if="checking" class="flex flex-col items-center gap-4 text-center reveal">
         <div class="h-9 w-9 rounded-full border-4 border-primary/30 border-t-primary animate-spin"></div>
-        <p class="text-muted-foreground text-[0.95rem]">Comprobando el robot…</p>
+        <p class="text-muted-foreground text-[0.95rem]">{{ t.checking_robot }}</p>
       </div>
 
       <!-- Error -->
       <div v-else-if="error" class="reveal" style="animation-delay: 40ms">
         <header class="mb-8">
-          <p class="eyebrow text-destructive mb-3">Acceso no disponible</p>
-          <h1 class="font-display text-4xl font-medium tracking-tight leading-[0.95]">Inténtalo de nuevo</h1>
+          <p class="eyebrow text-destructive mb-3">{{ t.access_unavailable }}</p>
+          <h1 class="font-display text-4xl font-medium tracking-tight leading-[0.95]">{{ t.try_again }}</h1>
         </header>
         <Alert variant="destructive">{{ error }}</Alert>
         <p class="mt-6 text-sm text-muted-foreground">
-          <router-link to="/" class="text-foreground underline decoration-border decoration-1 underline-offset-4 hover:decoration-primary transition-colors">&larr; Volver al inicio</router-link>
+          <router-link to="/" class="text-foreground underline decoration-border decoration-1 underline-offset-4 hover:decoration-primary transition-colors">{{ t.back_home }}</router-link>
         </p>
       </div>
 
       <!-- Form -->
       <div v-else-if="showNamePrompt">
         <header class="reveal" style="animation-delay: 40ms">
-          <h1 class="font-display text-5xl font-medium tracking-tight leading-[0.95] mb-3">¡Hola!</h1>
-          <p class="text-muted-foreground text-[0.95rem] leading-relaxed">¿Cómo te llamas? El robot te llamará por tu nombre.</p>
+          <h1 class="font-display text-5xl font-medium tracking-tight leading-[0.95] mb-3">{{ t.greeting }}</h1>
+          <p class="text-muted-foreground text-[0.95rem] leading-relaxed">{{ t.greeting_question }}</p>
         </header>
 
         <hr class="hairline my-8 reveal" style="animation-delay: 120ms" />
 
         <div class="space-y-7 reveal" style="animation-delay: 200ms">
           <div>
-            <Label for="visitor-name">Tu nombre</Label>
-            <Input id="visitor-name" v-model="visitorName" type="text" placeholder="Ej. María"
+            <Label for="visitor-name">{{ t.your_name }}</Label>
+            <Input id="visitor-name" v-model="visitorName" type="text" :placeholder="t.name_placeholder"
               autofocus @keyup.enter="startChat" />
           </div>
 
           <div>
-            <p class="eyebrow mb-3">¿Cuánto sabes sobre arte?</p>
+            <p class="eyebrow mb-3">{{ t.expertise_question }}</p>
             <div class="space-y-2">
               <button v-for="lvl in LEVELS" :key="lvl.id" type="button" @click="expertiseLevel = lvl.id"
                 class="w-full flex items-center px-4 py-3 text-left border rounded-sm transition-colors"
@@ -144,7 +256,7 @@ const startChat = async () => {
           </div>
 
           <Button @click="startChat" size="lg" class="w-full group">
-            Empezar la visita
+            {{ t.start_visit }}
             <span class="transition-transform group-hover:translate-x-1">&rarr;</span>
           </Button>
         </div>
@@ -153,7 +265,7 @@ const startChat = async () => {
       <!-- Loading -->
       <div v-else-if="loading" class="flex flex-col items-center gap-4 text-center reveal">
         <div class="h-9 w-9 rounded-full border-4 border-primary/30 border-t-primary animate-spin"></div>
-        <p class="text-muted-foreground text-[0.95rem]">Estableciendo conexión…</p>
+        <p class="text-muted-foreground text-[0.95rem]">{{ t.establishing_connection }}</p>
       </div>
 
     </div>

@@ -145,6 +145,9 @@ const LEVELS = computed(() => [
     { id: 'experto', ...t.value.levels.experto }
 ])
 
+// Description of the currently selected level, shown under the combo box.
+const selectedLevel = computed(() => LEVELS.value.find(l => l.id === expertiseLevel.value))
+
 onMounted(async () => {
     robotId.value = route.params.id
     if (!robotId.value) {
@@ -241,18 +244,15 @@ const startChat = async () => {
           </div>
 
           <div>
-            <p class="eyebrow mb-3">{{ t.expertise_question }}</p>
-            <div class="space-y-2">
-              <button v-for="lvl in LEVELS" :key="lvl.id" type="button" @click="expertiseLevel = lvl.id"
-                class="w-full flex items-center px-4 py-3 text-left border rounded-sm transition-colors"
-                :class="expertiseLevel === lvl.id ? 'border-primary bg-primary/5' : 'border-border hover:border-primary/40'">
-                <span class="flex flex-col flex-1 min-w-0">
-                  <span class="text-sm font-medium text-foreground">{{ lvl.label }}</span>
-                  <span class="text-xs text-muted-foreground">{{ lvl.desc }}</span>
-                </span>
-                <span v-if="expertiseLevel === lvl.id" class="text-primary text-sm">&check;</span>
-              </button>
+            <Label for="expertise-level">{{ t.expertise_question }}</Label>
+            <div class="relative">
+              <select id="expertise-level" v-model="expertiseLevel"
+                class="flex h-11 w-full appearance-none rounded-sm border border-input bg-background pl-4 pr-10 py-3 text-sm text-foreground transition-all focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none cursor-pointer">
+                <option v-for="lvl in LEVELS" :key="lvl.id" :value="lvl.id">{{ lvl.label }}</option>
+              </select>
+              <span class="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground">&#9662;</span>
             </div>
+            <p v-if="selectedLevel" class="text-xs text-muted-foreground mt-2">{{ selectedLevel.desc }}</p>
           </div>
 
           <Button @click="startChat" size="lg" class="w-full group">

@@ -10,7 +10,9 @@
     "start": "npm --prefix backend run start"
   },
   "dependencies": {
+    "docx": "^9.7.1",
     "express-rate-limit": "^8.3.1",
+    "parser": "^0.1.4",
     "roslib": "^2.1.0"
   }
 }

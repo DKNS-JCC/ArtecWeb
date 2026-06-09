@@ -88,6 +88,10 @@ function initializeDatabase() {
                 FOREIGN KEY(map_id) REFERENCES maps(id)
             )
         `);
+        // Latest navigation failure, surfaced inline on the dashboard. Cleared when
+        // a new goal is dispatched (see rosService.sendNavGoal).
+        db.run(`ALTER TABLE robots ADD COLUMN last_nav_error_at DATETIME`, () => {});
+        db.run(`ALTER TABLE robots ADD COLUMN last_nav_error_place TEXT`, () => {});
 
         // 5. Visitors (temporary QR sessions tied to a robot)
         db.run(`
@@ -102,10 +106,10 @@ function initializeDatabase() {
                 FOREIGN KEY(robot_id) REFERENCES robots(id)
             )
         `);
-        // Migration: add expertise_level to existing databases that lack it
-        db.run(`ALTER TABLE visitors ADD COLUMN expertise_level TEXT DEFAULT 'general'`, () => {
-            // Silently ignore SQLITE_ERROR if column already exists
-        });
+        // Migrations: silently ignored if column already exists
+        db.run(`ALTER TABLE visitors ADD COLUMN expertise_level TEXT DEFAULT 'general'`, () => {});
+        db.run(`ALTER TABLE visitors ADD COLUMN deleted_at DATETIME`, () => {});
+        db.run(`ALTER TABLE visitors ADD COLUMN language TEXT DEFAULT 'es'`, () => {});
 
         // 6. Zones — belong to a map (not a robot)
         //    Zones are unique per map; different maps have independent zones
@@ -139,7 +143,26 @@ function initializeDatabase() {
             )
         `);
 
-        // 8. Password reset tokens (single-use, 1h expiry)
+        // 8. Incidents — operational events technicians need to review (e.g. a
+        //    robot that couldn't reach a navigation goal). Persisted so failures
+        //    are visible after the fact, not just in the live dashboard.
+        db.run(`
+            CREATE TABLE IF NOT EXISTS incidents (
+                id TEXT PRIMARY KEY,
+                museum_id TEXT,
+                robot_id TEXT,
+                visitor_id TEXT,
+                type TEXT NOT NULL,
+                place_name TEXT,
+                detail TEXT,
+                resolved INTEGER DEFAULT 0,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY(museum_id) REFERENCES museums(id),
+                FOREIGN KEY(robot_id)  REFERENCES robots(id)
+            )
+        `);
+
+        // 9. Password reset tokens (single-use, 1h expiry)
         db.run(`
             CREATE TABLE IF NOT EXISTS password_reset_tokens (
                 id TEXT PRIMARY KEY,
@@ -165,6 +188,13 @@ function initializeDatabase() {
         db.run(`CREATE INDEX IF NOT EXISTS idx_visitors_session_id ON visitors(session_id)`);
         db.run(`CREATE INDEX IF NOT EXISTS idx_chat_messages_session ON chat_messages(session_id)`);
         db.run(`CREATE INDEX IF NOT EXISTS idx_chat_messages_visitor ON chat_messages(visitor_id)`);
+        db.run(`CREATE INDEX IF NOT EXISTS idx_chat_messages_session_time ON chat_messages(session_id, created_at)`);
+        db.run(`CREATE INDEX IF NOT EXISTS idx_chat_messages_created_at ON chat_messages(created_at)`);
+        db.run(`CREATE INDEX IF NOT EXISTS idx_visitors_ended_at ON visitors(ended_at)`);
+        db.run(`CREATE INDEX IF NOT EXISTS idx_visitors_deleted_at ON visitors(deleted_at)`);
+        db.run(`CREATE INDEX IF NOT EXISTS idx_incidents_museum ON incidents(museum_id)`);
+        db.run(`CREATE INDEX IF NOT EXISTS idx_incidents_created ON incidents(created_at)`);
+        db.run(`CREATE INDEX IF NOT EXISTS idx_incidents_resolved ON incidents(resolved)`);
     });
 }
 

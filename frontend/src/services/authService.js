@@ -5,8 +5,8 @@ export const authService = {
         return api.post('/auth/login', { identifier, password })
     },
 
-    createVisitor(robotId, name, expertiseLevel = 'general') {
-        return api.post('/auth/visitor', { robotId, name, expertiseLevel })
+    createVisitor(robotId, name, expertiseLevel = 'general', language = 'es') {
+        return api.post('/auth/visitor', { robotId, name, expertiseLevel, language })
     },
 
     /** QR pre-flight: { available, online, occupied, robot_name }. */

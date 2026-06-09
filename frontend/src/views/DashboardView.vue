@@ -1,6 +1,5 @@
 <script setup>
 import { ref, onMounted, onUnmounted, computed } from 'vue'
-import { api } from '@/services/api'
 import { robotService } from '@/services/robotService'
 import { authService } from '@/services/authService'
 import { museumService } from '@/services/museumService'
@@ -10,9 +9,11 @@ import { Card, CardContent, CardHeader } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Alert } from '@/components/ui/alert'
-import { RefreshCw, Zap, MapPin, Plus, X, Building2, Users, BarChart3, Clock, Settings, Wifi, Search, Pencil, Eye, EyeOff, Trash2, ShieldAlert, Map, Bot, History, Navigation, Loader2 } from 'lucide-vue-next'
+import { RefreshCw, Zap, MapPin, Plus, X, Building2, Users, BarChart3, Clock, Settings, Wifi, Search, Pencil, Eye, EyeOff, Trash2, ShieldAlert, Map, Bot, History, Navigation, Loader2, AlertTriangle } from 'lucide-vue-next'
 import MapTab             from '@/components/MapTab.vue'
 import ChatHistoryTab     from '@/components/ChatHistoryTab.vue'
+import StatsTab           from '@/components/StatsTab.vue'
+import IncidentsTab       from '@/components/IncidentsTab.vue'
 import QRCode             from 'qrcode'
 
 const authStore = useAuthStore()
@@ -35,6 +36,12 @@ const applyRobotUpdate = (updated) => {
     if (idx === -1) {
         robots.value.push(updated)
     } else {
+        // A newer nav-failure timestamp means a fresh incident the admin hasn't seen.
+        const prev = robots.value[idx]
+        if (updated.last_nav_error_at && updated.last_nav_error_at !== prev.last_nav_error_at
+            && activeTab.value !== 'incidents') {
+            hasNewIncident.value = true
+        }
         robots.value[idx] = updated
     }
 }
@@ -329,36 +336,31 @@ const handleCreateMuseum = async () => {
 }
 
 // ---------------- STATS ----------------
-const stats = ref({
-    totalRobots: 0,
-    activeRobots: 0,
-    totalVisitors: 0,
-    avgSessionTime: 0,
-    totalMuseums: 0
-})
+const statsTabRef = ref(null)
 
-const fetchStats = async () => {
-    try {
-        const data = await api.get('/admin/stats')
-        stats.value = data
-    } catch (e) {
-        console.error("Error fetching stats:", e)
-    }
+// ---------------- INCIDENTS ----------------
+const incidentsTabRef = ref(null)
+const hasNewIncident  = ref(false)   // unseen nav-failure notification dot
+
+const openIncidentsTab = () => {
+    activeTab.value = 'incidents'
+    hasNewIncident.value = false
+    incidentsTabRef.value?.refresh()
 }
 
 // ---------------- GLOBAL TAB REFRESH ----------------
 const refreshCurrentTab = () => {
-    if (activeTab.value === 'robots') fetchRobots()   // manual one-shot after mutations
-    if (activeTab.value === 'staff') fetchStaff()
-    if (activeTab.value === 'museums') fetchMuseums()
-    if (activeTab.value === 'stats') fetchStats()
+    if (activeTab.value === 'robots')    fetchRobots()
+    if (activeTab.value === 'staff')     fetchStaff()
+    if (activeTab.value === 'museums')   fetchMuseums()
+    if (activeTab.value === 'stats')     statsTabRef.value?.refresh()
+    if (activeTab.value === 'incidents') incidentsTabRef.value?.refresh()
 }
 
 onMounted(() => {
     startRobotStream()
     if (isMuseumAdmin.value || isPlatformAdmin.value) fetchStaff()
     if (isPlatformAdmin.value) fetchMuseums()
-    fetchStats()
 })
 
 onUnmounted(() => {
@@ -409,6 +411,16 @@ onUnmounted(() => {
                 class="px-4 py-2 text-sm font-medium transition-colors border-b-2 flex items-center gap-2"
                 :class="activeTab === 'history' ? 'border-primary text-foreground' : 'border-transparent text-muted-foreground hover:text-foreground'">
                 <History class="w-4 h-4" /> Historial
+            </button>
+            <button v-if="isMuseumAdmin || isPlatformAdmin" @click="openIncidentsTab"
+                class="relative px-4 py-2 text-sm font-medium transition-colors border-b-2 flex items-center gap-2"
+                :class="activeTab === 'incidents' ? 'border-primary text-foreground' : 'border-transparent text-muted-foreground hover:text-foreground'">
+                <AlertTriangle class="w-4 h-4" /> Incidencias
+                <span v-if="hasNewIncident"
+                    class="absolute top-1.5 right-1 flex h-2.5 w-2.5">
+                    <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+                    <span class="relative inline-flex rounded-full h-2.5 w-2.5 bg-red-500"></span>
+                </span>
             </button>
         </div>
 
@@ -480,6 +492,14 @@ onUnmounted(() => {
                             </span>
                             <span class="bg-primary/10 text-primary px-2 py-0.5 rounded-sm text-xs font-semibold">
                                 {{ robot.current_location.name }}
+                            </span>
+                        </div>
+                        <!-- Last navigation failure (cleared when a new goal is dispatched) -->
+                        <div v-if="robot.last_nav_error_at" class="flex items-start gap-2 text-sm rounded-sm bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-700/40 px-2.5 py-2">
+                            <AlertTriangle class="w-4 h-4 text-red-600 dark:text-red-400 flex-shrink-0 mt-0.5" />
+                            <span class="text-xs text-red-700 dark:text-red-300 leading-snug">
+                                No pudo llegar<template v-if="robot.last_nav_error_place"> a <strong>{{ robot.last_nav_error_place }}</strong></template>.
+                                <button @click="openIncidentsTab" class="underline font-semibold whitespace-nowrap">Ver incidencias</button>
                             </span>
                         </div>
                         <div class="flex justify-between items-center text-sm">
@@ -731,78 +751,14 @@ onUnmounted(() => {
 
         <!-- TAB: STATS -->
         <div v-show="activeTab === 'stats'">
-            <div class="flex justify-between items-center mb-6">
-                <h2 class="font-display text-xl font-medium tracking-tight text-foreground">Estadísticas del Sistema</h2>
-                <Button @click="fetchStats" variant="outline" size="sm" class="gap-2">
-                    <RefreshCw class="w-4 h-4" /> Recargar
-                </Button>
-            </div>
-            
-            <div class="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
-                <Card v-if="isPlatformAdmin">
-                    <CardHeader class="flex flex-row items-center justify-between pb-2 space-y-0">
-                        <div class="text-sm font-medium">Museos Registrados</div>
-                        <Building2 class="w-4 h-4 text-muted-foreground" />
-                    </CardHeader>
-                    <CardContent>
-                        <div class="font-display text-2xl font-medium">{{ stats.totalMuseums || 0 }}</div>
-                        <p class="text-xs text-muted-foreground mt-1">Activos en la plataforma</p>
-                    </CardContent>
-                </Card>
-
-                <Card>
-                    <CardHeader class="flex flex-row items-center justify-between pb-2 space-y-0">
-                        <div class="text-sm font-medium">Total de Robots</div>
-                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-4 h-4 text-muted-foreground"><path d="M12 8V4H8"/><rect width="16" height="12" x="4" y="8" rx="2"/><path d="M2 14h2"/><path d="M20 14h2"/><path d="M15 13v2"/><path d="M9 13v2"/></svg>
-                    </CardHeader>
-                    <CardContent>
-                        <div class="font-display text-2xl font-medium">{{ stats.totalRobots || 0 }}</div>
-                        <p class="text-xs text-muted-foreground mt-1">
-                            <span class="text-green-600 dark:text-green-400 font-medium">{{ stats.activeRobots || 0 }} en operación</span>
-                        </p>
-                    </CardContent>
-                </Card>
-
-                <Card>
-                    <CardHeader class="flex flex-row items-center justify-between pb-2 space-y-0">
-                        <div class="text-sm font-medium">Total Visitantes</div>
-                        <Users class="w-4 h-4 text-muted-foreground" />
-                    </CardHeader>
-                    <CardContent>
-                        <div class="font-display text-2xl font-medium">{{ stats.totalVisitors || 0 }}</div>
-                        <p class="text-xs text-muted-foreground mt-1">Interacciones registradas</p>
-                    </CardContent>
-                </Card>
-
-                <Card>
-                    <CardHeader class="flex flex-row items-center justify-between pb-2 space-y-0">
-                        <div class="text-sm font-medium">Tiempo Promedio</div>
-                        <Clock class="w-4 h-4 text-muted-foreground" />
-                    </CardHeader>
-                    <CardContent>
-                        <div class="font-display text-2xl font-medium">{{ stats.avgSessionTime > 0 ? stats.avgSessionTime + ' min' : '0 min' }}</div>
-                        <p class="text-xs text-muted-foreground mt-1">Duración de visita x interacción</p>
-                    </CardContent>
-                </Card>
-            </div>
-            
-            <div class="mt-8">
-                <Card>
-                    <CardHeader>
-                        <h3 class="font-display text-lg font-medium tracking-tight">Resumen Rápido</h3>
-                    </CardHeader>
-                    <CardContent>
-                        <p class="text-muted-foreground text-sm">
-                            Este panel te permite monitorizar el estado general. Los datos provienen en tiempo real de las bases de datos de sesión.
-                            <template v-if="isPlatformAdmin">Como Super Administrador, ves las métricas globales para mejorar la escalabilidad del sistema y entender el retorno de inversión.</template>
-                            <template v-else>Como Administrador de Museo, puedes ver las métricas relativas a la interacción de los robots dentro de tu propio emplazamiento.</template>
-                        </p>
-                    </CardContent>
-                </Card>
-            </div>
+            <StatsTab ref="statsTabRef" />
         </div>
 
-        <!-- MODALS (Rendered outside normal flow) -->
+        <!-- TAB: INCIDENTS -->
+        <div v-show="activeTab === 'incidents'">
+            <IncidentsTab ref="incidentsTabRef" />
+        </div>
+
 
         <!-- EDIT ROBOT MODAL -->
         <div v-if="showEditRobotModal"

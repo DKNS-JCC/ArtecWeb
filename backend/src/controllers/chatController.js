@@ -62,7 +62,7 @@ function resolvePlace(placeName, places) {
  */
 exports.handleMessage = async (req, res) => {
     const message = req.body.message?.trim();
-    const { id: visitorId, session_id, robot_id, robot_name, museum_id, name: visitorName, expertise_level } = req.user;
+    const { id: visitorId, session_id, robot_id, robot_name, museum_id, name: visitorName, expertise_level, language } = req.user;
 
     if (!message) {
         return res.status(400).json({ error: 'Message is required' });
@@ -101,6 +101,7 @@ exports.handleMessage = async (req, res) => {
             museumName:     museum?.name || 'Museo',
             museumId:       museum_id,
             expertiseLevel: expertise_level || 'general',
+            language:       language || 'es',
             places,
             currentLocation: nearest?.name || null
         };

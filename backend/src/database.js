@@ -105,6 +105,7 @@ function initializeDatabase() {
         // Migrations: silently ignored if column already exists
         db.run(`ALTER TABLE visitors ADD COLUMN expertise_level TEXT DEFAULT 'general'`, () => {});
         db.run(`ALTER TABLE visitors ADD COLUMN deleted_at DATETIME`, () => {});
+        db.run(`ALTER TABLE visitors ADD COLUMN language TEXT DEFAULT 'es'`, () => {});
 
         // 6. Zones — belong to a map (not a robot)
         //    Zones are unique per map; different maps have independent zones

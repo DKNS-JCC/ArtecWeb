@@ -1,5 +1,5 @@
 <script setup>
-import { ref, onMounted, onUnmounted, computed } from 'vue'
+import { ref, onMounted, onUnmounted, computed, watch } from 'vue'
 import { robotService } from '@/services/robotService'
 import { authService } from '@/services/authService'
 import { museumService } from '@/services/museumService'
@@ -85,15 +85,25 @@ const qrCodes = ref({})
 
 const buildVisitUrl = (robotId) => `${originUrl}/r/${robotId}`
 
+// Idempotent: the QR URL depends only on the stable robot id, so each one is
+// generated once and reused (skipped if already present).
 const generateQrCodes = async () => {
-    const map = {}
     for (const robot of robots.value) {
+        if (qrCodes.value[robot.id]) continue
         try {
-            map[robot.id] = await QRCode.toDataURL(buildVisitUrl(robot.id), { width: 300, margin: 1 })
+            qrCodes.value[robot.id] = await QRCode.toDataURL(buildVisitUrl(robot.id), { width: 300, margin: 1 })
         } catch { /* skip individual failures */ }
     }
-    qrCodes.value = map
 }
+
+// Robots arrive asynchronously over SSE (not just via fetchRobots), so generate
+// QRs whenever the set of robot ids changes — otherwise the first paint after an
+// SSE load is stuck on "Generando QR…" until a manual refresh.
+watch(
+    () => robots.value.map(r => r.id).join('|'),
+    generateQrCodes,
+    { immediate: true }
+)
 
 /** Manual refresh — still useful after mutations (connect/disconnect/update). */
 const fetchRobots = async () => {
@@ -101,7 +111,7 @@ const fetchRobots = async () => {
         const fresh = await robotService.fetchAll()
         robots.value = fresh
         errorRobots.value = null
-        generateQrCodes()
+        generateQrCodes()  // covers the case where fetch replaces the list with the same ids (watch wouldn't re-fire)
     } catch (err) {
         errorRobots.value = 'No se pudo obtener la lista de robots.'
     } finally {

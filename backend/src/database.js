@@ -88,6 +88,10 @@ function initializeDatabase() {
                 FOREIGN KEY(map_id) REFERENCES maps(id)
             )
         `);
+        // Latest navigation failure, surfaced inline on the dashboard. Cleared when
+        // a new goal is dispatched (see rosService.sendNavGoal).
+        db.run(`ALTER TABLE robots ADD COLUMN last_nav_error_at DATETIME`, () => {});
+        db.run(`ALTER TABLE robots ADD COLUMN last_nav_error_place TEXT`, () => {});
 
         // 5. Visitors (temporary QR sessions tied to a robot)
         db.run(`
@@ -139,7 +143,26 @@ function initializeDatabase() {
             )
         `);
 
-        // 8. Password reset tokens (single-use, 1h expiry)
+        // 8. Incidents — operational events technicians need to review (e.g. a
+        //    robot that couldn't reach a navigation goal). Persisted so failures
+        //    are visible after the fact, not just in the live dashboard.
+        db.run(`
+            CREATE TABLE IF NOT EXISTS incidents (
+                id TEXT PRIMARY KEY,
+                museum_id TEXT,
+                robot_id TEXT,
+                visitor_id TEXT,
+                type TEXT NOT NULL,
+                place_name TEXT,
+                detail TEXT,
+                resolved INTEGER DEFAULT 0,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY(museum_id) REFERENCES museums(id),
+                FOREIGN KEY(robot_id)  REFERENCES robots(id)
+            )
+        `);
+
+        // 9. Password reset tokens (single-use, 1h expiry)
         db.run(`
             CREATE TABLE IF NOT EXISTS password_reset_tokens (
                 id TEXT PRIMARY KEY,
@@ -169,6 +192,9 @@ function initializeDatabase() {
         db.run(`CREATE INDEX IF NOT EXISTS idx_chat_messages_created_at ON chat_messages(created_at)`);
         db.run(`CREATE INDEX IF NOT EXISTS idx_visitors_ended_at ON visitors(ended_at)`);
         db.run(`CREATE INDEX IF NOT EXISTS idx_visitors_deleted_at ON visitors(deleted_at)`);
+        db.run(`CREATE INDEX IF NOT EXISTS idx_incidents_museum ON incidents(museum_id)`);
+        db.run(`CREATE INDEX IF NOT EXISTS idx_incidents_created ON incidents(created_at)`);
+        db.run(`CREATE INDEX IF NOT EXISTS idx_incidents_resolved ON incidents(resolved)`);
     });
 }
 

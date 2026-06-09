@@ -9,10 +9,11 @@ import { Card, CardContent, CardHeader } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Alert } from '@/components/ui/alert'
-import { RefreshCw, Zap, MapPin, Plus, X, Building2, Users, BarChart3, Clock, Settings, Wifi, Search, Pencil, Eye, EyeOff, Trash2, ShieldAlert, Map, Bot, History, Navigation, Loader2 } from 'lucide-vue-next'
+import { RefreshCw, Zap, MapPin, Plus, X, Building2, Users, BarChart3, Clock, Settings, Wifi, Search, Pencil, Eye, EyeOff, Trash2, ShieldAlert, Map, Bot, History, Navigation, Loader2, AlertTriangle } from 'lucide-vue-next'
 import MapTab             from '@/components/MapTab.vue'
 import ChatHistoryTab     from '@/components/ChatHistoryTab.vue'
 import StatsTab           from '@/components/StatsTab.vue'
+import IncidentsTab       from '@/components/IncidentsTab.vue'
 import QRCode             from 'qrcode'
 
 const authStore = useAuthStore()
@@ -35,6 +36,12 @@ const applyRobotUpdate = (updated) => {
     if (idx === -1) {
         robots.value.push(updated)
     } else {
+        // A newer nav-failure timestamp means a fresh incident the admin hasn't seen.
+        const prev = robots.value[idx]
+        if (updated.last_nav_error_at && updated.last_nav_error_at !== prev.last_nav_error_at
+            && activeTab.value !== 'incidents') {
+            hasNewIncident.value = true
+        }
         robots.value[idx] = updated
     }
 }
@@ -331,12 +338,23 @@ const handleCreateMuseum = async () => {
 // ---------------- STATS ----------------
 const statsTabRef = ref(null)
 
+// ---------------- INCIDENTS ----------------
+const incidentsTabRef = ref(null)
+const hasNewIncident  = ref(false)   // unseen nav-failure notification dot
+
+const openIncidentsTab = () => {
+    activeTab.value = 'incidents'
+    hasNewIncident.value = false
+    incidentsTabRef.value?.refresh()
+}
+
 // ---------------- GLOBAL TAB REFRESH ----------------
 const refreshCurrentTab = () => {
-    if (activeTab.value === 'robots')  fetchRobots()
-    if (activeTab.value === 'staff')   fetchStaff()
-    if (activeTab.value === 'museums') fetchMuseums()
-    if (activeTab.value === 'stats')   statsTabRef.value?.refresh()
+    if (activeTab.value === 'robots')    fetchRobots()
+    if (activeTab.value === 'staff')     fetchStaff()
+    if (activeTab.value === 'museums')   fetchMuseums()
+    if (activeTab.value === 'stats')     statsTabRef.value?.refresh()
+    if (activeTab.value === 'incidents') incidentsTabRef.value?.refresh()
 }
 
 onMounted(() => {
@@ -393,6 +411,16 @@ onUnmounted(() => {
                 class="px-4 py-2 text-sm font-medium transition-colors border-b-2 flex items-center gap-2"
                 :class="activeTab === 'history' ? 'border-primary text-foreground' : 'border-transparent text-muted-foreground hover:text-foreground'">
                 <History class="w-4 h-4" /> Historial
+            </button>
+            <button v-if="isMuseumAdmin || isPlatformAdmin" @click="openIncidentsTab"
+                class="relative px-4 py-2 text-sm font-medium transition-colors border-b-2 flex items-center gap-2"
+                :class="activeTab === 'incidents' ? 'border-primary text-foreground' : 'border-transparent text-muted-foreground hover:text-foreground'">
+                <AlertTriangle class="w-4 h-4" /> Incidencias
+                <span v-if="hasNewIncident"
+                    class="absolute top-1.5 right-1 flex h-2.5 w-2.5">
+                    <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+                    <span class="relative inline-flex rounded-full h-2.5 w-2.5 bg-red-500"></span>
+                </span>
             </button>
         </div>
 
@@ -464,6 +492,14 @@ onUnmounted(() => {
                             </span>
                             <span class="bg-primary/10 text-primary px-2 py-0.5 rounded-sm text-xs font-semibold">
                                 {{ robot.current_location.name }}
+                            </span>
+                        </div>
+                        <!-- Last navigation failure (cleared when a new goal is dispatched) -->
+                        <div v-if="robot.last_nav_error_at" class="flex items-start gap-2 text-sm rounded-sm bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-700/40 px-2.5 py-2">
+                            <AlertTriangle class="w-4 h-4 text-red-600 dark:text-red-400 flex-shrink-0 mt-0.5" />
+                            <span class="text-xs text-red-700 dark:text-red-300 leading-snug">
+                                No pudo llegar<template v-if="robot.last_nav_error_place"> a <strong>{{ robot.last_nav_error_place }}</strong></template>.
+                                <button @click="openIncidentsTab" class="underline font-semibold whitespace-nowrap">Ver incidencias</button>
                             </span>
                         </div>
                         <div class="flex justify-between items-center text-sm">
@@ -716,6 +752,11 @@ onUnmounted(() => {
         <!-- TAB: STATS -->
         <div v-show="activeTab === 'stats'">
             <StatsTab ref="statsTabRef" />
+        </div>
+
+        <!-- TAB: INCIDENTS -->
+        <div v-show="activeTab === 'incidents'">
+            <IncidentsTab ref="incidentsTabRef" />
         </div>
 
 

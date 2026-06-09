@@ -271,7 +271,7 @@ async function navigateToZone() {
         const data = await chatService.confirmNav(zone.id)
         selectedZone.value = null
         draw()
-        emit('navigated', data.nav_message, zone.name)
+        emit('navigated', data.nav_message, zone.name, null, { place_id: zone.id, map_x: zone.map_x, map_y: zone.map_y })
     } catch (err) {
         navError.value = err.message || 'No pude iniciar la navegación.'
     } finally {

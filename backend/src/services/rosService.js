@@ -293,12 +293,14 @@ class RosService extends EventEmitter {
             name:        '/navigate_to_pose/_action/cancel_goal',
             serviceType: 'action_msgs/CancelGoal',
         });
-        const request = new ROSLIB.ServiceRequest({
+        // roslib v2 removed ROSLIB.ServiceRequest — callService takes a plain object.
+        // An all-zero goal_id cancels every active goal for this action server.
+        const request = {
             goal_info: {
                 goal_id: { uuid: new Array(16).fill(0) },
                 stamp:   { sec: 0, nanosec: 0 },
             },
-        });
+        };
         return new Promise((resolve, reject) => {
             cancelSvc.callService(request, resolve, reject);
         });

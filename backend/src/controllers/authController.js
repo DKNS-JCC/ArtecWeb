@@ -260,7 +260,7 @@ exports.changePassword = async (req, res) => {
                 if (err) return res.status(500).json({ error: 'Error updating password' });
 
                 const token = jwt.sign(
-                    { id: user.id, name: user.name, role: user.role, must_change_password: false },
+                    { id: user.id, name: user.name, role: user.role, must_change_password: false, museum_id: user.museum_id },
                     JWT_SECRET,
                     { expiresIn: '24h' }
                 );

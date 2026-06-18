@@ -30,3 +30,14 @@ module.exports.superAdminMiddleware = (req, res, next) => {
     }
     next();
 };
+
+// Allows technicians in addition to admins. Used for robot operation and
+// monitoring endpoints (control, teleop, map/scan), which technicians need but
+// which are scoped to their own museum via req.user.museum_id in each query.
+module.exports.staffMiddleware = (req, res, next) => {
+    const allowed = ['technician', 'museum_admin', 'platform_admin'];
+    if (!req.user || !allowed.includes(req.user.role)) {
+        return res.status(403).json({ error: 'Staff access required' });
+    }
+    next();
+};

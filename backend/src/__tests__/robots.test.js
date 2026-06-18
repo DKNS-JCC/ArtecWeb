@@ -271,3 +271,73 @@ describe('POST /api/robots/:id/force-end', () => {
         expect(res.body.message).toMatch(/No active session/i);
     });
 });
+
+// ─── Technician role access ─────────────────────────────────────────────────────
+// Technicians operate/monitor robots in their own museum, but cannot manage
+// the fleet (create robots, force-end sessions) or other admin areas.
+describe('Technician role', () => {
+    let technician, techToken;
+
+    beforeAll(async () => {
+        technician = await createUser(db, {
+            name: 'robottech', email: 'robottech@test.com',
+            role: 'technician', museum_id: museum.id, password: 'TechPass1!'
+        });
+        techToken = makeAdminToken(technician); // signs with user.role === 'technician'
+    });
+
+    test('technician can list robots in their museum', async () => {
+        const res = await request(app)
+            .get('/api/robots')
+            .set('Authorization', `Bearer ${techToken}`);
+        expect(res.status).toBe(200);
+        expect(Array.isArray(res.body)).toBe(true);
+        expect(res.body.every(r => r.museum_id === museum.id)).toBe(true);
+    });
+
+    test('technician can fetch a robot detail in their museum', async () => {
+        const res = await request(app)
+            .get(`/api/robots/${robot.id}`)
+            .set('Authorization', `Bearer ${techToken}`);
+        expect(res.status).toBe(200);
+        expect(res.body.id).toBe(robot.id);
+    });
+
+    test('technician can send a teleop command', async () => {
+        const res = await request(app)
+            .post(`/api/robots/${robot.id}/command`)
+            .set('Authorization', `Bearer ${techToken}`)
+            .send({ command: 'move', payload: { linearX: 0.2, angularZ: 0 } });
+        expect(res.status).toBe(200);
+    });
+
+    test('technician can send a nav goal', async () => {
+        const res = await request(app)
+            .post(`/api/robots/${robot.id}/nav-goal`)
+            .set('Authorization', `Bearer ${techToken}`)
+            .send({ x: 1, y: 2 });
+        expect(res.status).toBe(200);
+    });
+
+    test('technician cannot create a robot (superadmin-only)', async () => {
+        const res = await request(app)
+            .post('/api/robots')
+            .set('Authorization', `Bearer ${techToken}`)
+            .send({ name: 'Tech Bot', museum_id: museum.id });
+        expect(res.status).toBe(403);
+    });
+
+    test('technician cannot force-end a session (admin-only)', async () => {
+        const res = await request(app)
+            .post(`/api/robots/${robot.id}/force-end`)
+            .set('Authorization', `Bearer ${techToken}`);
+        expect(res.status).toBe(403);
+    });
+
+    test('technician cannot list staff (admin-only)', async () => {
+        const res = await request(app)
+            .get('/api/admin/users')
+            .set('Authorization', `Bearer ${techToken}`);
+        expect(res.status).toBe(403);
+    });
+});

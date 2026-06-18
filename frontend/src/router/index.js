@@ -37,7 +37,15 @@ const router = createRouter({
             path: '/dashboard',
             name: 'dashboard',
             component: () => import('../views/DashboardView.vue'),
-            meta: { requiresAuth: true, requiresAdmin: true }
+            // Staff = technicians + admins. The view itself limits which tabs a
+            // technician sees (Robots only).
+            meta: { requiresAuth: true, requiresStaff: true }
+        },
+        {
+            path: '/robots/:id/control',
+            name: 'robot-control',
+            component: () => import('../views/RobotControlView.vue'),
+            meta: { requiresAuth: true, requiresStaff: true }
         },
         {
             path: '/r/:id',
@@ -91,11 +99,6 @@ router.beforeEach((to, from, next) => {
         return next({ name: 'home' })
     }
 
-    // 2. Protect dashboard — admin only
-    if (to.meta.requiresAdmin && !authStore.isMuseumAdmin && !authStore.isPlatformAdmin) {
-        return next({ name: 'forbidden' })
-    }
-
     // 3. If authenticated admin with must_change_password, force them to change it
     if (authStore.isAuthenticated && authStore.mustChangePassword && to.name !== 'change-password') {
         return next({ name: 'change-password' })
@@ -103,7 +106,7 @@ router.beforeEach((to, from, next) => {
 
     // 4. Already logged in → skip login pages
     if (to.name === 'login' && authStore.isAuthenticated && !authStore.mustChangePassword) {
-        return next(authStore.isMuseumAdmin || authStore.isPlatformAdmin ? { name: 'dashboard' } : { name: 'home' })
+        return next(authStore.isStaff ? { name: 'dashboard' } : { name: 'home' })
     }
 
     next()

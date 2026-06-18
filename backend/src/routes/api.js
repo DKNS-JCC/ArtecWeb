@@ -5,7 +5,7 @@ const router = express.Router();
 const db = require('../database');
 const authController = require('../controllers/authController');
 const museumController = require('../controllers/museumController');
-const { authMiddleware, adminMiddleware, superAdminMiddleware } = require('../middleware/authMiddleware');
+const { authMiddleware, adminMiddleware, superAdminMiddleware, staffMiddleware } = require('../middleware/authMiddleware');
 const upload = require('../config/uploadConfig');
 const rosService = require('../services/rosService');
 const sseService = require('../services/sseService');
@@ -54,8 +54,8 @@ router.get('/robots/stream', (req, res) => {
         return res.status(401).json({ error: 'Invalid token' });
     }
 
-    if (user.role !== 'museum_admin' && user.role !== 'platform_admin') {
-        return res.status(403).json({ error: 'Admin access required' });
+    if (!['technician', 'museum_admin', 'platform_admin'].includes(user.role)) {
+        return res.status(403).json({ error: 'Staff access required' });
     }
 
     sseService.addClient(req, res, user);
@@ -347,7 +347,7 @@ router.post('/robots', authMiddleware, superAdminMiddleware, (req, res) => {
     );
 });
 
-router.get('/robots', authMiddleware, adminMiddleware, (req, res) => {
+router.get('/robots', authMiddleware, staffMiddleware, (req, res) => {
     const isSuperAdmin = req.user.role === 'platform_admin';
     const museumId = req.user.museum_id;
 
@@ -406,7 +406,7 @@ router.get('/robots', authMiddleware, adminMiddleware, (req, res) => {
     });
 });
 
-router.get('/robots/:id', authMiddleware, adminMiddleware, (req, res) => {
+router.get('/robots/:id', authMiddleware, staffMiddleware, (req, res) => {
     const isSuperAdmin = req.user.role === 'platform_admin';
     const museumId = req.user.museum_id;
     const robotId = req.params.id;
@@ -498,7 +498,7 @@ router.put('/robots/:id', authMiddleware, adminMiddleware, (req, res) => {
     });
 });
 
-router.post('/robots/:id/command', authMiddleware, adminMiddleware, (req, res) => {
+router.post('/robots/:id/command', authMiddleware, staffMiddleware, (req, res) => {
     const { command, payload } = req.body;
     const isSuperAdmin = req.user.role === 'platform_admin';
     const museumId = req.user.museum_id;
@@ -588,7 +588,7 @@ router.post('/robots/:id/command', authMiddleware, adminMiddleware, (req, res) =
 // ─── ROS Navigation / Sensor Routes ──────────────────────────────────────────
 
 // POST /api/robots/:id/nav-goal  — send Nav2 goal pose
-router.post('/robots/:id/nav-goal', authMiddleware, adminMiddleware, async (req, res) => {
+router.post('/robots/:id/nav-goal', authMiddleware, staffMiddleware, async (req, res) => {
     const { x, y, qz = 0, qw = 1 } = req.body;
     if (x === undefined || y === undefined) {
         return res.status(400).json({ error: 'x and y are required' });
@@ -619,7 +619,7 @@ router.post('/robots/:id/nav-goal', authMiddleware, adminMiddleware, async (req,
 });
 
 // POST /api/robots/:id/cancel-nav  — cancel active navigation
-router.post('/robots/:id/cancel-nav', authMiddleware, adminMiddleware, async (req, res) => {
+router.post('/robots/:id/cancel-nav', authMiddleware, staffMiddleware, async (req, res) => {
     const robotId = req.params.id;
     const isSuperAdmin = req.user.role === 'platform_admin';
     const museumId = req.user.museum_id;
@@ -642,7 +642,7 @@ router.post('/robots/:id/cancel-nav', authMiddleware, adminMiddleware, async (re
 });
 
 // POST /api/robots/:id/go-to-base  — send the robot to its map's base point
-router.post('/robots/:id/go-to-base', authMiddleware, adminMiddleware, async (req, res) => {
+router.post('/robots/:id/go-to-base', authMiddleware, staffMiddleware, async (req, res) => {
     const robotId = req.params.id;
     const isSuperAdmin = req.user.role === 'platform_admin';
     const museumId = req.user.museum_id;
@@ -703,7 +703,7 @@ router.post('/robots/:id/initial-pose', authMiddleware, adminMiddleware, (req, r
 router.post('/robots/:id/capture-map', authMiddleware, adminMiddleware, mapController.captureMapFromRobot);
 
 // GET /api/robots/:id/map  — get latest occupancy grid
-router.get('/robots/:id/map', authMiddleware, adminMiddleware, (req, res) => {
+router.get('/robots/:id/map', authMiddleware, staffMiddleware, (req, res) => {
     const robotId = req.params.id;
     const isSuperAdmin = req.user.role === 'platform_admin';
     const museumId = req.user.museum_id;
@@ -723,7 +723,7 @@ router.get('/robots/:id/map', authMiddleware, adminMiddleware, (req, res) => {
 });
 
 // GET /api/robots/:id/pose  — get latest AMCL pose
-router.get('/robots/:id/pose', authMiddleware, adminMiddleware, (req, res) => {
+router.get('/robots/:id/pose', authMiddleware, staffMiddleware, (req, res) => {
     const robotId = req.params.id;
     const isSuperAdmin = req.user.role === 'platform_admin';
     const museumId = req.user.museum_id;
@@ -743,7 +743,7 @@ router.get('/robots/:id/pose', authMiddleware, adminMiddleware, (req, res) => {
 });
 
 // GET /api/robots/:id/scan  — get latest laser scan
-router.get('/robots/:id/scan', authMiddleware, adminMiddleware, (req, res) => {
+router.get('/robots/:id/scan', authMiddleware, staffMiddleware, (req, res) => {
     const robotId = req.params.id;
     const isSuperAdmin = req.user.role === 'platform_admin';
     const museumId = req.user.museum_id;

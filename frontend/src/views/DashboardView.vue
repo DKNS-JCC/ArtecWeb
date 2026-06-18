@@ -1,5 +1,6 @@
 <script setup>
 import { ref, onMounted, onUnmounted, computed, watch } from 'vue'
+import { useRouter } from 'vue-router'
 import { robotService } from '@/services/robotService'
 import { authService } from '@/services/authService'
 import { museumService } from '@/services/museumService'
@@ -9,7 +10,7 @@ import { Card, CardContent, CardHeader } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Alert } from '@/components/ui/alert'
-import { RefreshCw, Zap, MapPin, Plus, X, Building2, Users, BarChart3, Clock, Settings, Wifi, Search, Pencil, Eye, EyeOff, Trash2, ShieldAlert, Map, Bot, History, Navigation, Loader2, AlertTriangle } from 'lucide-vue-next'
+import { RefreshCw, Zap, MapPin, Plus, X, Building2, Users, BarChart3, Clock, Settings, Wifi, Search, Pencil, Eye, EyeOff, Trash2, ShieldAlert, Map, Bot, History, Navigation, Loader2, AlertTriangle, Gamepad2 } from 'lucide-vue-next'
 import MapTab             from '@/components/MapTab.vue'
 import ChatHistoryTab     from '@/components/ChatHistoryTab.vue'
 import StatsTab           from '@/components/StatsTab.vue'
@@ -17,9 +18,13 @@ import IncidentsTab       from '@/components/IncidentsTab.vue'
 import QRCode             from 'qrcode'
 
 const authStore = useAuthStore()
+const router = useRouter()
 const user = computed(() => authStore.user)
 const isMuseumAdmin = computed(() => authStore.isMuseumAdmin)
 const isPlatformAdmin = computed(() => authStore.isPlatformAdmin)
+const isStaff = computed(() => authStore.isStaff)
+
+const openRobotControl = (robotId) => router.push({ name: 'robot-control', params: { id: robotId } })
 
 const activeTab = ref('robots')
 const originUrl = window?.location?.origin || ''
@@ -412,7 +417,7 @@ onUnmounted(() => {
                 :class="activeTab === 'map' ? 'border-primary text-foreground' : 'border-transparent text-muted-foreground hover:text-foreground'">
                 <Map class="w-4 h-4" /> Mapa
             </button>
-            <button @click="activeTab = 'stats'"
+            <button v-if="isMuseumAdmin" @click="activeTab = 'stats'"
                 class="px-4 py-2 text-sm font-medium transition-colors border-b-2 flex items-center gap-2"
                 :class="activeTab === 'stats' ? 'border-primary text-foreground' : 'border-transparent text-muted-foreground hover:text-foreground'">
                 <BarChart3 class="w-4 h-4" /> Estadísticas
@@ -520,7 +525,7 @@ onUnmounted(() => {
                                 <span class="bg-primary/10 text-primary px-2 py-0.5 rounded-sm text-xs font-semibold">
                                     Por: {{ robot.visitor_name }}
                                 </span>
-                                <Button @click="handleEndVisit(robot.id)" variant="destructive" size="icon" class="h-6 w-6 scale-90" title="Finalizar Visita Forzosamente">
+                                <Button v-if="isMuseumAdmin" @click="handleEndVisit(robot.id)" variant="destructive" size="icon" class="h-6 w-6 scale-90" title="Finalizar Visita Forzosamente">
                                     <X class="w-3.5 h-3.5" />
                                 </Button>
                             </div>
@@ -554,6 +559,9 @@ onUnmounted(() => {
                                 {{ pendingCommandId === robot.id ? 'Desconectando…' : 'Desconectar' }}
                             </Button>
                         </div>
+                        <Button v-if="isStaff" @click="openRobotControl(robot.id)" variant="outline" size="sm" class="gap-1.5">
+                            <Gamepad2 class="w-4 h-4" /> Control
+                        </Button>
                         <p v-if="commandError && commandError.id === robot.id" class="text-xs text-destructive">
                             {{ commandError.message }}
                         </p>
@@ -574,7 +582,7 @@ onUnmounted(() => {
         </div>
 
         <!-- TAB: STAFF -->
-        <div v-show="activeTab === 'staff'">
+        <div v-if="isMuseumAdmin" v-show="activeTab === 'staff'">
             <!-- Header -->
             <div class="flex justify-between items-center mb-6">
                 <div>
@@ -722,7 +730,7 @@ onUnmounted(() => {
         </div>
 
         <!-- TAB: MUSEUMS -->
-        <div v-show="activeTab === 'museums'">
+        <div v-if="isMuseumAdmin" v-show="activeTab === 'museums'">
             <div class="flex justify-between items-center mb-6">
                 <h2 class="font-display text-xl font-medium tracking-tight text-foreground">Museos Integrados</h2>
                 <Button @click="openMuseumModal" class="gap-2">
@@ -750,22 +758,22 @@ onUnmounted(() => {
         </div>
 
         <!-- TAB: HISTORY -->
-        <div v-show="activeTab === 'history'">
+        <div v-if="isMuseumAdmin" v-show="activeTab === 'history'">
             <ChatHistoryTab />
         </div>
 
         <!-- TAB: MAP -->
-        <div v-show="activeTab === 'map'">
+        <div v-if="isMuseumAdmin" v-show="activeTab === 'map'">
             <MapTab :robots="robots" />
         </div>
 
         <!-- TAB: STATS -->
-        <div v-show="activeTab === 'stats'">
+        <div v-if="isMuseumAdmin" v-show="activeTab === 'stats'">
             <StatsTab ref="statsTabRef" />
         </div>
 
         <!-- TAB: INCIDENTS -->
-        <div v-show="activeTab === 'incidents'">
+        <div v-if="isMuseumAdmin" v-show="activeTab === 'incidents'">
             <IncidentsTab ref="incidentsTabRef" />
         </div>
 

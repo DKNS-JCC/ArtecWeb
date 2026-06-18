@@ -14,11 +14,12 @@ jest.mock('../utils/emailService', () => ({
 // Mock rosService so the visitor "robot must be online" pre-flight check
 // (see authController.createVisitor) passes without a real WebSocket/robot
 jest.mock('../services/rosService', () => ({
-    connect:            jest.fn(),
-    disconnect:         jest.fn(),
-    getConnectionState: jest.fn().mockReturnValue(true),
-    waitForConnection:  jest.fn().mockResolvedValue(true),
-    on:                 jest.fn(),
+    connect:              jest.fn(),
+    disconnect:           jest.fn(),
+    getConnectionState:   jest.fn().mockReturnValue(true),
+    waitForConnection:    jest.fn().mockResolvedValue(true),
+    publishSessionActive: jest.fn(),
+    on:                   jest.fn(),
 }));
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -189,6 +190,25 @@ describe('POST /api/auth/change-password', () => {
             .post('/api/auth/change-password')
             .send({ current_password: 'OldPass1!', new_password: 'NewPass1!' });
         expect(res.status).toBe(401);
+    });
+
+    test('re-issued token keeps museum_id (museum scoping survives the forced change)', async () => {
+        const techUser = await createUser(db, {
+            name: 'pwtech2', email: 'pwtech2@test.com',
+            role: 'technician', museum_id: museum.id, password: 'OldPass2!',
+            must_change_password: 1
+        });
+        const techToken = makeAdminToken(techUser);
+
+        const res = await request(app)
+            .post('/api/auth/change-password')
+            .set('Authorization', `Bearer ${techToken}`)
+            .send({ current_password: 'OldPass2!', new_password: 'NewPass2!' });
+        expect(res.status).toBe(200);
+
+        const payload = JSON.parse(Buffer.from(res.body.token.split('.')[1], 'base64').toString());
+        expect(payload.museum_id).toBe(museum.id);
+        expect(payload.must_change_password).toBe(false);
     });
 });
 

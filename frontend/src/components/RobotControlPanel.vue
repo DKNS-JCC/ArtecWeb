@@ -7,7 +7,6 @@
  *  • Laser-scan overlay on the map canvas
  *  • Live AMCL pose (heading arrow on canvas)
  *  • Send Nav2 goal by clicking on the map
- *  • Set AMCL initial pose with a dedicated mode
  *  • Teleoperation (D-pad + keyboard WASD / arrow keys)
  *  • Cancel active navigation
  */
@@ -15,8 +14,8 @@ import { ref, computed, onMounted, onUnmounted, watch, nextTick } from 'vue'
 import { robotService } from '@/services/robotService'
 import { Button } from '@/components/ui/button'
 import {
-    Navigation, Crosshair, X, RotateCcw, ArrowUp, ArrowDown,
-    ArrowLeft, ArrowRight, RotateCw, Wifi, Loader2, Home, MapPin
+    Navigation, X, RotateCcw, ArrowUp, ArrowDown,
+    ArrowLeft, ArrowRight, RotateCw, Wifi, Loader2, Home, MapPin, Radar
 } from 'lucide-vue-next'
 
 const props = defineProps({
@@ -43,7 +42,7 @@ const scanData   = ref(null)   // fetched once when panel opens, not polled
 // No HTTP request needed.
 const pose = computed(() => props.robot.position ?? null)
 
-// Interaction mode: 'none' | 'nav-goal' | 'initial-pose'
+// Interaction mode: 'none' | 'nav-goal'
 const mapMode    = ref('none')
 const pendingClick = ref(null) // { x, y } in map coords
 
@@ -62,6 +61,10 @@ const loadMap = async () => {
 const loadScan = async () => {
     try { scanData.value = await robotService.getScan(props.robot.id) } catch (_) {}
 }
+
+// Refresh both the occupancy grid and the laser scan (and thus the nearest-obstacle
+// readout) in one click.
+const refreshSensors = () => { loadMap(); loadScan(); }
 
 // Redraw when map data or the live pose from SSE changes.
 // Scan is overlaid only once (static after fetch).
@@ -155,7 +158,7 @@ const drawCanvas = () => {
         const cx = (pendingClick.value.x - info.origin.position.x) / info.resolution
         const cy = info.height - (pendingClick.value.y - info.origin.position.y) / info.resolution
         ctx.save()
-        ctx.strokeStyle = mapMode.value === 'initial-pose' ? '#f59e0b' : '#16a34a'
+        ctx.strokeStyle = '#16a34a'
         ctx.lineWidth   = 2
         ctx.beginPath()
         ctx.arc(cx, cy, 8, 0, 2 * Math.PI)
@@ -164,7 +167,7 @@ const drawCanvas = () => {
     }
 }
 
-// ── Map interaction (nav-goal / initial-pose) ─────────────────────────────────
+// ── Map interaction (nav-goal) ────────────────────────────────────────────────
 
 const canvasToWorld = (e) => {
     const canvas  = mapCanvas.value
@@ -211,13 +214,6 @@ const onCanvasMouseup = async (e) => {
                 qz, qw
             )
             navStatus.value = `Goal: (${pendingClick.value.x.toFixed(2)}, ${pendingClick.value.y.toFixed(2)})`
-        } else if (mapMode.value === 'initial-pose') {
-            await robotService.setInitialPose(
-                props.robot.id,
-                pendingClick.value.x, pendingClick.value.y,
-                qz, qw
-            )
-            navStatus.value = `Pose inicial establecida: (${pendingClick.value.x.toFixed(2)}, ${pendingClick.value.y.toFixed(2)})`
         }
     } catch (err) {
         navStatus.value = `Error: ${err.message}`
@@ -368,40 +364,48 @@ const poseText = computed(() => {
 const mapModeLabel = computed(() => ({
     'none':         'Modo: Observar',
     'nav-goal':     'Modo: Clic → Arrastrar para establecer objetivo',
-    'initial-pose': 'Modo: Clic → Arrastrar para establecer pose inicial',
 }[mapMode.value]))
 
 // Current location = nearest waypoint to the live pose (from API/SSE).
 const currentLocation = computed(() => props.robot.current_location?.name || null)
+
+// Nearest obstacle distance from the latest LIDAR scan — the human-readable
+// form of "consultar el escaneo LIDAR". Picks the smallest valid range reading.
+const nearestObstacle = computed(() => {
+    const s = scanData.value
+    if (!s || !Array.isArray(s.ranges)) return null
+    const min = s.range_min ?? 0
+    const max = s.range_max ?? Infinity
+    let nearest = Infinity
+    for (const r of s.ranges) {
+        if (typeof r === 'number' && isFinite(r) && r >= min && r <= max && r < nearest) {
+            nearest = r
+        }
+    }
+    return isFinite(nearest) ? nearest : null
+})
 </script>
 
 <template>
-    <div class="space-y-5">
+    <div class="grid gap-6 lg:grid-cols-3">
 
         <!-- ── Map section ─────────────────────────────────────────────────── -->
-        <div class="space-y-2">
+        <div class="lg:col-span-2 space-y-2">
             <div class="flex flex-wrap gap-2 items-center justify-between">
                 <span class="text-sm font-semibold text-foreground">Mapa en Vivo</span>
                 <div class="flex gap-1.5 flex-wrap">
                     <!-- Mode toggles -->
-                    <Button size="sm" variant="outline" @click="loadMap" :disabled="!robot.connected || mapLoading" class="h-7 px-2 text-xs gap-1">
+                    <Button size="sm" variant="outline" @click="refreshSensors" :disabled="!robot.connected || mapLoading" class="h-7 px-2 text-xs gap-1">
                         <Loader2 v-if="mapLoading" class="w-3 h-3 animate-spin" />
                         <RotateCcw v-else class="w-3 h-3" />
-                        Refrescar Mapa
+                        Refrescar
                     </Button>
                     <Button size="sm"
                         :variant="mapMode === 'nav-goal' ? 'default' : 'outline'"
                         @click="mapMode = mapMode === 'nav-goal' ? 'none' : 'nav-goal'"
                         :disabled="!robot.connected || !mapData"
                         class="h-7 px-2 text-xs gap-1">
-                        <Navigation class="w-3 h-3" /> Nav Goal
-                    </Button>
-                    <Button size="sm"
-                        :variant="mapMode === 'initial-pose' ? 'default' : 'outline'"
-                        @click="mapMode = mapMode === 'initial-pose' ? 'none' : 'initial-pose'"
-                        :disabled="!robot.connected || !mapData"
-                        class="h-7 px-2 text-xs gap-1">
-                        <Crosshair class="w-3 h-3" /> Pose Inicial
+                        <Navigation class="w-3 h-3" /> Ir a Objetivo
                     </Button>
                     <Button size="sm" variant="destructive"
                         @click="cancelNav"
@@ -426,8 +430,7 @@ const currentLocation = computed(() => props.robot.current_location?.name || nul
             </p>
 
             <!-- Mode hint -->
-            <p v-if="mapMode !== 'none'" class="text-xs px-2 py-1 rounded-sm"
-                :class="mapMode === 'nav-goal' ? 'bg-green-500/10 text-green-700 dark:text-green-400' : 'bg-amber-500/10 text-amber-700 dark:text-amber-400'">
+            <p v-if="mapMode !== 'none'" class="text-xs px-2 py-1 rounded-sm bg-green-500/10 text-green-700 dark:text-green-400">
                 {{ mapModeLabel }}
             </p>
 
@@ -440,9 +443,15 @@ const currentLocation = computed(() => props.robot.current_location?.name || nul
                 AMCL → {{ poseText }}
             </p>
 
+            <!-- Nearest obstacle from the LIDAR scan -->
+            <p v-if="nearestObstacle !== null" class="text-xs flex items-center gap-1 text-muted-foreground">
+                <Radar class="w-3 h-3 text-primary shrink-0" />
+                Obstáculo más próximo (LIDAR): <span class="font-medium text-foreground">{{ nearestObstacle.toFixed(2) }} m</span>
+            </p>
+
             <!-- Canvas -->
             <div class="relative border border-border rounded-md overflow-hidden bg-muted/30"
-                :class="mapMode !== 'none' ? (mapMode === 'nav-goal' ? 'cursor-crosshair ring-2 ring-green-500' : 'cursor-crosshair ring-2 ring-amber-500') : 'cursor-default'">
+                :class="mapMode === 'nav-goal' ? 'cursor-crosshair ring-2 ring-green-500' : 'cursor-default'">
 
                 <div v-if="mapLoading" class="absolute inset-0 flex items-center justify-center bg-background/60 z-10">
                     <Loader2 class="w-6 h-6 animate-spin text-primary" />
@@ -453,10 +462,15 @@ const currentLocation = computed(() => props.robot.current_location?.name || nul
                     <span>{{ robot.connected ? 'Cargando mapa…' : 'Conecta el robot para ver el mapa' }}</span>
                 </div>
 
+                <!-- block + w-full + h-auto keeps the rendered image exactly
+                     proportional to the canvas pixels, so click→world mapping in
+                     canvasToWorld() is accurate. (object-contain/max-h letterboxed
+                     it and broke the goal placement.) pixelated keeps the grid crisp
+                     when scaled up. -->
                 <canvas
                     v-show="mapData"
                     ref="mapCanvas"
-                    class="w-full h-auto max-h-72 object-contain"
+                    class="block w-full h-auto [image-rendering:pixelated]"
                     @mousedown="onCanvasMousedown"
                     @mouseup="onCanvasMouseup"
                 />
@@ -464,7 +478,7 @@ const currentLocation = computed(() => props.robot.current_location?.name || nul
         </div>
 
         <!-- ── Teleoperation ───────────────────────────────────────────────── -->
-        <div class="space-y-2">
+        <div class="lg:col-span-1 space-y-2">
             <span class="text-sm font-semibold text-foreground">Teleoperación</span>
             <p class="text-xs text-muted-foreground">Usa las teclas WASD / ↑↓←→ o el D-pad.</p>
 

@@ -298,6 +298,8 @@ router.delete('/admin/users/:id', authMiddleware, adminMiddleware, authControlle
 // ─── SUPERADMIN-ONLY Routes ───────────────────────────────────
 router.post('/museums', authMiddleware, superAdminMiddleware, museumController.createMuseum);
 router.get('/museums', authMiddleware, superAdminMiddleware, museumController.listMuseums);
+router.put('/museums/:id', authMiddleware, superAdminMiddleware, museumController.updateMuseum);
+router.delete('/museums/:id', authMiddleware, superAdminMiddleware, museumController.deleteMuseum);
 
 // ─── MAP Routes (admin only) ──────────────────────────────────
 // Maps belong to museums; multiple robots can share a map
@@ -445,7 +447,7 @@ router.put('/robots/:id', authMiddleware, adminMiddleware, (req, res) => {
     const isSuperAdmin = req.user.role === 'platform_admin';
     const museumId = req.user.museum_id;
     const robotId = req.params.id;
-    const { ip, name, map_id } = req.body;
+    const { ip, name, map_id, museum_id } = req.body;
 
     if (ip !== undefined && ip !== '' && !IP_RE.test(ip)) {
         return res.status(400).json({ error: 'Invalid IP address format' });
@@ -462,8 +464,21 @@ router.put('/robots/:id', authMiddleware, adminMiddleware, (req, res) => {
         if (err) return res.status(500).json({ error: 'Database error' });
         if (!robot) return res.status(404).json({ error: 'Robot not found or unauthorized' });
 
+        // Reassigning a robot to another museum (or unassigning it) is provider-only.
+        const reassign = isSuperAdmin && museum_id !== undefined;
+        const newMuseumId = reassign ? (museum_id || null) : robot.museum_id;
+        const museumChanged = newMuseumId !== robot.museum_id;
+
+        if (reassign && newMuseumId) {
+            const museum = await new Promise(resolve => {
+                db.get('SELECT id FROM museums WHERE id = ?', [newMuseumId], (e, row) => resolve(row || null));
+            });
+            if (!museum) return res.status(404).json({ error: 'Museo no encontrado' });
+        }
+
         // If assigning a map, verify it belongs to the same museum AND has a base point.
-        if (map_id !== undefined && map_id !== null) {
+        // (Skipped on a museum change: the old map belongs to the previous museum.)
+        if (!museumChanged && map_id !== undefined && map_id !== null) {
             const mapRow = await new Promise(resolve => {
                 db.get('SELECT museum_id FROM maps WHERE id = ?', [map_id], (e, row) => resolve(row || null));
             });
@@ -482,9 +497,15 @@ router.put('/robots/:id', authMiddleware, adminMiddleware, (req, res) => {
 
         const updatedIp = ip !== undefined ? ip : robot.ip;
         const updatedName = name !== undefined ? name : robot.name;
-        const updatedMapId = map_id !== undefined ? map_id : robot.map_id;
+        // Maps are museum-scoped, so moving the robot to another museum drops its map.
+        const updatedMapId = museumChanged ? null : (map_id !== undefined ? map_id : robot.map_id);
 
-        db.run(`UPDATE robots SET ip = ?, name = ?, map_id = ? WHERE id = ?`, [updatedIp, updatedName, updatedMapId, robotId], (err) => {
+        // On a museum change, also clear any stale visitor session from the old museum.
+        const updateSql = museumChanged
+            ? `UPDATE robots SET ip = ?, name = ?, map_id = ?, museum_id = ?, current_visitor_id = NULL, locked_until = NULL WHERE id = ?`
+            : `UPDATE robots SET ip = ?, name = ?, map_id = ?, museum_id = ? WHERE id = ?`;
+
+        db.run(updateSql, [updatedIp, updatedName, updatedMapId, newMuseumId, robotId], (err) => {
             if (err) return res.status(500).json({ error: 'Error updating robot' });
 
             if (ip && ip !== robot.ip && rosService.getConnectionState(robotId)) {
@@ -494,6 +515,22 @@ router.put('/robots/:id', authMiddleware, adminMiddleware, (req, res) => {
 
             sseService.broadcastRobot(robotId);
             res.json({ message: 'Robot updated successfully' });
+        });
+    });
+});
+
+// DELETE /api/robots/:id — superadmin only (robots are managed by the provider).
+// FK cascade removes the robot's visitors, chat and incidents.
+router.delete('/robots/:id', authMiddleware, superAdminMiddleware, (req, res) => {
+    const robotId = req.params.id;
+    db.get('SELECT id FROM robots WHERE id = ?', [robotId], (err, robot) => {
+        if (err) return res.status(500).json({ error: 'Database error' });
+        if (!robot) return res.status(404).json({ error: 'Robot not found' });
+
+        db.run('DELETE FROM robots WHERE id = ?', [robotId], (delErr) => {
+            if (delErr) return res.status(500).json({ error: 'Error deleting robot' });
+            rosService.disconnect(robotId); // tear down any live ROS connection
+            res.json({ message: 'Robot deleted' });
         });
     });
 });

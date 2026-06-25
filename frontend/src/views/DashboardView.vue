@@ -163,13 +163,36 @@ const handleEditRobot = async () => {
     try {
         await robotService.update(robotForm.value.id, {
             name: robotForm.value.name,
-            ip: robotForm.value.ip
+            ip: robotForm.value.ip,
+            museum_id: robotForm.value.museum_id || null
         })
         robotSuccess.value = 'Robot actualizado correctamente.'
         await fetchRobots()
         setTimeout(() => showEditRobotModal.value = false, 1500)
     } catch (err) {
         robotError.value = err.message || 'Error al actualizar robot'
+    }
+}
+
+const showDeleteRobotModal = ref(false)
+const deleteRobotTarget = ref(null)
+const deleteRobotError = ref(null)
+
+const openDeleteRobotModal = (robot) => {
+    deleteRobotTarget.value = robot
+    deleteRobotError.value = null
+    showDeleteRobotModal.value = true
+}
+
+const handleDeleteRobot = async () => {
+    deleteRobotError.value = null
+    try {
+        await robotService.remove(deleteRobotTarget.value.id)
+        showDeleteRobotModal.value = false
+        deleteRobotTarget.value = null
+        await fetchRobots()
+    } catch (err) {
+        deleteRobotError.value = err.message || 'Error al eliminar robot'
     }
 }
 
@@ -313,6 +336,7 @@ const handleDeleteStaff = async () => {
 // ---------------- MUSEUMS ----------------
 const museums = ref([])
 const loadingMuseums = ref(false)
+const museumName = (id) => museums.value.find(m => m.id === id)?.name || 'Sin asignar'
 const showMuseumModal = ref(false)
 const museumError = ref(null)
 const museumSuccess = ref(null)
@@ -347,6 +371,54 @@ const handleCreateMuseum = async () => {
         setTimeout(() => showMuseumModal.value = false, 1500)
     } catch (err) {
         museumError.value = err.message || 'Error al crear museo'
+    }
+}
+
+const showEditMuseumModal = ref(false)
+const editMuseumForm = ref({ id: '', name: '', company: '' })
+
+const openEditMuseumModal = (museum) => {
+    editMuseumForm.value = { id: museum.id, name: museum.name, company: museum.company }
+    museumError.value = null
+    museumSuccess.value = null
+    showEditMuseumModal.value = true
+}
+
+const handleUpdateMuseum = async () => {
+    museumError.value = null
+    museumSuccess.value = null
+    try {
+        await museumService.update(editMuseumForm.value.id, {
+            name: editMuseumForm.value.name,
+            company: editMuseumForm.value.company,
+        })
+        museumSuccess.value = 'Museo actualizado correctamente.'
+        await fetchMuseums()
+        setTimeout(() => showEditMuseumModal.value = false, 1500)
+    } catch (err) {
+        museumError.value = err.message || 'Error al actualizar museo'
+    }
+}
+
+const showDeleteMuseumModal = ref(false)
+const deleteMuseumTarget = ref(null)
+const deleteMuseumError = ref(null)
+
+const openDeleteMuseumModal = (museum) => {
+    deleteMuseumTarget.value = museum
+    deleteMuseumError.value = null
+    showDeleteMuseumModal.value = true
+}
+
+const handleDeleteMuseum = async () => {
+    deleteMuseumError.value = null
+    try {
+        await museumService.remove(deleteMuseumTarget.value.id)
+        showDeleteMuseumModal.value = false
+        deleteMuseumTarget.value = null
+        await fetchMuseums()
+    } catch (err) {
+        deleteMuseumError.value = err.message || 'Error al eliminar museo'
     }
 }
 
@@ -462,6 +534,35 @@ onUnmounted(() => {
                 <!-- Robots Card Loop -->
                 <Card v-for="robot in robots" :key="robot.id"
                     class="p-6 hover:border-primary/40 transition-colors relative overflow-hidden group">
+
+                    <!-- SUPERADMIN (provider): assignment-only view -->
+                    <template v-if="isPlatformAdmin">
+                        <div class="flex items-center gap-4 mb-6">
+                            <div class="w-12 h-12 bg-primary/10 rounded-sm flex items-center justify-center text-primary flex-shrink-0">
+                                <Bot class="w-6 h-6" />
+                            </div>
+                            <div class="min-w-0">
+                                <h2 class="font-display text-xl font-medium tracking-tight text-foreground truncate">{{ robot.name }}</h2>
+                                <span class="text-xs text-muted-foreground uppercase tracking-wider">{{ robot.id }}</span>
+                            </div>
+                        </div>
+                        <div class="flex items-center gap-2 mb-6 text-sm">
+                            <Building2 class="w-4 h-4 text-muted-foreground flex-shrink-0" />
+                            <span v-if="robot.museum_id" class="font-medium text-foreground">{{ museumName(robot.museum_id) }}</span>
+                            <span v-else class="text-muted-foreground italic">Sin asignar</span>
+                        </div>
+                        <div class="flex gap-2 pt-4 border-t border-border">
+                            <Button variant="outline" size="sm" class="flex-1 gap-1.5" @click="openEditRobotModal(robot)">
+                                <Settings class="w-3.5 h-3.5" /> Editar / Mover
+                            </Button>
+                            <Button variant="ghost" size="sm" class="gap-1.5 text-destructive hover:text-destructive" @click="openDeleteRobotModal(robot)">
+                                <Trash2 class="w-3.5 h-3.5" /> Eliminar
+                            </Button>
+                        </div>
+                    </template>
+
+                    <!-- OPERATORS (museum_admin / technician): full operational panel -->
+                    <template v-else>
                     <div class="flex justify-between items-start mb-4">
                         <div>
                             <h2 class="font-display text-xl font-medium tracking-tight text-foreground">{{ robot.name }}</h2>
@@ -542,9 +643,6 @@ onUnmounted(() => {
                                 <span :class="robot.connected ? 'text-green-700 dark:text-green-400 bg-green-500/10' : 'text-red-700 dark:text-red-400 bg-red-500/10'" class="px-2 py-0.5 rounded-sm text-xs font-semibold">
                                     {{ robot.connected ? 'Conectado' : 'Desconectado' }}
                                 </span>
-                                <Button v-if="isPlatformAdmin" @click="openEditRobotModal(robot)" variant="ghost" size="icon" class="h-6 w-6 ml-1">
-                                    <Settings class="w-3.5 h-3.5" />
-                                </Button>
                             </div>
                         </div>
                     </div>
@@ -577,6 +675,7 @@ onUnmounted(() => {
                             >Chat</Button>
                         </div>
                       </div>
+                    </template>
                 </Card>
             </div>
         </div>
@@ -753,6 +852,14 @@ onUnmounted(() => {
                             <p class="text-sm text-muted-foreground">{{ museum.company }}</p>
                         </div>
                     </div>
+                    <div class="flex gap-2 pt-4 border-t border-border/50">
+                        <Button variant="outline" size="sm" class="flex-1 gap-1.5" @click="openEditMuseumModal(museum)">
+                            <Pencil class="w-3.5 h-3.5" /> Editar
+                        </Button>
+                        <Button variant="ghost" size="sm" class="gap-1.5 text-destructive hover:text-destructive" @click="openDeleteMuseumModal(museum)">
+                            <Trash2 class="w-3.5 h-3.5" /> Eliminar
+                        </Button>
+                    </div>
                 </Card>
             </div>
         </div>
@@ -798,6 +905,15 @@ onUnmounted(() => {
                         <div class="space-y-2">
                             <Label for="edit_robot_ip">IP / WebSockets</Label>
                             <Input id="edit_robot_ip" v-model="robotForm.ip" required placeholder="Ej: 192.168.1.100" />
+                        </div>
+                        <div class="space-y-2">
+                            <Label for="edit_robot_museum">Museo Asignado</Label>
+                            <select id="edit_robot_museum" v-model="robotForm.museum_id"
+                                class="h-10 w-full rounded-sm border border-input bg-background px-3 text-sm text-foreground focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none">
+                                <option :value="null">Sin asignar</option>
+                                <option v-for="m in museums" :key="m.id" :value="m.id">{{ m.name }}</option>
+                            </select>
+                            <p class="text-xs text-muted-foreground">Al cambiar de museo se desasigna su mapa actual.</p>
                         </div>
                         <Alert v-if="robotError" variant="destructive">
                             {{ robotError }}
@@ -1001,6 +1117,101 @@ onUnmounted(() => {
                         <Button type="submit" class="w-full mt-2"
                             :disabled="!museumForm.name || !museumForm.company">Registrar Museo</Button>
                     </form>
+                </div>
+            </Card>
+        </div>
+
+        <!-- EDIT MUSEUM MODAL -->
+        <div v-if="showEditMuseumModal"
+            class="fixed inset-0 bg-background/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+            <Card class="w-full max-w-md relative">
+                <button @click="showEditMuseumModal = false"
+                    class="absolute top-4 right-4 text-muted-foreground hover:text-foreground">
+                    <X class="w-5 h-5" />
+                </button>
+                <div class="p-6">
+                    <h2 class="font-display text-2xl font-medium tracking-tight mb-6 flex items-center gap-2">
+                        <Pencil class="w-6 h-6 text-primary" /> Editar Museo
+                    </h2>
+                    <form @submit.prevent="handleUpdateMuseum" class="space-y-4">
+                        <div class="space-y-2">
+                            <Label for="edit_museum_name">Nombre del Museo / Instalación</Label>
+                            <Input id="edit_museum_name" v-model="editMuseumForm.name" required
+                                placeholder="Ej: Museo Ciencias Naturales" />
+                        </div>
+                        <div class="space-y-2">
+                            <Label for="edit_company">Empresa Titular/Gestora</Label>
+                            <Input id="edit_company" v-model="editMuseumForm.company" required placeholder="Ej: Artec Co." />
+                        </div>
+
+                        <Alert v-if="museumError" variant="destructive" class="mb-4">
+                            <p>{{ museumError }}</p>
+                        </Alert>
+                        <Alert v-if="museumSuccess" variant="success" class="mb-4">
+                            <p>{{ museumSuccess }}</p>
+                        </Alert>
+
+                        <Button type="submit" class="w-full mt-2"
+                            :disabled="!editMuseumForm.name || !editMuseumForm.company">Guardar Cambios</Button>
+                    </form>
+                </div>
+            </Card>
+        </div>
+
+        <!-- MUSEUM DELETE CONFIRM MODAL -->
+        <div v-if="showDeleteMuseumModal"
+            class="fixed inset-0 bg-background/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+            <Card class="w-full max-w-sm">
+                <div class="p-6">
+                    <div class="flex items-center gap-3 mb-4">
+                        <div class="w-10 h-10 rounded-full bg-destructive/10 flex items-center justify-center flex-shrink-0">
+                            <ShieldAlert class="w-5 h-5 text-destructive" />
+                        </div>
+                        <div>
+                            <h2 class="font-display font-medium tracking-tight text-foreground">Eliminar museo</h2>
+                            <p class="text-sm text-muted-foreground">Esta acción no se puede deshacer</p>
+                        </div>
+                    </div>
+                    <p class="text-sm text-muted-foreground mb-6">
+                        Se eliminará <strong class="text-foreground">{{ deleteMuseumTarget?.name }}</strong> y, en cascada,
+                        <strong class="text-foreground">todos sus usuarios, robots, mapas, zonas e historial de visitas</strong>.
+                    </p>
+                    <Alert v-if="deleteMuseumError" variant="destructive" class="mb-4">
+                        <p>{{ deleteMuseumError }}</p>
+                    </Alert>
+                    <div class="flex gap-3">
+                        <Button variant="outline" class="flex-1" @click="showDeleteMuseumModal = false">Cancelar</Button>
+                        <Button variant="destructive" class="flex-1" @click="handleDeleteMuseum">Eliminar</Button>
+                    </div>
+                </div>
+            </Card>
+        </div>
+
+        <!-- ROBOT DELETE CONFIRM MODAL -->
+        <div v-if="showDeleteRobotModal"
+            class="fixed inset-0 bg-background/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+            <Card class="w-full max-w-sm">
+                <div class="p-6">
+                    <div class="flex items-center gap-3 mb-4">
+                        <div class="w-10 h-10 rounded-full bg-destructive/10 flex items-center justify-center flex-shrink-0">
+                            <ShieldAlert class="w-5 h-5 text-destructive" />
+                        </div>
+                        <div>
+                            <h2 class="font-display font-medium tracking-tight text-foreground">Eliminar robot</h2>
+                            <p class="text-sm text-muted-foreground">Esta acción no se puede deshacer</p>
+                        </div>
+                    </div>
+                    <p class="text-sm text-muted-foreground mb-6">
+                        Se eliminará el robot <strong class="text-foreground">{{ deleteRobotTarget?.name }}</strong> junto con
+                        <strong class="text-foreground">su historial de visitas, chat e incidencias</strong>.
+                    </p>
+                    <Alert v-if="deleteRobotError" variant="destructive" class="mb-4">
+                        <p>{{ deleteRobotError }}</p>
+                    </Alert>
+                    <div class="flex gap-3">
+                        <Button variant="outline" class="flex-1" @click="showDeleteRobotModal = false">Cancelar</Button>
+                        <Button variant="destructive" class="flex-1" @click="handleDeleteRobot">Eliminar</Button>
+                    </div>
                 </div>
             </Card>
         </div>

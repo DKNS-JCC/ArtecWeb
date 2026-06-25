@@ -20,6 +20,11 @@ export const robotService = {
         return api.put(`/robots/${id}`, data)
     },
 
+    // Delete a robot (Superadmin only — robots are provider-managed)
+    remove(id) {
+        return api.delete(`/robots/${id}`)
+    },
+
     forceEndSession(id) {
         return api.post(`/robots/${id}/force-end`)
     },

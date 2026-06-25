@@ -14,6 +14,7 @@ const db = new sqlite3.Database(dbPath, (err) => {
         console.error('Error opening database', err.message);
         return;
     }
+    db.run('PRAGMA foreign_keys = ON');
     initializeDatabase();
 });
 
@@ -29,27 +30,26 @@ function initializeDatabase() {
             )
         `);
 
-        // 2. Users (staff/admins)
+        // 2. Users
         db.run(`
             CREATE TABLE IF NOT EXISTS users (
                 id TEXT PRIMARY KEY,
                 name TEXT UNIQUE NOT NULL,
                 email TEXT UNIQUE NOT NULL,
                 password_hash TEXT NOT NULL,
-                role TEXT CHECK(role IN ('platform_admin', 'museum_admin', 'technician')),
+                role TEXT CHECK(role IN ('platform_admin', 'museum_admin', 'technician')) NOT NULL,
                 active INTEGER DEFAULT 1,
                 must_change_password INTEGER DEFAULT 0,
                 avatar TEXT,
                 museum_id TEXT,
                 created_by TEXT,
                 created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-                FOREIGN KEY(museum_id) REFERENCES museums(id),
-                FOREIGN KEY(created_by) REFERENCES users(id)
+                FOREIGN KEY(museum_id) REFERENCES museums(id) ON DELETE CASCADE,
+                FOREIGN KEY(created_by) REFERENCES users(id) ON DELETE SET NULL
             )
         `);
 
-        // 3. Maps — belong to a museum (not a robot)
-        //    A museum can have many maps (floors, sections, etc.)
+        // 3. Maps — belong to a museum
         db.run(`
             CREATE TABLE IF NOT EXISTS maps (
                 id TEXT PRIMARY KEY,
@@ -63,12 +63,11 @@ function initializeDatabase() {
                 width INTEGER NOT NULL DEFAULT 0,
                 height INTEGER NOT NULL DEFAULT 0,
                 uploaded_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-                FOREIGN KEY(museum_id) REFERENCES museums(id)
+                FOREIGN KEY(museum_id) REFERENCES museums(id) ON DELETE CASCADE
             )
         `);
 
-        // 4. Robots — belong to a museum, optionally assigned one map
-        //    Multiple robots can share the same map
+        // 4. Robots — belong to a museum, assigned one map
         db.run(`
             CREATE TABLE IF NOT EXISTS robots (
                 id TEXT PRIMARY KEY,
@@ -84,16 +83,14 @@ function initializeDatabase() {
                 locked_until TEXT,
                 current_visitor_id TEXT,
                 ip TEXT,
-                FOREIGN KEY(museum_id) REFERENCES museums(id),
-                FOREIGN KEY(map_id) REFERENCES maps(id)
+                last_nav_error_at DATETIME,
+                last_nav_error_place TEXT,
+                FOREIGN KEY(museum_id) REFERENCES museums(id) ON DELETE CASCADE,
+                FOREIGN KEY(map_id) REFERENCES maps(id) ON DELETE SET NULL
             )
         `);
-        // Latest navigation failure, surfaced inline on the dashboard. Cleared when
-        // a new goal is dispatched (see rosService.sendNavGoal).
-        db.run(`ALTER TABLE robots ADD COLUMN last_nav_error_at DATETIME`, () => {});
-        db.run(`ALTER TABLE robots ADD COLUMN last_nav_error_place TEXT`, () => {});
 
-        // 5. Visitors (temporary QR sessions tied to a robot)
+        // 5. Visitors
         db.run(`
             CREATE TABLE IF NOT EXISTS visitors (
                 id TEXT PRIMARY KEY,
@@ -101,18 +98,15 @@ function initializeDatabase() {
                 robot_id TEXT,
                 name TEXT,
                 expertise_level TEXT DEFAULT 'general',
+                language TEXT DEFAULT 'es',
                 created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
                 ended_at DATETIME,
-                FOREIGN KEY(robot_id) REFERENCES robots(id)
+                deleted_at DATETIME,
+                FOREIGN KEY(robot_id) REFERENCES robots(id) ON DELETE CASCADE
             )
         `);
-        // Migrations: silently ignored if column already exists
-        db.run(`ALTER TABLE visitors ADD COLUMN expertise_level TEXT DEFAULT 'general'`, () => {});
-        db.run(`ALTER TABLE visitors ADD COLUMN deleted_at DATETIME`, () => {});
-        db.run(`ALTER TABLE visitors ADD COLUMN language TEXT DEFAULT 'es'`, () => {});
 
-        // 6. Zones — belong to a map (not a robot)
-        //    Zones are unique per map; different maps have independent zones
+        // 6. Zones — belong to a map
         db.run(`
             CREATE TABLE IF NOT EXISTS zones (
                 id TEXT PRIMARY KEY,
@@ -123,11 +117,11 @@ function initializeDatabase() {
                 map_x REAL,
                 map_y REAL,
                 created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-                FOREIGN KEY(map_id) REFERENCES maps(id)
+                FOREIGN KEY(map_id) REFERENCES maps(id) ON DELETE CASCADE
             )
         `);
 
-        // 7. Chat messages (conversation history + analytics)
+        // 7. Chat messages
         db.run(`
             CREATE TABLE IF NOT EXISTS chat_messages (
                 id TEXT PRIMARY KEY,
@@ -138,14 +132,12 @@ function initializeDatabase() {
                 content TEXT NOT NULL,
                 intent TEXT,
                 created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-                FOREIGN KEY(visitor_id) REFERENCES visitors(id),
-                FOREIGN KEY(robot_id) REFERENCES robots(id)
+                FOREIGN KEY(visitor_id) REFERENCES visitors(id) ON DELETE CASCADE,
+                FOREIGN KEY(robot_id) REFERENCES robots(id) ON DELETE CASCADE
             )
         `);
 
-        // 8. Incidents — operational events technicians need to review (e.g. a
-        //    robot that couldn't reach a navigation goal). Persisted so failures
-        //    are visible after the fact, not just in the live dashboard.
+        // 8. Incidents
         db.run(`
             CREATE TABLE IF NOT EXISTS incidents (
                 id TEXT PRIMARY KEY,
@@ -157,12 +149,13 @@ function initializeDatabase() {
                 detail TEXT,
                 resolved INTEGER DEFAULT 0,
                 created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-                FOREIGN KEY(museum_id) REFERENCES museums(id),
-                FOREIGN KEY(robot_id)  REFERENCES robots(id)
+                FOREIGN KEY(museum_id) REFERENCES museums(id) ON DELETE CASCADE,
+                FOREIGN KEY(robot_id)  REFERENCES robots(id) ON DELETE CASCADE,
+                FOREIGN KEY(visitor_id) REFERENCES visitors(id) ON DELETE SET NULL
             )
         `);
 
-        // 9. Password reset tokens (single-use, 1h expiry)
+        // 9. Password reset tokens
         db.run(`
             CREATE TABLE IF NOT EXISTS password_reset_tokens (
                 id TEXT PRIMARY KEY,
@@ -171,30 +164,27 @@ function initializeDatabase() {
                 expires_at DATETIME NOT NULL,
                 used INTEGER DEFAULT 0,
                 created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-                FOREIGN KEY(user_id) REFERENCES users(id)
+                FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
             )
         `);
 
-        // Indexes
-        db.run(`CREATE INDEX IF NOT EXISTS idx_users_email ON users(email)`);
+        // 10.Indexes
         db.run(`CREATE INDEX IF NOT EXISTS idx_users_museum_id ON users(museum_id)`);
         db.run(`CREATE INDEX IF NOT EXISTS idx_maps_museum_id ON maps(museum_id)`);
         db.run(`CREATE INDEX IF NOT EXISTS idx_robots_museum_id ON robots(museum_id)`);
         db.run(`CREATE INDEX IF NOT EXISTS idx_robots_map_id ON robots(map_id)`);
         db.run(`CREATE INDEX IF NOT EXISTS idx_zones_map_id ON zones(map_id)`);
-        // At most one "base" zone (robot home/return point) per map.
+        
         db.run(`CREATE UNIQUE INDEX IF NOT EXISTS idx_zones_one_base_per_map ON zones(map_id) WHERE category = 'base'`);
         db.run(`CREATE INDEX IF NOT EXISTS idx_visitors_robot_id ON visitors(robot_id)`);
-        db.run(`CREATE INDEX IF NOT EXISTS idx_visitors_session_id ON visitors(session_id)`);
-        db.run(`CREATE INDEX IF NOT EXISTS idx_chat_messages_session ON chat_messages(session_id)`);
-        db.run(`CREATE INDEX IF NOT EXISTS idx_chat_messages_visitor ON chat_messages(visitor_id)`);
+        db.run(`CREATE INDEX IF NOT EXISTS idx_visitors_ended_at ON visitors(ended_at)`);
+        
         db.run(`CREATE INDEX IF NOT EXISTS idx_chat_messages_session_time ON chat_messages(session_id, created_at)`);
         db.run(`CREATE INDEX IF NOT EXISTS idx_chat_messages_created_at ON chat_messages(created_at)`);
-        db.run(`CREATE INDEX IF NOT EXISTS idx_visitors_ended_at ON visitors(ended_at)`);
-        db.run(`CREATE INDEX IF NOT EXISTS idx_visitors_deleted_at ON visitors(deleted_at)`);
+        
+        db.run(`CREATE INDEX IF NOT EXISTS idx_chat_messages_visitor ON chat_messages(visitor_id)`);
         db.run(`CREATE INDEX IF NOT EXISTS idx_incidents_museum ON incidents(museum_id)`);
         db.run(`CREATE INDEX IF NOT EXISTS idx_incidents_created ON incidents(created_at)`);
-        db.run(`CREATE INDEX IF NOT EXISTS idx_incidents_resolved ON incidents(resolved)`);
     });
 }
 

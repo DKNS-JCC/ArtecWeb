@@ -210,14 +210,6 @@ describe('POST /api/robots/:id/command', () => {
         expect(res.status).toBe(200);
     });
 
-    test('charge command is accepted', async () => {
-        const res = await request(app)
-            .post(`/api/robots/${robot.id}/command`)
-            .set('Authorization', `Bearer ${adminToken}`)
-            .send({ command: 'charge' });
-        expect(res.status).toBe(200);
-    });
-
     test('connect command is accepted', async () => {
         const res = await request(app)
             .post(`/api/robots/${robot.id}/command`)

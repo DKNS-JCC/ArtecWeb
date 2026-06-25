@@ -306,35 +306,6 @@ class RosService extends EventEmitter {
         });
     }
 
-    setInitialPose(robotId, x, y, qz, qw, covariance = null) {
-        const robot = this._requireConnected(robotId);
-        if (!robot.topics.initialPose) {
-            robot.topics.initialPose = new ROSLIB.Topic({
-                ros:         robot.ros,
-                name:        '/initialpose',
-                messageType: 'geometry_msgs/PoseWithCovarianceStamped',
-            });
-        }
-        const cov = covariance || [
-            0.25, 0, 0, 0, 0, 0,
-            0, 0.25, 0, 0, 0, 0,
-            0, 0, 0, 0, 0, 0,
-            0, 0, 0, 0, 0, 0,
-            0, 0, 0, 0, 0, 0,
-            0, 0, 0, 0, 0, 0.06853892326654787,
-        ];
-        robot.topics.initialPose.publish({
-            header: { frame_id: 'map', stamp: { sec: 0, nanosec: 0 } },
-            pose: {
-                pose: {
-                    position:    { x, y, z: 0.0 },
-                    orientation: { x: 0.0, y: 0.0, z: qz, w: qw },
-                },
-                covariance: cov,
-            },
-        });
-    }
-
     move(robotId, linearX, angularZ) {
         const robot = this._requireConnected(robotId);
         robot.topics.cmdVel.publish({
@@ -391,10 +362,6 @@ class RosService extends EventEmitter {
                 });
             });
         });
-    }
-
-    getPose(robotId) {
-        return this.robots.get(robotId)?.latestPose ?? null;
     }
 
     getLatestScan(robotId) {

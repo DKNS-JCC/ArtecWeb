@@ -141,7 +141,7 @@ describe('buildSystemPrompt', () => {
     test('shows no-places message when places is empty', () => {
         const ctx = { ...baseContext, places: [] };
         const prompt = buildSystemPrompt(ctx);
-        expect(prompt).toContain('No hay lugares registrados');
+        expect(prompt).toContain('No places have been registered');
     });
 
     test('includes all valid intents', () => {

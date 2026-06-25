@@ -566,8 +566,6 @@ router.post('/robots/:id/command', authMiddleware, staffMiddleware, (req, res) =
             } catch (error) {
                  console.error(`ROS Stop error on robot ${robotId}:`, error.message);
             }
-        } else if (command === 'charge') {
-            status = 'charging';
         } else {
             return res.status(400).json({ error: 'Unknown command' });
         }
@@ -671,34 +669,6 @@ router.post('/robots/:id/go-to-base', authMiddleware, staffMiddleware, async (re
     });
 });
 
-// POST /api/robots/:id/initial-pose  — set AMCL initial pose
-router.post('/robots/:id/initial-pose', authMiddleware, adminMiddleware, (req, res) => {
-    const { x, y, qz = 0, qw = 1, covariance = null } = req.body;
-    if (x === undefined || y === undefined) {
-        return res.status(400).json({ error: 'x and y are required' });
-    }
-
-    const robotId = req.params.id;
-    const isSuperAdmin = req.user.role === 'platform_admin';
-    const museumId = req.user.museum_id;
-
-    let query = `SELECT id FROM robots WHERE id = ?`;
-    let params = [robotId];
-    if (!isSuperAdmin) { query += ` AND museum_id = ?`; params.push(museumId); }
-
-    db.get(query, params, (err, robot) => {
-        if (err) return res.status(500).json({ error: 'Database error' });
-        if (!robot) return res.status(404).json({ error: 'Robot not found or unauthorized' });
-
-        try {
-            rosService.setInitialPose(robotId, Number(x), Number(y), Number(qz), Number(qw), covariance);
-            res.json({ message: 'Initial pose set', x, y, qz, qw });
-        } catch (e) {
-            res.status(503).json({ error: e.message });
-        }
-    });
-});
-
 // POST /api/robots/:id/capture-map  — subscribe to /map once, convert to PNG, persist
 router.post('/robots/:id/capture-map', authMiddleware, adminMiddleware, mapController.captureMapFromRobot);
 
@@ -719,26 +689,6 @@ router.get('/robots/:id/map', authMiddleware, staffMiddleware, (req, res) => {
         const map = rosService.getMap(robotId);
         if (!map) return res.status(503).json({ error: 'Map not yet available. Is the robot connected?' });
         res.json(map);
-    });
-});
-
-// GET /api/robots/:id/pose  — get latest AMCL pose
-router.get('/robots/:id/pose', authMiddleware, staffMiddleware, (req, res) => {
-    const robotId = req.params.id;
-    const isSuperAdmin = req.user.role === 'platform_admin';
-    const museumId = req.user.museum_id;
-
-    let query = `SELECT id FROM robots WHERE id = ?`;
-    let params = [robotId];
-    if (!isSuperAdmin) { query += ` AND museum_id = ?`; params.push(museumId); }
-
-    db.get(query, params, (err, robot) => {
-        if (err) return res.status(500).json({ error: 'Database error' });
-        if (!robot) return res.status(404).json({ error: 'Robot not found or unauthorized' });
-
-        const pose = rosService.getPose(robotId);
-        if (!pose) return res.status(503).json({ error: 'Pose not yet available. Is the robot connected?' });
-        res.json(pose);
     });
 });
 
@@ -869,7 +819,8 @@ router.get('/admin/stats', authMiddleware, adminMiddleware, async (req, res) => 
             activeRobots:   activeRobots.count || 0,
             totalVisitors:  totVisitors.count  || 0,
             avgSessionTime: Math.round((avgSession.avg || 0) * 10) / 10,
-            totalMuseums:   totMuseums.count   ?? null,
+            // Museum count is only meaningful platform-wide, so expose it to superadmins only.
+            ...(isSuperAdmin && { totalMuseums: totMuseums.count || 0 }),
             visitorsByDay,
             expertiseDist,
             intentDist,

@@ -1,220 +1,224 @@
-const sqlite3 = require('sqlite3').verbose();
-const path = require('path');
-const bcrypt = require('bcrypt');
+/**
+ * Seed script — wipes the database and repopulates it with realistic demo data:
+ * several museums, staff accounts (usernames without spaces), robots, and a
+ * history of visitor sessions + chat so the analytics dashboard isn't empty.
+ *
+ * The schema is NOT redefined here: we require ../database, which creates every
+ * table (with FK cascade and indexes) exactly once. That way the seed can never
+ * drift from the real schema again.
+ *
+ * Run with the backend server stopped:   npm run seed
+ * Honours DB_PATH, so it can target a throwaway DB for verification.
+ */
+const path   = require('path');
+const fs     = require('fs');
 const crypto = require('crypto');
-const fs = require('fs');
+const bcrypt = require('bcrypt');
 
-const dbPath = path.resolve(__dirname, '../../../database/database.sqlite');
-const uploadsAvatarsPath = path.resolve(__dirname, '../../../uploads/avatars');
-
-// Remove existing database to start clean
-if (fs.existsSync(dbPath)) {
-    console.log('Removing old database...');
-    fs.unlinkSync(dbPath);
+// ─── 1. Start from a clean slate ──────────────────────────────────────────────
+const dbFile = process.env.DB_PATH || path.resolve(__dirname, '../../../database/database.sqlite');
+for (const f of [dbFile, `${dbFile}-wal`, `${dbFile}-shm`]) {
+    if (fs.existsSync(f)) fs.unlinkSync(f);
 }
-if (fs.existsSync(uploadsAvatarsPath)) {
-    fs.readdirSync(uploadsAvatarsPath).forEach(f => fs.unlinkSync(path.join(uploadsAvatarsPath, f)));
-}
-
-const db = new sqlite3.Database(dbPath, async (err) => {
-    if (err) {
-        console.error('Error opening database', err.message);
-        process.exit(1);
+// Only wipe shared avatar uploads when seeding the real DB, never on a DB_PATH override.
+if (!process.env.DB_PATH) {
+    const avatarsDir = path.resolve(__dirname, '../../uploads/avatars');
+    if (fs.existsSync(avatarsDir)) {
+        for (const f of fs.readdirSync(avatarsDir)) fs.unlinkSync(path.join(avatarsDir, f));
     }
-
-    console.log('Database connected. Initializing schema...');
-
-    db.serialize(() => {
-        db.run(`
-            CREATE TABLE IF NOT EXISTS museums (
-                id TEXT PRIMARY KEY,
-                name TEXT NOT NULL,
-                company TEXT NOT NULL,
-                created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-            )
-        `);
-
-        db.run(`
-            CREATE TABLE IF NOT EXISTS users (
-                id TEXT PRIMARY KEY,
-                name TEXT UNIQUE NOT NULL,
-                email TEXT UNIQUE NOT NULL,
-                password_hash TEXT NOT NULL,
-                role TEXT CHECK(role IN ('platform_admin', 'museum_admin', 'technician')),
-                active INTEGER DEFAULT 1,
-                must_change_password INTEGER DEFAULT 0,
-                avatar TEXT,
-                museum_id TEXT,
-                created_by TEXT,
-                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-                FOREIGN KEY(museum_id) REFERENCES museums(id),
-                FOREIGN KEY(created_by) REFERENCES users(id)
-            )
-        `);
-
-        db.run(`
-            CREATE TABLE IF NOT EXISTS maps (
-                id TEXT PRIMARY KEY,
-                museum_id TEXT NOT NULL,
-                name TEXT NOT NULL,
-                image_path TEXT NOT NULL,
-                resolution REAL NOT NULL DEFAULT 0.05,
-                origin_x REAL NOT NULL DEFAULT 0,
-                origin_y REAL NOT NULL DEFAULT 0,
-                origin_theta REAL NOT NULL DEFAULT 0,
-                width INTEGER NOT NULL DEFAULT 0,
-                height INTEGER NOT NULL DEFAULT 0,
-                uploaded_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-                FOREIGN KEY(museum_id) REFERENCES museums(id)
-            )
-        `);
-
-        db.run(`
-            CREATE TABLE IF NOT EXISTS robots (
-                id TEXT PRIMARY KEY,
-                museum_id TEXT,
-                map_id TEXT,
-                name TEXT NOT NULL,
-                status TEXT DEFAULT 'idle',
-                battery INTEGER DEFAULT 100,
-                position_x REAL DEFAULT 0,
-                position_y REAL DEFAULT 0,
-                position_theta REAL DEFAULT 0,
-                last_update DATETIME DEFAULT CURRENT_TIMESTAMP,
-                locked_until TEXT,
-                current_visitor_id TEXT,
-                ip TEXT,
-                FOREIGN KEY(museum_id) REFERENCES museums(id),
-                FOREIGN KEY(map_id) REFERENCES maps(id)
-            )
-        `);
-
-        db.run(`
-            CREATE TABLE IF NOT EXISTS visitors (
-                id TEXT PRIMARY KEY,
-                session_id TEXT UNIQUE NOT NULL,
-                robot_id TEXT,
-                name TEXT,
-                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-                ended_at DATETIME,
-                FOREIGN KEY(robot_id) REFERENCES robots(id)
-            )
-        `);
-
-        db.run(`
-            CREATE TABLE IF NOT EXISTS zones (
-                id TEXT PRIMARY KEY,
-                map_id TEXT NOT NULL,
-                name TEXT NOT NULL,
-                description TEXT,
-                category TEXT DEFAULT 'exhibit',
-                map_x REAL,
-                map_y REAL,
-                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-                FOREIGN KEY(map_id) REFERENCES maps(id)
-            )
-        `);
-
-        db.run(`
-            CREATE TABLE IF NOT EXISTS chat_messages (
-                id TEXT PRIMARY KEY,
-                visitor_id TEXT NOT NULL,
-                session_id TEXT NOT NULL,
-                robot_id TEXT NOT NULL,
-                role TEXT NOT NULL CHECK(role IN ('user', 'assistant')),
-                content TEXT NOT NULL,
-                intent TEXT,
-                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-                FOREIGN KEY(visitor_id) REFERENCES visitors(id),
-                FOREIGN KEY(robot_id) REFERENCES robots(id)
-            )
-        `);
-
-        // Indexes
-        db.run(`CREATE INDEX IF NOT EXISTS idx_users_email ON users(email)`);
-        db.run(`CREATE INDEX IF NOT EXISTS idx_users_museum_id ON users(museum_id)`);
-        db.run(`CREATE INDEX IF NOT EXISTS idx_maps_museum_id ON maps(museum_id)`);
-        db.run(`CREATE INDEX IF NOT EXISTS idx_robots_museum_id ON robots(museum_id)`);
-        db.run(`CREATE INDEX IF NOT EXISTS idx_robots_map_id ON robots(map_id)`);
-        db.run(`CREATE INDEX IF NOT EXISTS idx_zones_map_id ON zones(map_id)`);
-        db.run(`CREATE INDEX IF NOT EXISTS idx_visitors_robot_id ON visitors(robot_id)`);
-        db.run(`CREATE INDEX IF NOT EXISTS idx_visitors_session_id ON visitors(session_id)`, async () => {
-            console.log('Schema ready. Seeding data...');
-            await seedData();
-        });
-    });
-});
-
-async function runCommand(query, params = []) {
-    return new Promise((resolve, reject) => {
-        db.run(query, params, function (err) {
-            if (err) reject(err);
-            else resolve(this);
-        });
-    });
 }
 
-async function seedData() {
-    try {
-        const saltRounds = 10;
-        const pass = '123456';
-        const hashPlatform = await bcrypt.hash(pass, saltRounds);
-        const hashMuseum = await bcrypt.hash(pass, saltRounds);
-        const hashTech = await bcrypt.hash(pass, saltRounds);
+// Requiring database.js (re)creates the schema on the fresh file, with
+// foreign_keys = ON and the ON DELETE CASCADE rules already in place.
+const db = require('../database');
 
-        // 1. Museum
+// ─── Promise helpers ──────────────────────────────────────────────────────────
+const run = (sql, p = []) => new Promise((res, rej) => db.run(sql, p, function (e) { e ? rej(e) : res(this); }));
+const get = (sql, p = []) => new Promise((res, rej) => db.get(sql, p, (e, r) => (e ? rej(e) : res(r))));
+
+async function waitForSchema() {
+    for (let i = 0; i < 30; i++) {
+        try { await get('SELECT 1 FROM museums LIMIT 1'); return; }
+        catch { await new Promise(r => setTimeout(r, 100)); }
+    }
+    throw new Error('Schema not ready after timeout');
+}
+
+// UTC 'YYYY-MM-DD HH:MM:SS', N days ago — aligns with SQLite's date('now') buckets.
+function ts(daysAgo, hour = 10, min = 0) {
+    const d = new Date(Date.now() - daysAgo * 86_400_000);
+    d.setUTCHours(hour, min, 0, 0);
+    return d.toISOString().slice(0, 19).replace('T', ' ');
+}
+
+// ─── Data definitions ─────────────────────────────────────────────────────────
+const PASSWORD = 'artec1234';   // shared by every demo account
+
+// The robot that already exists in the system — its id must NOT change.
+const EXISTING_ROBOT_ID = 'b0a2b9f6-a4bc-47f6-82fc-99a5672c926a';
+
+const MUSEUMS = [
+    {
+        key: 'prado', name: 'Museo del Prado', company: 'Museo Nacional del Prado',
+        domain: 'prado.es', techs: 2,
+        robots: [
+            { id: EXISTING_ROBOT_ID, name: 'Goya', status: 'idle', battery: 92 }, // kept pristine for live testing
+            { name: 'Velázquez', status: 'navigating', battery: 67, sessions: 6 },
+        ],
+    },
+    {
+        key: 'reina', name: 'Museo Reina Sofía', company: 'MNCARS',
+        domain: 'reinasofia.es', techs: 1,
+        robots: [
+            { name: 'Dalí', status: 'idle', battery: 80, sessions: 5 },
+            { name: 'Miró', status: 'navigating', battery: 45, sessions: 4, navError: 'Sala 206' },
+        ],
+    },
+    {
+        key: 'gugg', name: 'Museo Guggenheim Bilbao', company: 'Fundación Guggenheim',
+        domain: 'guggenheim.es', techs: 1,
+        robots: [
+            { name: 'Chillida', status: 'idle', battery: 100, sessions: 3 },
+        ],
+    },
+    {
+        key: 'thyssen', name: 'Museo Thyssen-Bornemisza', company: 'Fundación Thyssen',
+        domain: 'thyssen.es', techs: 1,
+        robots: [
+            { name: 'Carmen', status: 'idle', battery: 55, sessions: 0 }, // brand-new robot, no history yet
+        ],
+    },
+];
+
+const EXPERTISE = ['general', 'general', 'general', 'experto', 'nino'];
+const LANGS     = ['es', 'es', 'es', 'en', 'en', 'fr', 'it'];
+
+const DIALOGS = [
+    { intent: 'greet',       user: 'Hola',                          bot: 'Hola, soy tu guía del museo. ¿Qué te gustaría ver?' },
+    { intent: 'navigate_to', user: 'Llévame a Las Meninas',         bot: 'Perfecto, te llevo a Las Meninas.' },
+    { intent: 'explain',     user: '¿Quién pintó Las Meninas?',     bot: 'Las Meninas las pintó Diego Velázquez en 1656.' },
+    { intent: 'explain',     user: 'Cuéntame sobre el Guernica',    bot: 'El Guernica es una obra de Picasso de 1937 sobre la guerra.' },
+    { intent: 'navigate_to', user: 'Quiero ir a la salida',         bot: 'Claro, te acompaño a la salida.' },
+    { intent: 'none',        user: 'Muchas gracias',                bot: '¡Un placer! Disfruta de la visita.' },
+    { intent: 'farewell',    user: 'Adiós',                         bot: '¡Hasta pronto, que disfrutes!' },
+];
+
+// ─── Seeding ──────────────────────────────────────────────────────────────────
+async function seed() {
+    await waitForSchema();
+    const hash = await bcrypt.hash(PASSWORD, 10);
+
+    // Platform admin (belongs to no museum)
+    const superAdminId = crypto.randomUUID();
+    await run(
+        `INSERT INTO users (id, name, email, password_hash, role, active, must_change_password)
+         VALUES (?, ?, ?, ?, 'platform_admin', 1, 0)`,
+        [superAdminId, 'superadmin', 'admin@artec.io', hash]
+    );
+
+    const credentials = [{ role: 'Platform admin', user: 'superadmin', email: 'admin@artec.io' }];
+    let users = 1, robots = 0, visitors = 0, messages = 0, incidents = 0;
+
+    for (const m of MUSEUMS) {
         const museumId = crypto.randomUUID();
-        await runCommand(
-            `INSERT INTO museums (id, name, company) VALUES (?, ?, ?)`,
-            [museumId, 'Museo del Prado Demo', 'Demo Client']
+        await run(`INSERT INTO museums (id, name, company) VALUES (?, ?, ?)`, [museumId, m.name, m.company]);
+
+        // Museum admin
+        const adminId = crypto.randomUUID();
+        const adminUser = `${m.key}_admin`;
+        await run(
+            `INSERT INTO users (id, name, email, password_hash, role, active, museum_id, created_by, must_change_password)
+             VALUES (?, ?, ?, ?, 'museum_admin', 1, ?, ?, 0)`,
+            [adminId, adminUser, `admin@${m.domain}`, hash, museumId, superAdminId]
         );
+        users++;
+        credentials.push({ role: `Admin · ${m.name}`, user: adminUser, email: `admin@${m.domain}` });
 
-        // 2. Platform Admin
-        const platformAdminId = crypto.randomUUID();
-        const platformEmail = 'platform@demo.com';
-        await runCommand(
-            `INSERT INTO users (id, name, email, password_hash, role, active, must_change_password) VALUES (?, ?, ?, ?, ?, ?, ?)`,
-            [platformAdminId, 'Admin Plataforma', platformEmail, hashPlatform, 'platform_admin', 1, 0]
-        );
+        // Technicians (created by the museum admin)
+        for (let t = 1; t <= m.techs; t++) {
+            const techUser = `${m.key}_tec${t}`;
+            await run(
+                `INSERT INTO users (id, name, email, password_hash, role, active, museum_id, created_by, must_change_password)
+                 VALUES (?, ?, ?, ?, 'technician', 1, ?, ?, 0)`,
+                [crypto.randomUUID(), techUser, `${techUser}@${m.domain}`, hash, museumId, adminId]
+            );
+            users++;
+        }
 
-        // 3. Museum Admin
-        const museumAdminId = crypto.randomUUID();
-        const museumEmail = 'admin@prado-demo.com';
-        await runCommand(
-            `INSERT INTO users (id, name, email, password_hash, role, active, museum_id, created_by, must_change_password) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-            [museumAdminId, 'Admin Museo', museumEmail, hashMuseum, 'museum_admin', 1, museumId, platformAdminId, 0]
-        );
+        // Robots
+        for (const r of m.robots) {
+            const robotId = r.id || crypto.randomUUID();
+            await run(
+                `INSERT INTO robots (id, museum_id, name, status, battery) VALUES (?, ?, ?, ?, ?)`,
+                [robotId, museumId, r.name, r.status, r.battery]
+            );
+            robots++;
 
-        // 4. Technician
-        const techId = crypto.randomUUID();
-        const techEmail = 'tech@prado-demo.com';
-        await runCommand(
-            `INSERT INTO users (id, name, email, password_hash, role, active, museum_id, created_by, must_change_password) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-            [techId, 'Técnico Museo', techEmail, hashTech, 'technician', 1, museumId, museumAdminId, 0]
-        );
+            // Optional: flag a recent navigation failure + log the incident
+            if (r.navError) {
+                await run(`UPDATE robots SET last_nav_error_at = ?, last_nav_error_place = ? WHERE id = ?`,
+                    [ts(0, 9, 30), r.navError, robotId]);
+                await run(
+                    `INSERT INTO incidents (id, museum_id, robot_id, type, place_name, detail, resolved, created_at)
+                     VALUES (?, ?, ?, 'nav_failed', ?, ?, 0, ?)`,
+                    [crypto.randomUUID(), museumId, robotId, r.navError,
+                     `El robot no pudo llegar a "${r.navError}". Posible obstáculo o ruta bloqueada.`, ts(0, 9, 30)]
+                );
+                incidents++;
+            }
 
-        // 5. Demo robot (no map assigned yet)
-        const robotId = crypto.randomUUID();
-        await runCommand(
-            `INSERT INTO robots (id, museum_id, name, status) VALUES (?, ?, ?, ?)`,
-            ['b0a2b9f6-a4bc-47f6-82fc-99a5672c926a', museumId, 'Robot Guía Demo', 'idle']
-        );
+            // Visitor sessions + chat history spread over the last ~10 days
+            for (let i = 0; i < (r.sessions || 0); i++) {
+                visitors++;
+                const daysAgo   = i % 10;
+                const startHour = 9 + (i % 8);
+                const expertise = EXPERTISE[visitors % EXPERTISE.length];
+                const language  = LANGS[visitors % LANGS.length];
+                const active    = daysAgo === 0 && i % 4 === 0;            // a couple still open today
+                const startTs   = ts(daysAgo, startHour, 0);
+                const endTs     = active ? null : ts(daysAgo, startHour, 8 + (visitors % 15));
 
-        console.log('\n=============================================');
-        console.log('Seed completed successfully!');
-        console.log('=============================================\n');
-        console.log('Museum ID:', museumId);
-        console.log('\nPlatform Admin:');
-        console.log('  email:', platformEmail, '  password:', pass);
-        console.log('\nMuseum Admin:');
-        console.log('  email:', museumEmail, '  password:', pass);
-        console.log('\nTechnician:');
-        console.log('  email:', techEmail, '  password:', pass);
-        console.log('\nDemo Robot ID:', robotId, '(no map assigned)\n');
+                const visitorId = crypto.randomUUID();
+                const sessionId = crypto.randomUUID();
+                await run(
+                    `INSERT INTO visitors (id, session_id, robot_id, name, expertise_level, language, created_at, ended_at)
+                     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+                    [visitorId, sessionId, robotId, `Visitante ${visitors}`, expertise, language, startTs, endTs]
+                );
 
-    } catch (err) {
-        console.error('Error during seeding:', err);
-    } finally {
-        db.close();
+                const pairs = 2 + (visitors % 2); // 2–3 message pairs per session
+                for (let d = 0; d < pairs; d++) {
+                    const turn = DIALOGS[(i + d) % DIALOGS.length];
+                    await run(
+                        `INSERT INTO chat_messages (id, visitor_id, session_id, robot_id, role, content, intent, created_at)
+                         VALUES (?, ?, ?, ?, 'user', ?, NULL, ?)`,
+                        [crypto.randomUUID(), visitorId, sessionId, robotId, turn.user, ts(daysAgo, startHour, d * 2)]
+                    );
+                    await run(
+                        `INSERT INTO chat_messages (id, visitor_id, session_id, robot_id, role, content, intent, created_at)
+                         VALUES (?, ?, ?, ?, 'assistant', ?, ?, ?)`,
+                        [crypto.randomUUID(), visitorId, sessionId, robotId, turn.bot, turn.intent, ts(daysAgo, startHour, d * 2 + 1)]
+                    );
+                    messages += 2;
+                }
+            }
+        }
     }
+
+    // ─── Summary ──────────────────────────────────────────────────────────────
+    console.log('\n=================== SEED COMPLETO ===================');
+    console.log(`Museos: ${MUSEUMS.length}  |  Usuarios: ${users}  |  Robots: ${robots}`);
+    console.log(`Visitantes: ${visitors}  |  Mensajes: ${messages}  |  Incidencias: ${incidents}`);
+    console.log(`\nContraseña para TODAS las cuentas: ${PASSWORD}`);
+    console.log('\nCuentas (login por usuario o email):');
+    for (const c of credentials) {
+        console.log(`  · ${c.role.padEnd(26)} ${c.user.padEnd(16)} ${c.email}`);
+    }
+    console.log('  · (técnicos)                 <museo>_tec1 / _tec2   misma contraseña');
+    console.log(`\nRobot existente conservado: ${EXISTING_ROBOT_ID}  (Goya · Museo del Prado)`);
+    console.log('=====================================================\n');
 }
+
+seed()
+    .catch(err => { console.error('Error during seeding:', err); process.exitCode = 1; })
+    .finally(() => db.close());

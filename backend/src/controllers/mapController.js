@@ -298,15 +298,12 @@ exports.deleteMap = async (req, res) => {
             return res.status(403).json({ error: 'No tienes acceso a este mapa' });
         }
 
-        // Unassign from any robots using this map
-        await dbRun('UPDATE robots SET map_id = NULL WHERE map_id = ?', [map_id]);
-
-        // Delete image file
+        // Delete image file from disk (the DB cascade can't touch the filesystem)
         const filePath = path.join(__dirname, '../../', map.image_path);
         if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
 
-        // Delete zones (FK constraint)
-        await dbRun('DELETE FROM zones WHERE map_id = ?', [map_id]);
+        // Deleting the map cascades to its zones and sets robots.map_id = NULL
+        // automatically (see FK definitions in database.js).
         await dbRun('DELETE FROM maps WHERE id = ?', [map_id]);
         zoneCache.invalidate(map_id);
 

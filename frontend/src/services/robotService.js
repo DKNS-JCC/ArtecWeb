@@ -8,10 +8,6 @@ export const robotService = {
         return api.get('/robots')
     },
 
-    fetchOne(id) {
-        return api.get(`/robots/${id}`)
-    },
-
     sendCommand(id, command, payload = null) {
         return api.post(`/robots/${id}/command`, { command, payload })
     },
@@ -56,29 +52,11 @@ export const robotService = {
         return api.post(`/robots/${id}/go-to-base`, {})
     },
 
-    /**
-     * Set the AMCL initial pose estimate (equivalent to RViz "2D Pose Estimate").
-     * @param {string} id
-     * @param {number} x
-     * @param {number} y
-     * @param {number} qz
-     * @param {number} qw
-     * @param {number[]|null} covariance  Optional 36-element covariance matrix
-     */
-    setInitialPose(id, x, y, qz = 0, qw = 1, covariance = null) {
-        return api.post(`/robots/${id}/initial-pose`, { x, y, qz, qw, covariance })
-    },
-
     // ── ROS sensor data ───────────────────────────────────────────────────────
 
     /** Fetch the latest OccupancyGrid (/map). */
     getMap(id) {
         return api.get(`/robots/${id}/map`)
-    },
-
-    /** Fetch the latest AMCL pose (/amcl_pose). */
-    getPose(id) {
-        return api.get(`/robots/${id}/pose`)
     },
 
     /** Fetch the latest laser scan (/scan). */

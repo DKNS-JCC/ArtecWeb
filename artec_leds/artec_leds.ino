@@ -1,5 +1,5 @@
 /*
- * artec_leds.ino  —  ESP32 + WS2812B 96 LEDs
+ * artec_leds.ino  -  ESP32 + WS2812B 96 LEDs
  * ArtTEC Kobuki robot LED controller
  *
  * Serial protocol (115200 baud), same port for both modes:
@@ -14,7 +14,7 @@
  * Telemetry out (every 1 s): "T:<lidar_fps>,<state>\n"
  * Status out:                "[ESP32] <message>\n"
  *
- * Palette:  ArtTEC brand  —  warm bone / ink / terracotta
+ * Palette:  ArtTEC brand  -  warm bone / ink / terracotta
  *   Primary  #B0461E   R=176 G=70  B=30   (terracotta)
  *   Accent   #D9743E   R=217 G=116 B=62   (amber)
  *   Error    #A3361F   R=163 G=54  B=31   (deep terracotta)
@@ -149,12 +149,12 @@ void readSerial() {
 
     } else {
       if (rxLen == 1 && rxBuf[0] == PROTO_H1 && b == PROTO_H2) {
-        // Binary header confirmed — switch to binary mode
+        // Binary header confirmed - switch to binary mode
         inBinary = true;
         rxLen    = 0;
 
       } else if (b == PROTO_H1) {
-        // Possible binary header start — park it
+        // Possible binary header start - park it
         rxBuf[0] = b;
         rxLen    = 1;
 
@@ -169,7 +169,7 @@ void readSerial() {
         if (rxLen < (int)(sizeof(rxBuf) - 1)) rxBuf[rxLen++] = b;
 
       } else {
-        // Unexpected byte — discard line buffer
+        // Unexpected byte - discard line buffer
         rxLen = 0;
       }
     }
@@ -246,7 +246,7 @@ void animIdle() {
 
 // ── NAVIGATE ─────────────────────────────────────────────────
 //  Terracotta comet chasing around the strip (full lap ≈ 0.77 s)
-//  22-LED tail fades to amber — reads as purposeful forward motion.
+//  22-LED tail fades to amber - reads as purposeful forward motion.
 void animNavigate() {
   static const int TAIL_LEN = 22;
 
@@ -352,7 +352,7 @@ void animCharging() {
 }
 
 // ── STANDBY ──────────────────────────────────────────────────
-//  All off. No active user session — conserve power.
+//  All off. No active user session - conserve power.
 void animStandby() {
   fill_solid(leds, NUM_LEDS, CRGB::Black);
   FastLED.show();

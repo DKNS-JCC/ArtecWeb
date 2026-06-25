@@ -1,15 +1,15 @@
 #!/usr/bin/env python3
 """
-robot_led_status_node — ROS2 Jazzy
+robot_led_status_node - ROS2 Jazzy
 Monitors Nav2 + Kobuki state and sends LED commands to ESP32.
 
 States (priority high → low):
-    error    — nav ABORTED, bumper/cliff hit  (5 s → idle/standby)
-    success  — nav goal reached               (5 s → idle/standby)
-    navigate — goal accepted / executing
-    charging — battery actively charging while idle/standby
-    idle     — session active, robot ready
-    standby  — no active user session (LEDs off)
+    error    - nav ABORTED, bumper/cliff hit  (5 s → idle/standby)
+    success  - nav goal reached               (5 s → idle/standby)
+    navigate - goal accepted / executing
+    charging - battery actively charging while idle/standby
+    idle     - session active, robot ready
+    standby  - no active user session (LEDs off)
 
 Subscribes:
     /navigate_to_pose/_action/status          (GoalStatusArray)
@@ -18,13 +18,13 @@ Subscribes:
     /events/cliff                              (CliffEvent)
     /events/wheel_drop                         (WheelDropEvent)
     /sensors/battery_state                     (BatteryState)
-    /session_active                            (Bool) — True = user session active
-    /led_command                               (String) — manual override
+    /session_active                            (Bool) - True = user session active
+    /led_command                               (String) - manual override
 Publishes:
-    /led_state                                 (String) — current state
+    /led_state                                 (String) - current state
 
 Notes:
-    - STATUS_CANCELED is NOT an error — it fires when the user retargets
+    - STATUS_CANCELED is NOT an error - it fires when the user retargets
       while navigating. Only STATUS_ABORTED (planner failure) triggers error.
     - Bumper and cliff always trigger error regardless of navigation state.
     - Wheel-drop only triggers during navigation (picking the robot up is normal).
@@ -80,7 +80,7 @@ class RobotLedStatusNode(Node):
         self._connect_serial()
         if self._ser is None:
             self.get_logger().warn(
-                f'{self._port} not available — will retry every {SERIAL_RETRY_SECS}s')
+                f'{self._port} not available - will retry every {SERIAL_RETRY_SECS}s')
             self._retry_timer = self.create_timer(SERIAL_RETRY_SECS, self._retry_connect)
         else:
             self._retry_timer = None
@@ -177,31 +177,31 @@ class RobotLedStatusNode(Node):
             self._show_result('success')
 
         elif status == GoalStatus.STATUS_ABORTED:
-            # Planner genuinely failed — show error
+            # Planner genuinely failed - show error
             self._is_navigating = False
             self._show_result('error')
 
         elif status == GoalStatus.STATUS_CANCELED:
-            # User sent a new goal while navigating — not an error, quietly return
+            # User sent a new goal while navigating - not an error, quietly return
             self._is_navigating = False
             self._resolve_idle_state()
 
     def _bumper_cb(self, msg: BumperEvent):
-        # Bumper is always a real collision — signal error regardless of nav state
+        # Bumper is always a real collision - signal error regardless of nav state
         if msg.state == BumperEvent.PRESSED:
             self.get_logger().warn(f'Bumper {_BUMPER_NAMES[msg.bumper]} hit')
             self._is_navigating = False
             self._show_result('error')
 
     def _cliff_cb(self, msg: CliffEvent):
-        # Cliff is always a hazard — signal error regardless of nav state
+        # Cliff is always a hazard - signal error regardless of nav state
         if msg.state == CliffEvent.CLIFF:
             self.get_logger().warn(f'Cliff {_CLIFF_NAMES[msg.sensor]} detected')
             self._is_navigating = False
             self._show_result('error')
 
     def _wheel_cb(self, msg: WheelDropEvent):
-        # Wheel-drop only relevant during navigation — picking the robot up is normal maintenance
+        # Wheel-drop only relevant during navigation - picking the robot up is normal maintenance
         if msg.state == WheelDropEvent.DROPPED and self._is_navigating:
             self.get_logger().warn(f'Wheel {_WHEEL_NAMES[msg.wheel]} dropped during navigation')
             self._is_navigating = False
@@ -220,10 +220,10 @@ class RobotLedStatusNode(Node):
         was_active       = self._in_session
         self._in_session = msg.data
         if self._in_session and not was_active:
-            self.get_logger().info('Session started — waking from standby')
+            self.get_logger().info('Session started - waking from standby')
             self._resolve_idle_state()
         elif not self._in_session and was_active:
-            self.get_logger().info('Session ended — entering standby')
+            self.get_logger().info('Session ended - entering standby')
             self._resolve_idle_state()
 
     def _manual_cb(self, msg: String):
@@ -246,7 +246,7 @@ class RobotLedStatusNode(Node):
         if self._result_timer is not None or self._is_navigating:
             return
         if self._is_charging:
-            # Charging is always visible — even without a session
+            # Charging is always visible - even without a session
             self._send_command('charging')
         elif self._in_session:
             self._send_command('idle')
@@ -319,7 +319,7 @@ class RobotLedStatusNode(Node):
     # ═══════════════════════════════════════════════════════
 
     def destroy_node(self):
-        self.get_logger().info('Shutting down — sending standby to ESP32')
+        self.get_logger().info('Shutting down - sending standby to ESP32')
         self._cancel_result_timer()
         with self._ser_lock:
             if self._ser is not None:

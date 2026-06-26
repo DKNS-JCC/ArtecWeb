@@ -148,28 +148,36 @@ class RosService extends EventEmitter {
             messageType: 'geometry_msgs/Twist',
         });
 
-        // ── Battery / core sensor (/mobile_base/sensors/core)
-        robotState.topics.coreSensor = new ROSLIB.Topic({
+        // ── Batería (/sensors/battery_state, sensor_msgs/BatteryState)
+        // El kobuki_node de ROS 2 publica la tensión en 'voltage' (V) y deja
+        // 'percentage' a 0, así que derivamos el % de la tensión con los umbrales
+        // de la Kobuki (lleno 16.5 V, peligroso 13.2 V).
+        // NOTA: el topic de ROS 1 '/mobile_base/sensors/core' (kobuki_msgs/SensorState)
+        // no existe en ROS 2 Jazzy; por eso la batería se quedaba en el 100 por defecto.
+        robotState.topics.battery = new ROSLIB.Topic({
             ros:         robotState.ros,
-            name:        '/mobile_base/sensors/core',
-            messageType: 'kobuki_msgs/SensorState',
+            name:        '/sensors/battery_state',
+            messageType: 'sensor_msgs/BatteryState',
         });
 
+        const BATTERY_FULL_V  = 16.5;   // Kobuki: batería llena
+        const BATTERY_EMPTY_V = 13.2;   // Kobuki: nivel peligroso (≈ vacío)
         let lastBatteryUpdate = 0;
-        robotState.topics.coreSensor.subscribe((message) => {
+        robotState.topics.battery.subscribe((message) => {
             const now = Date.now();
             if (now - lastBatteryUpdate < 5000) return;
-            if (message.battery !== undefined) {
-                lastBatteryUpdate = now;
-                const BATTERY_MAX_MV = 16700;
-                const BATTERY_MIN_MV = 13200;
-                const pct = Math.round(
-                    Math.max(0, Math.min(100,
-                        ((message.battery - BATTERY_MIN_MV) / (BATTERY_MAX_MV - BATTERY_MIN_MV)) * 100
-                    ))
-                );
-                this._update(robotId, { battery: pct });
+
+            let pct = null;
+            if (typeof message.percentage === 'number' && message.percentage > 0) {
+                pct = message.percentage * 100;                       // viene 0..1
+            } else if (typeof message.voltage === 'number' && message.voltage > 0) {
+                pct = ((message.voltage - BATTERY_EMPTY_V) /
+                       (BATTERY_FULL_V - BATTERY_EMPTY_V)) * 100;     // derivado de la tensión
             }
+            if (pct === null) return;
+
+            lastBatteryUpdate = now;
+            this._update(robotId, { battery: Math.round(Math.max(0, Math.min(100, pct))) });
         });
 
         // ── AMCL pose (/amcl_pose)
@@ -211,7 +219,7 @@ class RosService extends EventEmitter {
 
             // Attribute the result to the goal we dispatched. No active goal means
             // we already handled it (the status list keeps re-publishing) or it was
-            // fired outside this backend — either way, nothing to report.
+            // fired outside this backend - either way, nothing to report.
             const goal = robotState.activeGoal;
             if (!goal) return;
             // Guard against reading the *previous* goal's terminal status in the
@@ -227,7 +235,7 @@ class RosService extends EventEmitter {
             this.emit('robot:nav_result', { robotId, outcome, goal });
         });
 
-        // Scan and map are heavy — they are fetched on-demand via HTTP endpoints
+        // Scan and map are heavy - they are fetched on-demand via HTTP endpoints
         // (GET /robots/:id/scan and /robots/:id/map) only when the control panel
         // is open. No persistent subscriptions here.
     }
@@ -293,7 +301,7 @@ class RosService extends EventEmitter {
             name:        '/navigate_to_pose/_action/cancel_goal',
             serviceType: 'action_msgs/CancelGoal',
         });
-        // roslib v2 removed ROSLIB.ServiceRequest — callService takes a plain object.
+        // roslib v2 removed ROSLIB.ServiceRequest - callService takes a plain object.
         // An all-zero goal_id cancels every active goal for this action server.
         const request = {
             goal_info: {
@@ -417,7 +425,7 @@ class RosService extends EventEmitter {
 
     /**
      * Runs every 60 s. If a robot's visitor lock has expired but the DB still
-     * shows an active visitor (ping stopped — user left without ending session),
+     * shows an active visitor (ping stopped - user left without ending session),
      * publish session_active=false and clean up the DB row.
      */
     _startSessionMonitor() {
@@ -430,7 +438,7 @@ class RosService extends EventEmitter {
                 (err, rows) => {
                     if (err || !rows || !rows.length) return;
                     rows.forEach(row => {
-                        console.log(`[ROS] Session expired for robot ${row.id} — standby`);
+                        console.log(`[ROS] Session expired for robot ${row.id} - standby`);
                         this.publishSessionActive(row.id, false);
                         db.run(
                             `UPDATE robots SET locked_until = NULL, current_visitor_id = NULL WHERE id = ?`,

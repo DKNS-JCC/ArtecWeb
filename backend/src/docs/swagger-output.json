@@ -1,0 +1,3718 @@
+{
+  "openapi": "3.0.0",
+  "info": {
+    "title": "API de ARTEC",
+    "version": "1.0.0",
+    "description": "API REST de la plataforma ARTEC: gestión de museos, robots, mapas, zonas, personal, visitantes, conversaciones con IA e incidencias. La mayoría de endpoints requieren un token JWT en la cabecera `Authorization: Bearer <token>`."
+  },
+  "servers": [
+    {
+      "url": "http://localhost:3000",
+      "description": "Entorno de desarrollo"
+    }
+  ],
+  "tags": [
+    {
+      "name": "Autenticación",
+      "description": "Login, sesiones de visitante y contraseñas"
+    },
+    {
+      "name": "Visitante / Chat",
+      "description": "Interacción del visitante con el robot y la IA"
+    },
+    {
+      "name": "Robots",
+      "description": "Listado, control, navegación y telemetría de robots"
+    },
+    {
+      "name": "Museos y Mapas",
+      "description": "Gestión de museos, mapas y zonas de interés"
+    },
+    {
+      "name": "Administración",
+      "description": "Gestión de personal y estadísticas"
+    },
+    {
+      "name": "Historial",
+      "description": "Historial de conversaciones visitante-robot"
+    },
+    {
+      "name": "Incidencias",
+      "description": "Incidencias operativas de la flota"
+    },
+    {
+      "name": "General",
+      "description": "Otros endpoints"
+    }
+  ],
+  "paths": {
+    "/robots/stream": {
+      "get": {
+        "tags": [
+          "Robots"
+        ],
+        "summary": "Consultar /robots/stream",
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "Operación correcta"
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/robots/position-stream": {
+      "get": {
+        "tags": [
+          "Robots"
+        ],
+        "summary": "Consultar /robots/position-stream",
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "Operación correcta"
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/robots/{id}/availability": {
+      "get": {
+        "tags": [
+          "Robots"
+        ],
+        "summary": "Consultar /robots/{id}/availability",
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "Operación correcta"
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/auth/visitor": {
+      "post": {
+        "tags": [
+          "Autenticación"
+        ],
+        "summary": "Crear sesión de visitante (escaneo del QR)",
+        "security": [],
+        "responses": {
+          "201": {
+            "description": "Sesión de visitante creada",
+            "content": {
+              "application/json": {
+                "example": {
+                  "message": "Visitor session created",
+                  "token": "eyJ...",
+                  "visitor": {
+                    "id": "v-001",
+                    "session_id": "s-001",
+                    "role": "visitor",
+                    "robot_id": "r-7f3a",
+                    "robot_name": "Rob-1",
+                    "name": "María",
+                    "expertise_level": "general",
+                    "language": "es"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Falta el ID del robot",
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": "Se requiere el ID del robot leído del QR"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Robot ocupado por otro visitante",
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": "Este robot ya está siendo utilizado por otro visitante. Por favor, espera a que termine su visita."
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Robot no encontrado",
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": "Robot no válido o no encontrado"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Robot fuera de línea",
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": "El robot no está disponible en este momento. Puede estar apagado o sin conexión. Inténtalo de nuevo en unos minutos."
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "description": "Reserva un robot disponible y crea una sesión anónima de visitante con un token JWT válido 12 h. El robot debe estar encendido y conectado. `expertiseLevel` ajusta el nivel de detalle de las explicaciones de la IA.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "robotId"
+                ],
+                "properties": {
+                  "robotId": {
+                    "type": "string",
+                    "description": "ID del robot leído del código QR"
+                  },
+                  "name": {
+                    "type": "string",
+                    "description": "Nombre del visitante (opcional)"
+                  },
+                  "expertiseLevel": {
+                    "type": "string",
+                    "enum": [
+                      "nino",
+                      "general",
+                      "estudiante",
+                      "experto"
+                    ]
+                  },
+                  "language": {
+                    "type": "string",
+                    "enum": [
+                      "es",
+                      "en",
+                      "fr",
+                      "de",
+                      "it"
+                    ]
+                  }
+                }
+              },
+              "example": {
+                "robotId": "r-7f3a",
+                "name": "María",
+                "expertiseLevel": "general",
+                "language": "es"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/auth/login": {
+      "post": {
+        "tags": [
+          "Autenticación"
+        ],
+        "summary": "Iniciar sesión (personal y administradores)",
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "Inicio de sesión correcto",
+            "content": {
+              "application/json": {
+                "example": {
+                  "message": "Login successful",
+                  "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+                  "must_change_password": false,
+                  "user": {
+                    "id": "a1b2c3",
+                    "name": "admin",
+                    "email": "admin@museo.es",
+                    "role": "museum_admin",
+                    "avatar": null,
+                    "museum_id": "m-001"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Faltan credenciales",
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": "Name/email and password are required"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Credenciales incorrectas",
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": "Credenciales incorrectas"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Rol no válido o cuenta desactivada",
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": "Esta cuenta ha sido desactivada. Contacta con tu administrador."
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "description": "Autentica con nombre de usuario o correo y contraseña. Devuelve un token JWT válido 24 h y los datos del usuario. Si la cuenta debe establecer una contraseña nueva, `must_change_password` es `true`.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "identifier",
+                  "password"
+                ],
+                "properties": {
+                  "identifier": {
+                    "type": "string",
+                    "description": "Nombre de usuario o correo electrónico"
+                  },
+                  "password": {
+                    "type": "string"
+                  }
+                }
+              },
+              "example": {
+                "identifier": "admin",
+                "password": "TuContrasena123"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/auth/forgot-password": {
+      "post": {
+        "tags": [
+          "Autenticación"
+        ],
+        "summary": "Solicitar restablecimiento de contraseña",
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "Solicitud procesada",
+            "content": {
+              "application/json": {
+                "example": {
+                  "message": "Si el correo existe, se ha enviado un enlace de recuperación."
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "description": "Envía por correo un enlace para restablecer la contraseña. Por seguridad responde siempre 200, exista o no la cuenta (evita enumeración de correos).",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "email"
+                ],
+                "properties": {
+                  "email": {
+                    "type": "string"
+                  }
+                }
+              },
+              "example": {
+                "email": "usuario@museo.es"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/auth/reset-password": {
+      "post": {
+        "tags": [
+          "Autenticación"
+        ],
+        "summary": "Restablecer contraseña con token",
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "Contraseña actualizada",
+            "content": {
+              "application/json": {
+                "example": {
+                  "message": "Password reset successfully"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Token inválido o expirado",
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": "Token inválido o expirado"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "description": "Establece una contraseña nueva a partir del token de un solo uso recibido por correo (válido 1 h).",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "token",
+                  "new_password"
+                ],
+                "properties": {
+                  "token": {
+                    "type": "string",
+                    "description": "Token recibido en el enlace del correo"
+                  },
+                  "new_password": {
+                    "type": "string",
+                    "description": "Mínimo 6 caracteres"
+                  }
+                }
+              },
+              "example": {
+                "token": "a1b2c3d4...",
+                "new_password": "NuevaContrasena123"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/auth/visitor/ping": {
+      "post": {
+        "tags": [
+          "Autenticación"
+        ],
+        "summary": "Enviar /auth/visitor/ping",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Operación correcta"
+          },
+          "401": {
+            "description": "No autenticado o token inválido",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Sin permisos suficientes para esta operación",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/auth/visitor/status": {
+      "get": {
+        "tags": [
+          "Autenticación"
+        ],
+        "summary": "Consultar /auth/visitor/status",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Operación correcta"
+          },
+          "401": {
+            "description": "No autenticado o token inválido",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Sin permisos suficientes para esta operación",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/auth/visitor/end": {
+      "post": {
+        "tags": [
+          "Autenticación"
+        ],
+        "summary": "Enviar /auth/visitor/end",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Operación correcta"
+          },
+          "401": {
+            "description": "No autenticado o token inválido",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Sin permisos suficientes para esta operación",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/auth/change-password": {
+      "post": {
+        "tags": [
+          "Autenticación"
+        ],
+        "summary": "Cambiar la contraseña propia",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Contraseña cambiada",
+            "content": {
+              "application/json": {
+                "example": {
+                  "message": "Password changed successfully",
+                  "token": "eyJ..."
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Datos inválidos",
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": "New password must be at least 6 characters"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Contraseña actual incorrecta",
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": "Current password is incorrect"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Sin permisos suficientes para esta operación",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "description": "Cambia la contraseña del usuario autenticado. Devuelve un token nuevo. Es el flujo del cambio obligatorio en el primer acceso del personal.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "current_password",
+                  "new_password"
+                ],
+                "properties": {
+                  "current_password": {
+                    "type": "string"
+                  },
+                  "new_password": {
+                    "type": "string",
+                    "description": "Mínimo 6 caracteres"
+                  }
+                }
+              },
+              "example": {
+                "current_password": "Temporal123",
+                "new_password": "NuevaContrasena123"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/auth/avatar": {
+      "post": {
+        "tags": [
+          "Autenticación"
+        ],
+        "summary": "Enviar /auth/avatar",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Operación correcta"
+          },
+          "401": {
+            "description": "No autenticado o token inválido",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Sin permisos suficientes para esta operación",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Autenticación"
+        ],
+        "summary": "Eliminar /auth/avatar",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Operación correcta"
+          },
+          "401": {
+            "description": "No autenticado o token inválido",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Sin permisos suficientes para esta operación",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/chat/message": {
+      "post": {
+        "tags": [
+          "Visitante / Chat"
+        ],
+        "summary": "Enviar un mensaje al robot (IA)",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Respuesta de la IA",
+            "content": {
+              "application/json": {
+                "example": {
+                  "reply": "Claro, te llevo a la Sala del Renacimiento.",
+                  "intent": "navigate_to",
+                  "place": {
+                    "id": "z-12",
+                    "name": "Sala del Renacimiento",
+                    "map_x": 3.2,
+                    "map_y": 1.8
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No autenticado o token inválido",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Sin permisos suficientes para esta operación",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "description": "El visitante envía un mensaje en lenguaje natural. La IA (Gemini) interpreta la intención (ir a un lugar, explicar, saludar, etc.) y devuelve la respuesta adaptada a su nivel. Requiere token de visitante.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "message"
+                ],
+                "properties": {
+                  "message": {
+                    "type": "string"
+                  }
+                }
+              },
+              "example": {
+                "message": "Llévame a la sala del Renacimiento"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/chat/stt": {
+      "post": {
+        "tags": [
+          "Visitante / Chat"
+        ],
+        "summary": "Enviar /chat/stt",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Operación correcta"
+          },
+          "401": {
+            "description": "No autenticado o token inválido",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Sin permisos suficientes para esta operación",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/chat/confirm-nav": {
+      "post": {
+        "tags": [
+          "Visitante / Chat"
+        ],
+        "summary": "Confirmar la navegación a un lugar",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Navegación iniciada",
+            "content": {
+              "application/json": {
+                "example": {
+                  "message": "Navegación iniciada",
+                  "place": "Sala del Renacimiento"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Falta el destino",
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": "place_id is required"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No autenticado o token inválido",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Sin permisos suficientes para esta operación",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "description": "Tras una intención `navigate_to`, el visitante confirma el destino y el servidor lanza el objetivo Nav2 al robot real.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "place_id"
+                ],
+                "properties": {
+                  "place_id": {
+                    "type": "string",
+                    "description": "ID de la zona destino"
+                  }
+                }
+              },
+              "example": {
+                "place_id": "z-12"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/visitor/expertise": {
+      "patch": {
+        "tags": [
+          "Visitante / Chat"
+        ],
+        "summary": "Modificar /visitor/expertise",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Operación correcta"
+          },
+          "401": {
+            "description": "No autenticado o token inválido",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Sin permisos suficientes para esta operación",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/visitor/map": {
+      "get": {
+        "tags": [
+          "Visitante / Chat"
+        ],
+        "summary": "Consultar /visitor/map",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Operación correcta"
+          },
+          "401": {
+            "description": "No autenticado o token inválido",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Sin permisos suficientes para esta operación",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/chat-history/sessions/{session_id}": {
+      "delete": {
+        "tags": [
+          "Historial"
+        ],
+        "summary": "Eliminar /chat-history/sessions/{session_id}",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Operación correcta"
+          },
+          "401": {
+            "description": "No autenticado o token inválido",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Sin permisos suficientes para esta operación",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/admin/create-staff": {
+      "post": {
+        "tags": [
+          "Administración"
+        ],
+        "summary": "Dar de alta personal",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Cuenta creada y correo enviado",
+            "content": {
+              "application/json": {
+                "example": {
+                  "message": "technician account created and welcome email sent.",
+                  "user": {
+                    "id": "u-010",
+                    "name": "Lucía Pérez",
+                    "email": "lucia@museo.es",
+                    "role": "technician",
+                    "museum_id": "m-001"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Datos inválidos",
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": "Name, email and role are required"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No autenticado o token inválido",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Sin permisos suficientes para esta operación",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Nombre o correo en uso",
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": "That email is already taken"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "description": "Crea una cuenta de personal y le envía por correo una contraseña temporal. El administrador de plataforma puede crear `museum_admin` o `technician` (indicando `museum_id`); el administrador de museo solo `technician` de su museo.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "name",
+                  "email",
+                  "role"
+                ],
+                "properties": {
+                  "name": {
+                    "type": "string"
+                  },
+                  "email": {
+                    "type": "string"
+                  },
+                  "role": {
+                    "type": "string",
+                    "enum": [
+                      "museum_admin",
+                      "technician"
+                    ]
+                  },
+                  "museum_id": {
+                    "type": "string",
+                    "description": "Museo al que se asigna (obligatorio para platform_admin)"
+                  }
+                }
+              },
+              "example": {
+                "name": "Lucía Pérez",
+                "email": "lucia@museo.es",
+                "role": "technician",
+                "museum_id": "m-001"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/users": {
+      "get": {
+        "tags": [
+          "Administración"
+        ],
+        "summary": "Consultar /admin/users",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Operación correcta"
+          },
+          "401": {
+            "description": "No autenticado o token inválido",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Sin permisos suficientes para esta operación",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/users/{id}": {
+      "patch": {
+        "tags": [
+          "Administración"
+        ],
+        "summary": "Modificar /admin/users/{id}",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Operación correcta"
+          },
+          "401": {
+            "description": "No autenticado o token inválido",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Sin permisos suficientes para esta operación",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      },
+      "delete": {
+        "tags": [
+          "Administración"
+        ],
+        "summary": "Eliminar /admin/users/{id}",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Operación correcta"
+          },
+          "401": {
+            "description": "No autenticado o token inválido",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Sin permisos suficientes para esta operación",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/admin/users/{id}/active": {
+      "patch": {
+        "tags": [
+          "Administración"
+        ],
+        "summary": "Modificar /admin/users/{id}/active",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Operación correcta"
+          },
+          "401": {
+            "description": "No autenticado o token inválido",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Sin permisos suficientes para esta operación",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/museums": {
+      "post": {
+        "tags": [
+          "Museos y Mapas"
+        ],
+        "summary": "Crear un museo",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Museo creado",
+            "content": {
+              "application/json": {
+                "example": {
+                  "message": "Museum created successfully",
+                  "museum": {
+                    "id": "m-001",
+                    "name": "Museo de Salamanca",
+                    "company": "Junta de Castilla y León"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Datos inválidos",
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": "Name and company are required"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No autenticado o token inválido",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Sin permisos suficientes para esta operación",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "description": "Da de alta una instalación nueva. Solo administrador de plataforma.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "name",
+                  "company"
+                ],
+                "properties": {
+                  "name": {
+                    "type": "string"
+                  },
+                  "company": {
+                    "type": "string",
+                    "description": "Entidad responsable"
+                  }
+                }
+              },
+              "example": {
+                "name": "Museo de Salamanca",
+                "company": "Junta de Castilla y León"
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "Museos y Mapas"
+        ],
+        "summary": "Consultar /museums",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Operación correcta"
+          },
+          "401": {
+            "description": "No autenticado o token inválido",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Sin permisos suficientes para esta operación",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/museums/{id}": {
+      "put": {
+        "tags": [
+          "Museos y Mapas"
+        ],
+        "summary": "Actualizar /museums/{id}",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Operación correcta"
+          },
+          "401": {
+            "description": "No autenticado o token inválido",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Sin permisos suficientes para esta operación",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      },
+      "delete": {
+        "tags": [
+          "Museos y Mapas"
+        ],
+        "summary": "Eliminar /museums/{id}",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Operación correcta"
+          },
+          "401": {
+            "description": "No autenticado o token inválido",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Sin permisos suficientes para esta operación",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/museums/{museum_id}/maps": {
+      "post": {
+        "tags": [
+          "Museos y Mapas"
+        ],
+        "summary": "Subir un mapa al museo",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Mapa creado",
+            "content": {
+              "application/json": {
+                "example": {
+                  "message": "Map uploaded",
+                  "map": {
+                    "id": "map-1",
+                    "museum_id": "m-001",
+                    "name": "Planta baja",
+                    "image_path": "/uploads/maps/abc.png",
+                    "resolution": 0.05,
+                    "origin_x": -10,
+                    "origin_y": -10,
+                    "width": 800,
+                    "height": 600
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Faltan datos o imagen",
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": "Se requiere una imagen del mapa"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No autenticado o token inválido",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Sin acceso al museo",
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": "No tienes acceso a este museo"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "museum_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "description": "Sube el plano del museo (imagen PGM o PNG) con un YAML opcional de metadatos de ROS (`resolution`, `origin`). Los PGM se convierten a PNG automáticamente. Petición `multipart/form-data`.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "name",
+                  "image"
+                ],
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "description": "Nombre del mapa"
+                  },
+                  "image": {
+                    "type": "string",
+                    "format": "binary",
+                    "description": "Imagen del mapa (.pgm o .png)"
+                  },
+                  "yaml": {
+                    "type": "string",
+                    "format": "binary",
+                    "description": "Metadatos ROS (.yaml, opcional)"
+                  },
+                  "resolution": {
+                    "type": "number",
+                    "description": "Metros por píxel (opcional, si no hay YAML)"
+                  },
+                  "origin_x": {
+                    "type": "number"
+                  },
+                  "origin_y": {
+                    "type": "number"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "Museos y Mapas"
+        ],
+        "summary": "Consultar /museums/{museum_id}/maps",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Operación correcta"
+          },
+          "401": {
+            "description": "No autenticado o token inválido",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Sin permisos suficientes para esta operación",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "museum_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/maps/{map_id}": {
+      "get": {
+        "tags": [
+          "Museos y Mapas"
+        ],
+        "summary": "Consultar /maps/{map_id}",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Operación correcta"
+          },
+          "401": {
+            "description": "No autenticado o token inválido",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Sin permisos suficientes para esta operación",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "map_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      },
+      "delete": {
+        "tags": [
+          "Museos y Mapas"
+        ],
+        "summary": "Eliminar /maps/{map_id}",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Operación correcta"
+          },
+          "401": {
+            "description": "No autenticado o token inválido",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Sin permisos suficientes para esta operación",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "map_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/maps/{map_id}/zones": {
+      "get": {
+        "tags": [
+          "Museos y Mapas"
+        ],
+        "summary": "Consultar /maps/{map_id}/zones",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Operación correcta"
+          },
+          "401": {
+            "description": "No autenticado o token inválido",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Sin permisos suficientes para esta operación",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "map_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      },
+      "post": {
+        "tags": [
+          "Museos y Mapas"
+        ],
+        "summary": "Crear una zona de interés",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Zona creada",
+            "content": {
+              "application/json": {
+                "example": {
+                  "id": "z-12",
+                  "map_id": "map-1",
+                  "name": "Sala del Renacimiento",
+                  "description": "Pintura de los siglos XV-XVI",
+                  "category": "exhibit",
+                  "map_x": 3.2,
+                  "map_y": 1.8
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Datos inválidos",
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": "El nombre es obligatorio"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No autenticado o token inválido",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Sin permisos suficientes para esta operación",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Ya existe un punto base",
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": "Este mapa ya tiene un punto base. Edítalo para moverlo."
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "map_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "description": "Crea un punto de interés en el mapa. `category` puede ser `exhibit`, `entrance`, `exit`, `base`, etc. Las coordenadas `map_x`/`map_y` están en metros del mundo ROS. Solo puede existir un punto `base` por mapa.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "name"
+                ],
+                "properties": {
+                  "name": {
+                    "type": "string"
+                  },
+                  "description": {
+                    "type": "string"
+                  },
+                  "category": {
+                    "type": "string",
+                    "description": "exhibit | entrance | exit | base ..."
+                  },
+                  "map_x": {
+                    "type": "number",
+                    "description": "Coordenada X en metros (ROS)"
+                  },
+                  "map_y": {
+                    "type": "number",
+                    "description": "Coordenada Y en metros (ROS)"
+                  }
+                }
+              },
+              "example": {
+                "name": "Sala del Renacimiento",
+                "description": "Pintura de los siglos XV-XVI",
+                "category": "exhibit",
+                "map_x": 3.2,
+                "map_y": 1.8
+              }
+            }
+          }
+        }
+      }
+    },
+    "/maps/{map_id}/zones/{id}": {
+      "put": {
+        "tags": [
+          "Museos y Mapas"
+        ],
+        "summary": "Actualizar /maps/{map_id}/zones/{id}",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Operación correcta"
+          },
+          "401": {
+            "description": "No autenticado o token inválido",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Sin permisos suficientes para esta operación",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "map_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      },
+      "delete": {
+        "tags": [
+          "Museos y Mapas"
+        ],
+        "summary": "Eliminar /maps/{map_id}/zones/{id}",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Operación correcta"
+          },
+          "401": {
+            "description": "No autenticado o token inválido",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Sin permisos suficientes para esta operación",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "map_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/": {
+      "get": {
+        "tags": [
+          "General"
+        ],
+        "summary": "Consultar /",
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "Operación correcta"
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/robots": {
+      "post": {
+        "tags": [
+          "Robots"
+        ],
+        "summary": "Registrar un robot nuevo",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Robot creado",
+            "content": {
+              "application/json": {
+                "example": {
+                  "message": "Robot created",
+                  "id": "r-7f3a",
+                  "name": "Robot Recepción",
+                  "museum_id": "m-001",
+                  "status": "idle",
+                  "battery": 100,
+                  "position": {
+                    "x": 0,
+                    "y": 0,
+                    "theta": 0
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Datos inválidos",
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": "Name and museum_id are required"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No autenticado o token inválido",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Sin permisos suficientes para esta operación",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "description": "Crea un robot y lo asocia a un museo. Solo administrador de plataforma.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "name",
+                  "museum_id"
+                ],
+                "properties": {
+                  "name": {
+                    "type": "string"
+                  },
+                  "museum_id": {
+                    "type": "string"
+                  }
+                }
+              },
+              "example": {
+                "name": "Robot Recepción",
+                "museum_id": "m-001"
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "Robots"
+        ],
+        "summary": "Consultar /robots",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Operación correcta"
+          },
+          "401": {
+            "description": "No autenticado o token inválido",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Sin permisos suficientes para esta operación",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/robots/{id}": {
+      "get": {
+        "tags": [
+          "Robots"
+        ],
+        "summary": "Consultar /robots/{id}",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Operación correcta"
+          },
+          "401": {
+            "description": "No autenticado o token inválido",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Sin permisos suficientes para esta operación",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      },
+      "put": {
+        "tags": [
+          "Robots"
+        ],
+        "summary": "Actualizar /robots/{id}",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Operación correcta"
+          },
+          "401": {
+            "description": "No autenticado o token inválido",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Sin permisos suficientes para esta operación",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      },
+      "delete": {
+        "tags": [
+          "Robots"
+        ],
+        "summary": "Eliminar /robots/{id}",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Operación correcta"
+          },
+          "401": {
+            "description": "No autenticado o token inválido",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Sin permisos suficientes para esta operación",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/robots/{id}/command": {
+      "post": {
+        "tags": [
+          "Robots"
+        ],
+        "summary": "Enviar un comando al robot",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Comando ejecutado",
+            "content": {
+              "application/json": {
+                "example": {
+                  "message": "Conectado a Robot Recepción",
+                  "connected": true
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No autenticado o token inválido",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Sin permisos suficientes para esta operación",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Robot no encontrado o sin permiso",
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": "Robot not found or unauthorized"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Error iniciando la conexión",
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": "Error iniciando la conexión: timeout"
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "No se pudo conectar con el robot",
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": "No se pudo conectar con \"Robot Recepción\" en 192.168.1.50:9090. Comprueba que el robot está encendido, en la misma red y con rosbridge_server activo."
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "description": "Envía una orden de teleoperación o conexión al robot. Valores de `command`: `connect`, `disconnect`, `move`, `stop`, `charge`. Para `connect` se puede indicar `payload.ip`; para `move`, `payload.linearX` y `payload.angularZ` (velocidades).",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "command"
+                ],
+                "properties": {
+                  "command": {
+                    "type": "string",
+                    "enum": [
+                      "connect",
+                      "disconnect",
+                      "move",
+                      "stop",
+                      "charge"
+                    ]
+                  },
+                  "payload": {
+                    "type": "object",
+                    "description": "Parámetros del comando (ip para connect; linearX/angularZ para move)"
+                  }
+                }
+              },
+              "example": {
+                "command": "move",
+                "payload": {
+                  "linearX": 0.2,
+                  "angularZ": 0
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/robots/{id}/nav-goal": {
+      "post": {
+        "tags": [
+          "Robots"
+        ],
+        "summary": "Enviar /robots/{id}/nav-goal",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Operación correcta"
+          },
+          "401": {
+            "description": "No autenticado o token inválido",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Sin permisos suficientes para esta operación",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/robots/{id}/cancel-nav": {
+      "post": {
+        "tags": [
+          "Robots"
+        ],
+        "summary": "Enviar /robots/{id}/cancel-nav",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Operación correcta"
+          },
+          "401": {
+            "description": "No autenticado o token inválido",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Sin permisos suficientes para esta operación",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/robots/{id}/go-to-base": {
+      "post": {
+        "tags": [
+          "Robots"
+        ],
+        "summary": "Enviar /robots/{id}/go-to-base",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Operación correcta"
+          },
+          "401": {
+            "description": "No autenticado o token inválido",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Sin permisos suficientes para esta operación",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/robots/{id}/capture-map": {
+      "post": {
+        "tags": [
+          "Robots"
+        ],
+        "summary": "Enviar /robots/{id}/capture-map",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Operación correcta"
+          },
+          "401": {
+            "description": "No autenticado o token inválido",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Sin permisos suficientes para esta operación",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/robots/{id}/map": {
+      "get": {
+        "tags": [
+          "Robots"
+        ],
+        "summary": "Consultar /robots/{id}/map",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Operación correcta"
+          },
+          "401": {
+            "description": "No autenticado o token inválido",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Sin permisos suficientes para esta operación",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/robots/{id}/scan": {
+      "get": {
+        "tags": [
+          "Robots"
+        ],
+        "summary": "Consultar /robots/{id}/scan",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Operación correcta"
+          },
+          "401": {
+            "description": "No autenticado o token inválido",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Sin permisos suficientes para esta operación",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/robots/{id}/force-end": {
+      "post": {
+        "tags": [
+          "Robots"
+        ],
+        "summary": "Enviar /robots/{id}/force-end",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Operación correcta"
+          },
+          "401": {
+            "description": "No autenticado o token inválido",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Sin permisos suficientes para esta operación",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/admin/stats": {
+      "get": {
+        "tags": [
+          "Administración"
+        ],
+        "summary": "Consultar /admin/stats",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Operación correcta"
+          },
+          "401": {
+            "description": "No autenticado o token inválido",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Sin permisos suficientes para esta operación",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/incidents": {
+      "get": {
+        "tags": [
+          "Incidencias"
+        ],
+        "summary": "Consultar /admin/incidents",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Operación correcta"
+          },
+          "401": {
+            "description": "No autenticado o token inválido",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Sin permisos suficientes para esta operación",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/incidents/{id}/resolve": {
+      "patch": {
+        "tags": [
+          "Incidencias"
+        ],
+        "summary": "Modificar /admin/incidents/{id}/resolve",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Operación correcta"
+          },
+          "401": {
+            "description": "No autenticado o token inválido",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Sin permisos suficientes para esta operación",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT"
+      }
+    },
+    "schemas": {
+      "Museum": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "company": {
+            "type": "string"
+          },
+          "created_at": {
+            "type": "string"
+          }
+        }
+      },
+      "User": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "email": {
+            "type": "string"
+          },
+          "role": {
+            "type": "string",
+            "enum": [
+              "platform_admin",
+              "museum_admin",
+              "technician"
+            ]
+          },
+          "active": {
+            "type": "integer"
+          },
+          "must_change_password": {
+            "type": "integer"
+          },
+          "avatar": {
+            "type": "string"
+          },
+          "museum_id": {
+            "type": "string"
+          },
+          "created_at": {
+            "type": "string"
+          }
+        }
+      },
+      "Robot": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "museum_id": {
+            "type": "string"
+          },
+          "map_id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "idle",
+              "moving",
+              "charging",
+              "navigating"
+            ]
+          },
+          "battery": {
+            "type": "integer"
+          },
+          "position_x": {
+            "type": "number"
+          },
+          "position_y": {
+            "type": "number"
+          },
+          "position_theta": {
+            "type": "number"
+          },
+          "ip": {
+            "type": "string"
+          },
+          "locked_until": {
+            "type": "string"
+          },
+          "current_visitor_id": {
+            "type": "string"
+          }
+        }
+      },
+      "Map": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "museum_id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "image_path": {
+            "type": "string"
+          },
+          "resolution": {
+            "type": "number"
+          },
+          "origin_x": {
+            "type": "number"
+          },
+          "origin_y": {
+            "type": "number"
+          },
+          "origin_theta": {
+            "type": "number"
+          },
+          "width": {
+            "type": "integer"
+          },
+          "height": {
+            "type": "integer"
+          }
+        }
+      },
+      "Zone": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "map_id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "category": {
+            "type": "string"
+          },
+          "map_x": {
+            "type": "number"
+          },
+          "map_y": {
+            "type": "number"
+          }
+        }
+      },
+      "Visitor": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "session_id": {
+            "type": "string"
+          },
+          "robot_id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "expertise_level": {
+            "type": "string"
+          },
+          "language": {
+            "type": "string"
+          },
+          "created_at": {
+            "type": "string"
+          },
+          "ended_at": {
+            "type": "string"
+          }
+        }
+      },
+      "ChatMessage": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "visitor_id": {
+            "type": "string"
+          },
+          "session_id": {
+            "type": "string"
+          },
+          "robot_id": {
+            "type": "string"
+          },
+          "role": {
+            "type": "string",
+            "enum": [
+              "user",
+              "assistant"
+            ]
+          },
+          "content": {
+            "type": "string"
+          },
+          "intent": {
+            "type": "string"
+          },
+          "created_at": {
+            "type": "string"
+          }
+        }
+      },
+      "Incident": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "museum_id": {
+            "type": "string"
+          },
+          "robot_id": {
+            "type": "string"
+          },
+          "visitor_id": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string"
+          },
+          "place_name": {
+            "type": "string"
+          },
+          "detail": {
+            "type": "string"
+          },
+          "resolved": {
+            "type": "integer"
+          },
+          "created_at": {
+            "type": "string"
+          }
+        }
+      },
+      "Error": {
+        "type": "object",
+        "properties": {
+          "error": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  }
+}

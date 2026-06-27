@@ -49,7 +49,7 @@ function initializeDatabase() {
             )
         `);
 
-        // 3. Maps — belong to a museum
+        // 3. Maps - belong to a museum
         db.run(`
             CREATE TABLE IF NOT EXISTS maps (
                 id TEXT PRIMARY KEY,
@@ -67,7 +67,7 @@ function initializeDatabase() {
             )
         `);
 
-        // 4. Robots — belong to a museum, assigned one map
+        // 4. Robots - belong to a museum, assigned one map
         db.run(`
             CREATE TABLE IF NOT EXISTS robots (
                 id TEXT PRIMARY KEY,
@@ -106,7 +106,7 @@ function initializeDatabase() {
             )
         `);
 
-        // 6. Zones — belong to a map
+        // 6. Zones - belong to a map
         db.run(`
             CREATE TABLE IF NOT EXISTS zones (
                 id TEXT PRIMARY KEY,

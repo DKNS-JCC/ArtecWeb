@@ -7,7 +7,7 @@
  * only reload when zones are mutated (create/update/delete) or a map is removed.
  *
  * `get()` is synchronous and returns the cached array (possibly an empty array
- * on the very first call while the async load is in flight — acceptable, the
+ * on the very first call while the async load is in flight - acceptable, the
  * next tick will have the data). HTTP endpoints that need strong freshness
  * should query the DB directly instead of using this cache.
  */

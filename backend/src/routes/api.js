@@ -26,7 +26,7 @@ const chatLimiter = rateLimit({
     message: { error: 'Demasiados mensajes. Espera un momento antes de enviar otro.' }
 });
 
-// Speech-to-text limiter — local Whisper inference is CPU-heavy, so cap it
+// Speech-to-text limiter - local Whisper inference is CPU-heavy, so cap it
 // tighter than text chat (20 clips/min per IP).
 const sttLimiter = rateLimit({
     windowMs: 60 * 1000,
@@ -164,7 +164,7 @@ router.post('/chat/confirm-nav', chatLimiter, authMiddleware, async (req, res) =
             return res.status(400).json({ error: 'place_id is required' });
         }
 
-        // Load zone — coordinates are already stored as ROS world coords (meters)
+        // Load zone - coordinates are already stored as ROS world coords (meters)
         db.get(
             `SELECT z.id, z.name, z.map_x, z.map_y
              FROM zones z
@@ -190,7 +190,7 @@ router.post('/chat/confirm-nav', chatLimiter, authMiddleware, async (req, res) =
                 }
 
                 try {
-                    // Coordinates are stored in ROS world frame (meters) — send directly.
+                    // Coordinates are stored in ROS world frame (meters) - send directly.
                     // Tag the goal so a failure can be reported to this visitor and logged.
                     rosService.sendNavGoal(robot_id, zone.map_x, zone.map_y, 0, 1, {
                         kind:      'visit',
@@ -271,7 +271,7 @@ router.get('/visitor/map', authMiddleware, (req, res) => {
             db.get('SELECT * FROM maps WHERE id = ?', [robot.map_id], (err, map) => {
                 if (err || !map) return res.status(500).json({ error: 'Error al obtener el mapa' });
 
-                // Exclude the internal base point — it's opaque to visitors.
+                // Exclude the internal base point - it's opaque to visitors.
                 db.all('SELECT * FROM zones WHERE map_id = ? AND category != ?', [robot.map_id, BASE_CATEGORY], (err, zones) => {
                     if (err) return res.status(500).json({ error: 'Error al obtener las zonas' });
                     res.json({ map, zones: zones || [] });
@@ -443,8 +443,11 @@ router.get('/robots/:id', authMiddleware, staffMiddleware, (req, res) => {
 
 const IP_RE = /^(\d{1,3}\.){3}\d{1,3}$/;
 
-router.put('/robots/:id', authMiddleware, adminMiddleware, (req, res) => {
+router.put('/robots/:id', authMiddleware, staffMiddleware, (req, res) => {
     const isSuperAdmin = req.user.role === 'platform_admin';
+    // Técnicos y museum_admin pueden editar nombre e IP de los robots de su museo.
+    // Asignar mapa queda para admins; mover de museo, solo para el proveedor (super-admin).
+    const isAdmin = isSuperAdmin || req.user.role === 'museum_admin';
     const museumId = req.user.museum_id;
     const robotId = req.params.id;
     const { ip, name, map_id, museum_id } = req.body;
@@ -478,7 +481,7 @@ router.put('/robots/:id', authMiddleware, adminMiddleware, (req, res) => {
 
         // If assigning a map, verify it belongs to the same museum AND has a base point.
         // (Skipped on a museum change: the old map belongs to the previous museum.)
-        if (!museumChanged && map_id !== undefined && map_id !== null) {
+        if (isAdmin && !museumChanged && map_id !== undefined && map_id !== null) {
             const mapRow = await new Promise(resolve => {
                 db.get('SELECT museum_id FROM maps WHERE id = ?', [map_id], (e, row) => resolve(row || null));
             });
@@ -498,7 +501,7 @@ router.put('/robots/:id', authMiddleware, adminMiddleware, (req, res) => {
         const updatedIp = ip !== undefined ? ip : robot.ip;
         const updatedName = name !== undefined ? name : robot.name;
         // Maps are museum-scoped, so moving the robot to another museum drops its map.
-        const updatedMapId = museumChanged ? null : (map_id !== undefined ? map_id : robot.map_id);
+        const updatedMapId = museumChanged ? null : (isAdmin && map_id !== undefined ? map_id : robot.map_id);
 
         // On a museum change, also clear any stale visitor session from the old museum.
         const updateSql = museumChanged
@@ -519,7 +522,7 @@ router.put('/robots/:id', authMiddleware, adminMiddleware, (req, res) => {
     });
 });
 
-// DELETE /api/robots/:id — superadmin only (robots are managed by the provider).
+// DELETE /api/robots/:id - superadmin only (robots are managed by the provider).
 // FK cascade removes the robot's visitors, chat and incidents.
 router.delete('/robots/:id', authMiddleware, superAdminMiddleware, (req, res) => {
     const robotId = req.params.id;
@@ -622,7 +625,7 @@ router.post('/robots/:id/command', authMiddleware, staffMiddleware, (req, res) =
 
 // ─── ROS Navigation / Sensor Routes ──────────────────────────────────────────
 
-// POST /api/robots/:id/nav-goal  — send Nav2 goal pose
+// POST /api/robots/:id/nav-goal  - send Nav2 goal pose
 router.post('/robots/:id/nav-goal', authMiddleware, staffMiddleware, async (req, res) => {
     const { x, y, qz = 0, qw = 1 } = req.body;
     if (x === undefined || y === undefined) {
@@ -653,7 +656,7 @@ router.post('/robots/:id/nav-goal', authMiddleware, staffMiddleware, async (req,
     });
 });
 
-// POST /api/robots/:id/cancel-nav  — cancel active navigation
+// POST /api/robots/:id/cancel-nav  - cancel active navigation
 router.post('/robots/:id/cancel-nav', authMiddleware, staffMiddleware, async (req, res) => {
     const robotId = req.params.id;
     const isSuperAdmin = req.user.role === 'platform_admin';
@@ -676,7 +679,7 @@ router.post('/robots/:id/cancel-nav', authMiddleware, staffMiddleware, async (re
     });
 });
 
-// POST /api/robots/:id/go-to-base  — send the robot to its map's base point
+// POST /api/robots/:id/go-to-base  - send the robot to its map's base point
 router.post('/robots/:id/go-to-base', authMiddleware, staffMiddleware, async (req, res) => {
     const robotId = req.params.id;
     const isSuperAdmin = req.user.role === 'platform_admin';
@@ -706,10 +709,10 @@ router.post('/robots/:id/go-to-base', authMiddleware, staffMiddleware, async (re
     });
 });
 
-// POST /api/robots/:id/capture-map  — subscribe to /map once, convert to PNG, persist
+// POST /api/robots/:id/capture-map  - subscribe to /map once, convert to PNG, persist
 router.post('/robots/:id/capture-map', authMiddleware, adminMiddleware, mapController.captureMapFromRobot);
 
-// GET /api/robots/:id/map  — get latest occupancy grid
+// GET /api/robots/:id/map  - get latest occupancy grid
 router.get('/robots/:id/map', authMiddleware, staffMiddleware, (req, res) => {
     const robotId = req.params.id;
     const isSuperAdmin = req.user.role === 'platform_admin';
@@ -729,7 +732,7 @@ router.get('/robots/:id/map', authMiddleware, staffMiddleware, (req, res) => {
     });
 });
 
-// GET /api/robots/:id/scan  — get latest laser scan
+// GET /api/robots/:id/scan  - get latest laser scan
 router.get('/robots/:id/scan', authMiddleware, staffMiddleware, (req, res) => {
     const robotId = req.params.id;
     const isSuperAdmin = req.user.role === 'platform_admin';
@@ -833,7 +836,7 @@ router.get('/admin/stats', authMiddleware, adminMiddleware, async (req, res) => 
             isSuperAdmin
                 ? qGet(`SELECT COUNT(*) AS count FROM museums`, [])
                 : Promise.resolve({ count: null }),
-            // 6. Visitors per day — last 7 days
+            // 6. Visitors per day - last 7 days
             qAll(isSuperAdmin
                 ? `SELECT date(created_at) AS day, COUNT(*) AS count FROM visitors WHERE created_at >= date('now','-6 days') GROUP BY date(created_at) ORDER BY day`
                 : `SELECT date(v.created_at) AS day, COUNT(*) AS count FROM visitors v JOIN robots r ON r.id=v.robot_id WHERE r.museum_id=? AND v.created_at >= date('now','-6 days') GROUP BY date(v.created_at) ORDER BY day`, p),
@@ -872,7 +875,7 @@ router.get('/admin/stats', authMiddleware, adminMiddleware, async (req, res) => 
 // --- INCIDENTS (operational event log) ---
 const incidentService = require('../services/incidentService');
 
-// GET /api/admin/incidents — list nav failures etc., scoped to the museum.
+// GET /api/admin/incidents - list nav failures etc., scoped to the museum.
 router.get('/admin/incidents', authMiddleware, adminMiddleware, async (req, res) => {
     try {
         const incidents = await incidentService.list({
@@ -886,7 +889,7 @@ router.get('/admin/incidents', authMiddleware, adminMiddleware, async (req, res)
     }
 });
 
-// PATCH /api/admin/incidents/:id/resolve — mark an incident as handled.
+// PATCH /api/admin/incidents/:id/resolve - mark an incident as handled.
 router.patch('/admin/incidents/:id/resolve', authMiddleware, adminMiddleware, async (req, res) => {
     try {
         const result = await incidentService.resolve({

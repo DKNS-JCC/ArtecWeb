@@ -22,7 +22,7 @@ const { findNearestZone } = require('../utils/geo');
 // clients: Map<res, { museumId: string|null, isSuperAdmin: boolean }>
 const clients = new Map();
 
-// positionClients: Map<res, { robotId: string }> — visitor map overlays that
+// positionClients: Map<res, { robotId: string }> - visitor map overlays that
 // only need their assigned robot's live pose (replaces the 3 s HTTP poll).
 const positionClients = new Map();
 
@@ -177,8 +177,8 @@ rosService.on('robot:nav_result', async ({ robotId, outcome, goal }) => {
  * Sends an initial snapshot of all robots visible to this client,
  * then registers heartbeat and cleanup handlers.
  *
- * @param {import('express').Request}  req
- * @param {import('express').Response} res
+ * @param {express.Request}  req
+ * @param {express.Response} res
  * @param {{ id: string, role: string, museum_id: string|null }} user  JWT payload
  */
 function addClient(req, res, user) {
@@ -219,8 +219,8 @@ function addClient(req, res, user) {
  * Sends the robot's current pose immediately, then pushes every subsequent
  * pose update broadcast by rosService. One connection per visitor map view.
  *
- * @param {import('express').Request}  req
- * @param {import('express').Response} res
+ * @param {express.Request}  req
+ * @param {express.Response} res
  * @param {string} robotId  the robot assigned to the visitor's session
  */
 function addPositionClient(req, res, robotId) {

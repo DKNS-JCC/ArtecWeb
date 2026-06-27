@@ -2,7 +2,7 @@ const multer = require('multer');
 
 /**
  * In-memory upload config for short voice clips (speech-to-text).
- * Audio never touches disk — the buffer is handed straight to the local
+ * Audio never touches disk - the buffer is handed straight to the local
  * Whisper service and discarded after transcription.
  */
 const audioUpload = multer({

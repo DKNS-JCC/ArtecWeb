@@ -21,7 +21,7 @@ function dbRun(sql, params) {
 }
 
 // ─── POST /api/auth/forgot-password ──────────────────────────────────────────
-// Accepts an email address and — if it matches a staff account — sends a
+// Accepts an email address and - if it matches a staff account - sends a
 // password-reset link. Always returns 200 to prevent email enumeration.
 
 exports.forgotPassword = async (req, res) => {
@@ -99,7 +99,7 @@ exports.resetPassword = async (req, res) => {
 
         const newHash = await bcrypt.hash(new_password, SALT_ROUNDS);
 
-        // Update password and mark token as used — both in the same callback chain
+        // Update password and mark token as used - both in the same callback chain
         await dbRun(
             `UPDATE users SET password_hash = ?, must_change_password = 0, active = 1 WHERE id = ?`,
             [newHash, record.user_id]

@@ -76,7 +76,7 @@ exports.handleMessage = async (req, res) => {
         const museum = await dbGet('SELECT name FROM museums WHERE id = ?', [museum_id]);
 
         // Load zones from the map assigned to the robot (if any).
-        // The base point is internal — exclude it from anything the AI sees.
+        // The base point is internal - exclude it from anything the AI sees.
         const robot = await dbGet('SELECT map_id, position_x, position_y FROM robots WHERE id = ?', [robot_id]);
         const places = robot?.map_id
             ? await dbAll('SELECT id, name, description, category, map_x, map_y FROM zones WHERE map_id = ? AND category != ?', [robot.map_id, BASE_CATEGORY])
@@ -124,9 +124,9 @@ exports.handleMessage = async (req, res) => {
 
                 // NOTE: Confirmation is handled by the frontend modal dialog.
                 // The AI response should acknowledge the destination but not ask
-                // for text-based confirmation — the modal takes care of that.
+                // for text-based confirmation - the modal takes care of that.
             } else if (requestedName) {
-                // AI suggested a place that doesn't exist — downgrade intent
+                // AI suggested a place that doesn't exist - downgrade intent
                 aiResult.intent = 'none';
                 aiResult.confidence = 0.3;
                 // Build a helpful response listing available places
@@ -174,7 +174,7 @@ exports.handleMessage = async (req, res) => {
  * POST /api/chat/stt
  * Transcribes a visitor voice clip to text using the local Whisper model.
  * The audio (16 kHz mono WAV) arrives in memory via multer; nothing is stored.
- * Returns only the recognised text — the client then sends it like a typed
+ * Returns only the recognised text - the client then sends it like a typed
  * message, so the existing /chat/message pipeline (AI, history, intents) is reused.
  */
 exports.handleTranscribe = async (req, res) => {

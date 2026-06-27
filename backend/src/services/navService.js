@@ -13,7 +13,7 @@ function dbGet(sql, params) {
  * disconnected robot or a map without a base never blocks ending a visit. The
  * manual admin endpoint inspects the returned `reason` to give feedback.
  *
- * @returns {Promise<{ ok: boolean, reason?: string, base?: object, error?: string }>}
+ * @returns {Promise<Object>} Resultado con la forma: { ok: boolean, reason?: string, base?: object, error?: string }
  */
 async function sendRobotToBase(robotId) {
     const robot = await dbGet('SELECT map_id, museum_id FROM robots WHERE id = ?', [robotId]);

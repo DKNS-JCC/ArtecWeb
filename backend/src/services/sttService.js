@@ -1,5 +1,5 @@
 /**
- * Speech-to-Text service — 100% local, free, no external API.
+ * Speech-to-Text service - 100% local, free, no external API.
  *
  * Runs OpenAI Whisper on-device (on this server) through Transformers.js
  * (`@xenova/transformers`). Inference uses onnxruntime-node, which ships
@@ -11,7 +11,7 @@
  *
  * Audio contract: the frontend records the visitor's voice, resamples it to
  * 16 kHz mono and uploads it as a PCM-16 WAV. This keeps the backend free of
- * ffmpeg/native audio dependencies — we only parse a well-formed WAV buffer.
+ * ffmpeg/native audio dependencies - we only parse a well-formed WAV buffer.
  */
 
 // Multilingual model. `whisper-tiny` is the fastest; `whisper-base` is more
@@ -33,7 +33,7 @@ async function getTranscriber() {
     if (!transcriberPromise) {
         transcriberPromise = (async () => {
             const { pipeline, env } = await import('@xenova/transformers');
-            // We only ever run local inference — never hit a remote inference API.
+            // We only ever run local inference - never hit a remote inference API.
             env.allowRemoteModels = true;   // allow first-time model download from the hub
             env.allowLocalModels  = true;
             console.log(`[STT] Loading local Whisper model "${WHISPER_MODEL}" (first run downloads & caches it)...`);

@@ -129,7 +129,7 @@ exports.captureMapFromRobot = async (req, res) => {
         const origin_y = origin.position?.y ?? 0;
 
         // OccupancyGrid rows start at the bottom of the world frame; PNG rows start
-        // at the top, so we flip vertically — same as what map_saver_cli does.
+        // at the top, so we flip vertically - same as what map_saver_cli does.
         const buf = Buffer.alloc(width * height);
         for (let row = 0; row < height; row++) {
             const srcRow = height - 1 - row;

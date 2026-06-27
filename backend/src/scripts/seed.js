@@ -1,5 +1,5 @@
 /**
- * Seed script — wipes the database and repopulates it with realistic demo data:
+ * Seed script - wipes the database and repopulates it with realistic demo data:
  * several museums, staff accounts (usernames without spaces), robots, and a
  * history of visitor sessions + chat so the analytics dashboard isn't empty.
  *
@@ -44,7 +44,7 @@ async function waitForSchema() {
     throw new Error('Schema not ready after timeout');
 }
 
-// UTC 'YYYY-MM-DD HH:MM:SS', N days ago — aligns with SQLite's date('now') buckets.
+// UTC 'YYYY-MM-DD HH:MM:SS', N days ago - aligns with SQLite's date('now') buckets.
 function ts(daysAgo, hour = 10, min = 0) {
     const d = new Date(Date.now() - daysAgo * 86_400_000);
     d.setUTCHours(hour, min, 0, 0);
@@ -54,7 +54,7 @@ function ts(daysAgo, hour = 10, min = 0) {
 // ─── Data definitions ─────────────────────────────────────────────────────────
 const PASSWORD = 'artec1234';   // shared by every demo account
 
-// The robot that already exists in the system — its id must NOT change.
+// The robot that already exists in the system - its id must NOT change.
 const EXISTING_ROBOT_ID = 'b0a2b9f6-a4bc-47f6-82fc-99a5672c926a';
 
 const MUSEUMS = [

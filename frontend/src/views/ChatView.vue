@@ -18,7 +18,7 @@ import { ref, onMounted, onUnmounted, computed, nextTick } from 'vue';
 import { useRouter } from 'vue-router';
 import { useAuthStore } from '@/stores/auth';
 import { chatService } from '@/services/chatService';
-import { Send, LogOut, Bot, Clock, Navigation, Check, X, Loader2, Map as MapIcon, MapPin, Settings, ChevronRight, Mic, Volume2, VolumeX, AlertTriangle, RotateCw } from 'lucide-vue-next';
+import { Send, LogOut, Bot, Clock, Navigation, Check, X, Loader2, Map as MapIcon, MapPin, Settings, ChevronRight, Mic, Volume2, VolumeX, AlertTriangle, RotateCw, MessageCircle } from 'lucide-vue-next';
 import VisitorMap from '@/components/VisitorMap.vue';
 import { useTextToSpeech } from '@/composables/useTextToSpeech';
 import { useSpeechToText } from '@/composables/useSpeechToText';
@@ -29,6 +29,63 @@ const authStore = useAuthStore();
 // ── Voice: TTS (robot speaks) + STT (visitor talks), both local & free ────────
 const tts = useTextToSpeech();
 const stt = useSpeechToText();
+
+// ── First-time tutorial ───────────────────────────────────────────────────────
+const TUTORIAL_KEY = 'artec_chat_tutorial_done';
+
+const TUTORIAL_STEPS = [
+    {
+        icon:  'bot',
+        title: 'Bienvenido a tu guía robótica',
+        desc:  'Escríbele o háblale al robot y él te guiará por el museo. ¡Es tan sencillo como un chat!',
+    },
+    {
+        icon:  'mic',
+        title: 'Habla con el robot',
+        desc:  'Mantén pulsado el micrófono 🎤 y habla. Suéltalo cuando termines y el robot te responderá.',
+        position: 'bottom',
+        highlight: 'mic',
+    },
+    {
+        icon:  'map',
+        title: 'Mapa interactivo',
+        desc:  'Toca el botón del mapa 🗺️ para ver el museo y elegir directamente a qué sala quieres ir.',
+        position: 'bottom',
+        highlight: 'map',
+    },
+    {
+        icon:  'volume',
+        title: 'Voz del robot',
+        desc:  'El altavoz 🔊 activa o silencia la voz del robot. Cuando está encendido, él lee sus respuestas en voz alta.',
+        position: 'top',
+        highlight: 'volume',
+    },
+    {
+        icon:  'settings',
+        title: 'Nivel de explicaciones',
+        desc:  'Toca el ⚙️ junto al nombre del robot para ajustar el nivel de detalle: desde niños hasta expertos.',
+        position: 'top',
+        highlight: 'settings',
+    },
+];
+
+const showTutorial   = ref(false);
+const tutorialStep   = ref(0);
+
+const currentTutorialStep = computed(() => TUTORIAL_STEPS[tutorialStep.value]);
+
+const nextTutorialStep = () => {
+    if (tutorialStep.value < TUTORIAL_STEPS.length - 1) {
+        tutorialStep.value++;
+    } else {
+        closeTutorial();
+    }
+};
+
+const closeTutorial = () => {
+    showTutorial.value = false;
+    localStorage.setItem(TUTORIAL_KEY, '1');
+};
 
 /** One-time onboarding hint for the (non-obvious) hold-to-talk gesture. */
 const showMicHint = ref(false);
@@ -508,7 +565,9 @@ const sendSuggestion = (prompt) => {
 onMounted(() => {
     startTimer();
     scrollToBottom();
-    if (stt.supported) {
+    if (!localStorage.getItem(TUTORIAL_KEY)) {
+        showTutorial.value = true;
+    } else if (stt.supported) {
         showMicHint.value = true;
         micHintTimer = setTimeout(dismissMicHint, 7000);
     }
@@ -897,6 +956,90 @@ onUnmounted(() => {
             </div>
         </Transition>
         <!-- ── END EXPERTISE LEVEL MODAL ──────────────────────────────────── -->
+
+        <!-- ── FIRST-TIME TUTORIAL OVERLAY ───────────────────────────────── -->
+        <Transition name="modal">
+            <div v-if="showTutorial"
+                class="fixed inset-0 z-[400] flex items-end justify-center"
+                @click.self="closeTutorial">
+                <div class="absolute inset-0 bg-foreground/50 backdrop-blur-sm" />
+
+                <!-- Tooltip card: anchored to bottom for most steps, top for header steps -->
+                <Transition name="step" mode="out-in">
+                    <div :key="tutorialStep"
+                        class="relative w-full max-w-md bg-card rounded-t-[32px] px-5 pt-5 pb-8 shadow-2xl"
+                        :class="currentTutorialStep.position === 'top' ? 'mb-[120px]' : ''">
+
+                        <!-- Drag handle -->
+                        <div class="w-10 h-1 bg-foreground/20 rounded-full mx-auto mb-5" />
+
+                        <!-- Step indicator dots -->
+                        <div class="flex justify-center gap-1.5 mb-5">
+                            <span v-for="(_, i) in TUTORIAL_STEPS" :key="i"
+                                class="w-1.5 h-1.5 rounded-full transition-all"
+                                :class="i === tutorialStep ? 'bg-primary w-4' : 'bg-foreground/20'" />
+                        </div>
+
+                        <!-- Icon -->
+                        <div class="w-14 h-14 rounded-2xl bg-primary/10 flex items-center justify-center mx-auto mb-4">
+                            <Bot         v-if="currentTutorialStep.icon === 'bot'"      class="w-7 h-7 text-primary" />
+                            <Mic         v-else-if="currentTutorialStep.icon === 'mic'"     class="w-7 h-7 text-primary" />
+                            <MapIcon     v-else-if="currentTutorialStep.icon === 'map'"     class="w-7 h-7 text-primary" />
+                            <Volume2     v-else-if="currentTutorialStep.icon === 'volume'"  class="w-7 h-7 text-primary" />
+                            <Settings    v-else-if="currentTutorialStep.icon === 'settings'" class="w-7 h-7 text-primary" />
+                            <MessageCircle v-else class="w-7 h-7 text-primary" />
+                        </div>
+
+                        <!-- Text -->
+                        <h3 class="font-display text-[1.1rem] font-semibold text-center text-foreground mb-2 tracking-tight">
+                            {{ currentTutorialStep.title }}
+                        </h3>
+                        <p class="text-sm text-muted-foreground text-center leading-relaxed mb-6">
+                            {{ currentTutorialStep.desc }}
+                        </p>
+
+                        <!-- Arrow pointing to header buttons for top-positioned steps -->
+                        <div v-if="currentTutorialStep.position === 'top'"
+                            class="absolute -top-4 flex justify-center w-full left-0 pointer-events-none">
+                            <div class="flex flex-col items-center"
+                                :class="{
+                                    'translate-x-[60px]': currentTutorialStep.highlight === 'volume',
+                                    '-translate-x-[60px]': currentTutorialStep.highlight === 'settings',
+                                }">
+                                <div class="w-0 h-0 border-l-[8px] border-r-[8px] border-b-[12px] border-l-transparent border-r-transparent border-b-card" />
+                            </div>
+                        </div>
+
+                        <!-- Arrow pointing to footer buttons for bottom-positioned steps -->
+                        <div v-if="currentTutorialStep.position === 'bottom'"
+                            class="absolute -bottom-4 flex justify-center w-full left-0 pointer-events-none">
+                            <div class="flex flex-col items-center"
+                                :class="{
+                                    '-translate-x-[120px]': currentTutorialStep.highlight === 'map',
+                                    'translate-x-[120px]': currentTutorialStep.highlight === 'mic',
+                                }">
+                                <div class="w-0 h-0 border-l-[8px] border-r-[8px] border-t-[12px] border-l-transparent border-r-transparent border-t-card" />
+                            </div>
+                        </div>
+
+                        <!-- Actions -->
+                        <div class="flex gap-2.5">
+                            <button @click="closeTutorial"
+                                class="flex-1 py-3 rounded-2xl bg-muted text-muted-foreground text-sm font-semibold active:scale-95 transition-all">
+                                Saltar
+                            </button>
+                            <button @click="nextTutorialStep"
+                                class="flex-[2] py-3 rounded-2xl bg-primary text-primary-foreground text-sm font-semibold flex items-center justify-center gap-1.5 active:scale-95 transition-all">
+                                {{ tutorialStep === TUTORIAL_STEPS.length - 1 ? '¡Empezar!' : 'Siguiente' }}
+                                <ChevronRight v-if="tutorialStep < TUTORIAL_STEPS.length - 1" class="w-4 h-4" />
+                                <Check v-else class="w-4 h-4" />
+                            </button>
+                        </div>
+                    </div>
+                </Transition>
+            </div>
+        </Transition>
+        <!-- ── END FIRST-TIME TUTORIAL OVERLAY ────────────────────────────── -->
     </div>
 </template>
 
@@ -958,4 +1101,10 @@ onUnmounted(() => {
     opacity: 0;
     transform: scale(0.95) translateY(10px);
 }
+
+/* Tutorial step transition */
+.step-enter-active { transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1); }
+.step-leave-active { transition: all 0.15s ease; }
+.step-enter-from   { opacity: 0; transform: translateX(24px); }
+.step-leave-to     { opacity: 0; transform: translateX(-24px); }
 </style>

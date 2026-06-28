@@ -18,7 +18,7 @@ import { ref, onMounted, onUnmounted, computed, nextTick } from 'vue';
 import { useRouter } from 'vue-router';
 import { useAuthStore } from '@/stores/auth';
 import { chatService } from '@/services/chatService';
-import { Send, LogOut, Bot, Clock, Navigation, Check, X, Loader2, Map as MapIcon, MapPin, Settings, ChevronRight, Mic, Volume2, VolumeX, AlertTriangle, RotateCw, MessageCircle } from 'lucide-vue-next';
+import { Send, LogOut, Bot, Clock, Navigation, Check, X, Loader2, Map as MapIcon, MapPin, Settings, ChevronRight, Mic, Volume2, VolumeX, AlertTriangle, RotateCw } from 'lucide-vue-next';
 import VisitorMap from '@/components/VisitorMap.vue';
 import { useTextToSpeech } from '@/composables/useTextToSpeech';
 import { useSpeechToText } from '@/composables/useSpeechToText';
@@ -30,53 +30,118 @@ const authStore = useAuthStore();
 const tts = useTextToSpeech();
 const stt = useSpeechToText();
 
-// ── First-time tutorial ───────────────────────────────────────────────────────
+// ── First-time tutorial (coachmarks) ──────────────────────────────────────────
+// Spotlights each real control and anchors a small speech-bubble next to it, with
+// a tail pointing at the element. Positions are measured live from the DOM so the
+// bubble follows the actual button regardless of screen size.
 const TUTORIAL_KEY = 'artec_chat_tutorial_done';
 
+/**
+ * Each step targets a real element via its `data-tour` attribute. `place`
+ * decides which side of the element the bubble sits on ('below' for header
+ * controls, 'above' for footer controls). Steps whose target isn't on screen
+ * (e.g. voice unsupported) are skipped automatically.
+ */
 const TUTORIAL_STEPS = [
     {
-        icon:  'bot',
-        title: 'Bienvenido a tu guía robótica',
-        desc:  'Escríbele o háblale al robot y él te guiará por el museo. ¡Es tan sencillo como un chat!',
+        target: 'settings', place: 'below',
+        title:  'Ajusta las explicaciones',
+        desc:   'Toca el nombre del robot para elegir cuánto detalle quieres, desde niños hasta expertos.',
     },
     {
-        icon:  'mic',
-        title: 'Habla con el robot',
-        desc:  'Mantén pulsado el micrófono 🎤 y habla. Suéltalo cuando termines y el robot te responderá.',
-        position: 'bottom',
-        highlight: 'mic',
+        target: 'volume', place: 'below',
+        title:  'La voz del robot',
+        desc:   'Enciende o silencia la voz. Cuando está activa, el robot lee sus respuestas en alto.',
     },
     {
-        icon:  'map',
-        title: 'Mapa interactivo',
-        desc:  'Toca el botón del mapa 🗺️ para ver el museo y elegir directamente a qué sala quieres ir.',
-        position: 'bottom',
-        highlight: 'map',
+        target: 'map', place: 'above',
+        title:  'Abre el mapa del museo',
+        desc:   'Mira el museo entero y toca cualquier sala para que el robot te lleve hasta ella.',
     },
     {
-        icon:  'volume',
-        title: 'Voz del robot',
-        desc:  'El altavoz 🔊 activa o silencia la voz del robot. Cuando está encendido, él lee sus respuestas en voz alta.',
-        position: 'top',
-        highlight: 'volume',
-    },
-    {
-        icon:  'settings',
-        title: 'Nivel de explicaciones',
-        desc:  'Toca el ⚙️ junto al nombre del robot para ajustar el nivel de detalle: desde niños hasta expertos.',
-        position: 'top',
-        highlight: 'settings',
+        target: 'mic', place: 'above',
+        title:  'Háblale al robot',
+        desc:   'Mantén pulsado este botón mientras hablas y suéltalo al terminar. El robot te responderá.',
     },
 ];
 
-const showTutorial   = ref(false);
-const tutorialStep   = ref(0);
+const showTutorial = ref(false);
+const tutorialStep = ref(0);
+const targetRect   = ref(null);   // bounding box of the current step's element
 
-const currentTutorialStep = computed(() => TUTORIAL_STEPS[tutorialStep.value]);
+/** Visible steps: drop any whose target element isn't currently rendered. */
+const visibleSteps = computed(() =>
+    TUTORIAL_STEPS.filter(s => document.querySelector(`[data-tour="${s.target}"]`))
+);
 
-const nextTutorialStep = () => {
-    if (tutorialStep.value < TUTORIAL_STEPS.length - 1) {
+const currentTutorialStep = computed(() => visibleSteps.value[tutorialStep.value] || null);
+
+const VIEWPORT = () => ({ w: window.innerWidth, h: window.innerHeight });
+
+/** Re-measure the highlighted element so the spotlight and bubble track it. */
+const measureTarget = () => {
+    const step = currentTutorialStep.value;
+    if (!step) { targetRect.value = null; return; }
+    const el = document.querySelector(`[data-tour="${step.target}"]`);
+    if (!el) { targetRect.value = null; return; }
+    const r = el.getBoundingClientRect();
+    targetRect.value = { top: r.top, left: r.left, width: r.width, height: r.height,
+                         bottom: r.bottom, right: r.right, cx: r.left + r.width / 2 };
+};
+
+/** Spotlight cutout: a padded ring over the element with a huge outer shadow. */
+const spotlightStyle = computed(() => {
+    const r = targetRect.value;
+    if (!r) return { display: 'none' };
+    const pad = 8;
+    return {
+        top:    `${r.top - pad}px`,
+        left:   `${r.left - pad}px`,
+        width:  `${r.width + pad * 2}px`,
+        height: `${r.height + pad * 2}px`,
+    };
+});
+
+const BUBBLE_W = 280;
+
+/** Bubble box, clamped to the viewport and offset above/below the element. */
+const bubbleStyle = computed(() => {
+    const r = targetRect.value;
+    const step = currentTutorialStep.value;
+    if (!r || !step) return { display: 'none' };
+    const { w } = VIEWPORT();
+    const margin = 12;
+    let left = r.cx - BUBBLE_W / 2;
+    left = Math.max(margin, Math.min(left, w - BUBBLE_W - margin));
+    const style = { width: `${BUBBLE_W}px`, left: `${left}px` };
+    if (step.place === 'below') style.top = `${r.bottom + 16}px`;
+    else style.bottom = `${VIEWPORT().h - r.top + 16}px`;
+    return style;
+});
+
+/** Horizontal offset of the bubble tail so it points at the element centre. */
+const tailStyle = computed(() => {
+    const r = targetRect.value;
+    if (!r) return { display: 'none' };
+    const { w } = VIEWPORT();
+    const margin = 12;
+    let left = r.cx - BUBBLE_W / 2;
+    left = Math.max(margin, Math.min(left, w - BUBBLE_W - margin));
+    return { left: `${Math.max(16, Math.min(r.cx - left, BUBBLE_W - 16))}px` };
+});
+
+const startTutorial = async () => {
+    tutorialStep.value = 0;
+    showTutorial.value = true;
+    await nextTick();
+    measureTarget();
+};
+
+const nextTutorialStep = async () => {
+    if (tutorialStep.value < visibleSteps.value.length - 1) {
         tutorialStep.value++;
+        await nextTick();
+        measureTarget();
     } else {
         closeTutorial();
     }
@@ -84,6 +149,7 @@ const nextTutorialStep = () => {
 
 const closeTutorial = () => {
     showTutorial.value = false;
+    targetRect.value = null;
     localStorage.setItem(TUTORIAL_KEY, '1');
 };
 
@@ -562,11 +628,15 @@ const sendSuggestion = (prompt) => {
     sendMessage();
 };
 
+const onViewportChange = () => { if (showTutorial.value) measureTarget(); };
+
 onMounted(() => {
     startTimer();
     scrollToBottom();
+    window.addEventListener('resize', onViewportChange);
     if (!localStorage.getItem(TUTORIAL_KEY)) {
-        showTutorial.value = true;
+        // Wait for the first paint so every control is measurable.
+        nextTick(() => startTutorial());
     } else if (stt.supported) {
         showMicHint.value = true;
         micHintTimer = setTimeout(dismissMicHint, 7000);
@@ -576,6 +646,7 @@ onMounted(() => {
 onUnmounted(() => {
     if (timerInterval) clearInterval(timerInterval);
     if (micHintTimer) clearTimeout(micHintTimer);
+    window.removeEventListener('resize', onViewportChange);
     stopArrivalTracking();
 });
 </script>
@@ -594,7 +665,7 @@ onUnmounted(() => {
                 <div class="w-10 h-10 bg-primary/20 text-primary rounded-full flex items-center justify-center mb-1 ring-2 ring-primary/20">
                     <Bot class="w-6 h-6" />
                 </div>
-                <button @click="showExpertiseModal = true" class="flex items-center gap-1 group">
+                <button data-tour="settings" @click="showExpertiseModal = true" class="flex items-center gap-1 group">
                     <h1 class="text-sm font-semibold text-foreground">{{ robotName }}</h1>
                     <Settings class="w-3 h-3 text-muted-foreground group-hover:text-foreground transition-colors" />
                 </button>
@@ -602,7 +673,7 @@ onUnmounted(() => {
 
             <div class="flex items-center gap-2">
                 <!-- Auto-voice toggle (robot reads its replies aloud) -->
-                <button v-if="tts.supported" @click="tts.toggleAutoSpeak()"
+                <button v-if="tts.supported" data-tour="volume" @click="tts.toggleAutoSpeak()"
                     class="w-9 h-9 rounded-full flex items-center justify-center transition-all active:scale-95"
                     :class="tts.autoSpeak.value
                         ? 'bg-primary/15 text-primary ring-1 ring-primary/30'
@@ -770,7 +841,7 @@ onUnmounted(() => {
 
             <form @submit.prevent="sendMessage"
                 class="flex items-end gap-2 p-1 bg-card border border-foreground/10 rounded-3xl shadow-sm focus-within:ring-2 focus-within:ring-primary/20 transition-all">
-                <button type="button" @click="showMap = !showMap"
+                <button type="button" data-tour="map" @click="showMap = !showMap"
                     class="w-9 h-9 m-1 rounded-full flex flex-shrink-0 items-center justify-center transition-all"
                     :class="showMap ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground hover:text-foreground'"
                     title="Ver mapa">
@@ -789,6 +860,7 @@ onUnmounted(() => {
                 <!-- Hold-to-talk microphone (local Whisper speech-to-text) -->
                 <button v-if="stt.supported && !messageText.trim()"
                     type="button"
+                    data-tour="mic"
                     @pointerdown.prevent="handleMicDown"
                     @pointerup.prevent="handleMicUp"
                     @pointerleave="stt.isRecording.value && handleMicUp()"
@@ -957,89 +1029,62 @@ onUnmounted(() => {
         </Transition>
         <!-- ── END EXPERTISE LEVEL MODAL ──────────────────────────────────── -->
 
-        <!-- ── FIRST-TIME TUTORIAL OVERLAY ───────────────────────────────── -->
+        <!-- ── FIRST-TIME TUTORIAL (COACHMARKS) ──────────────────────────── -->
         <Transition name="modal">
-            <div v-if="showTutorial"
-                class="fixed inset-0 z-[400] flex items-end justify-center"
-                @click.self="closeTutorial">
-                <div class="absolute inset-0 bg-foreground/50 backdrop-blur-sm" />
+            <div v-if="showTutorial && currentTutorialStep" class="fixed inset-0 z-[400]">
 
-                <!-- Tooltip card: anchored to bottom for most steps, top for header steps -->
+                <!-- Dim layer + spotlight cutout over the highlighted control.
+                     Click anywhere on the dim layer advances to the next step. -->
+                <div class="absolute inset-0" @click="nextTutorialStep" />
+                <div class="tour-spotlight absolute rounded-2xl pointer-events-none" :style="spotlightStyle" />
+
+                <!-- Speech bubble anchored next to the element -->
                 <Transition name="step" mode="out-in">
-                    <div :key="tutorialStep"
-                        class="relative w-full max-w-md bg-card rounded-t-[32px] px-5 pt-5 pb-8 shadow-2xl"
-                        :class="currentTutorialStep.position === 'top' ? 'mb-[120px]' : ''">
+                    <div :key="tutorialStep" class="tour-bubble absolute bg-card rounded-2xl shadow-2xl px-4 pt-3.5 pb-3"
+                        :style="bubbleStyle">
 
-                        <!-- Drag handle -->
-                        <div class="w-10 h-1 bg-foreground/20 rounded-full mx-auto mb-5" />
+                        <!-- Tail: a rotated square sitting on the edge facing the element -->
+                        <div class="tour-tail absolute w-3.5 h-3.5 bg-card rotate-45"
+                            :class="currentTutorialStep.place === 'below' ? '-top-1.5' : '-bottom-1.5'"
+                            :style="tailStyle" />
 
-                        <!-- Step indicator dots -->
-                        <div class="flex justify-center gap-1.5 mb-5">
-                            <span v-for="(_, i) in TUTORIAL_STEPS" :key="i"
-                                class="w-1.5 h-1.5 rounded-full transition-all"
-                                :class="i === tutorialStep ? 'bg-primary w-4' : 'bg-foreground/20'" />
-                        </div>
-
-                        <!-- Icon -->
-                        <div class="w-14 h-14 rounded-2xl bg-primary/10 flex items-center justify-center mx-auto mb-4">
-                            <Bot         v-if="currentTutorialStep.icon === 'bot'"      class="w-7 h-7 text-primary" />
-                            <Mic         v-else-if="currentTutorialStep.icon === 'mic'"     class="w-7 h-7 text-primary" />
-                            <MapIcon     v-else-if="currentTutorialStep.icon === 'map'"     class="w-7 h-7 text-primary" />
-                            <Volume2     v-else-if="currentTutorialStep.icon === 'volume'"  class="w-7 h-7 text-primary" />
-                            <Settings    v-else-if="currentTutorialStep.icon === 'settings'" class="w-7 h-7 text-primary" />
-                            <MessageCircle v-else class="w-7 h-7 text-primary" />
+                        <!-- Step counter -->
+                        <div class="flex items-center justify-between mb-1.5">
+                            <span class="text-[0.65rem] font-semibold uppercase tracking-wider text-primary">
+                                Paso {{ tutorialStep + 1 }} de {{ visibleSteps.length }}
+                            </span>
+                            <button @click="closeTutorial"
+                                class="text-muted-foreground hover:text-foreground active:scale-90 transition-all">
+                                <X class="w-4 h-4" />
+                            </button>
                         </div>
 
                         <!-- Text -->
-                        <h3 class="font-display text-[1.1rem] font-semibold text-center text-foreground mb-2 tracking-tight">
+                        <h3 class="font-semibold text-[0.95rem] text-foreground mb-1 leading-tight">
                             {{ currentTutorialStep.title }}
                         </h3>
-                        <p class="text-sm text-muted-foreground text-center leading-relaxed mb-6">
+                        <p class="text-[0.8rem] text-muted-foreground leading-snug mb-3">
                             {{ currentTutorialStep.desc }}
                         </p>
 
-                        <!-- Arrow pointing to header buttons for top-positioned steps -->
-                        <div v-if="currentTutorialStep.position === 'top'"
-                            class="absolute -top-4 flex justify-center w-full left-0 pointer-events-none">
-                            <div class="flex flex-col items-center"
-                                :class="{
-                                    'translate-x-[60px]': currentTutorialStep.highlight === 'volume',
-                                    '-translate-x-[60px]': currentTutorialStep.highlight === 'settings',
-                                }">
-                                <div class="w-0 h-0 border-l-[8px] border-r-[8px] border-b-[12px] border-l-transparent border-r-transparent border-b-card" />
-                            </div>
-                        </div>
-
-                        <!-- Arrow pointing to footer buttons for bottom-positioned steps -->
-                        <div v-if="currentTutorialStep.position === 'bottom'"
-                            class="absolute -bottom-4 flex justify-center w-full left-0 pointer-events-none">
-                            <div class="flex flex-col items-center"
-                                :class="{
-                                    '-translate-x-[120px]': currentTutorialStep.highlight === 'map',
-                                    'translate-x-[120px]': currentTutorialStep.highlight === 'mic',
-                                }">
-                                <div class="w-0 h-0 border-l-[8px] border-r-[8px] border-t-[12px] border-l-transparent border-r-transparent border-t-card" />
-                            </div>
-                        </div>
-
                         <!-- Actions -->
-                        <div class="flex gap-2.5">
+                        <div class="flex items-center justify-between gap-3">
                             <button @click="closeTutorial"
-                                class="flex-1 py-3 rounded-2xl bg-muted text-muted-foreground text-sm font-semibold active:scale-95 transition-all">
+                                class="text-xs font-medium text-muted-foreground active:scale-95 transition-all">
                                 Saltar
                             </button>
                             <button @click="nextTutorialStep"
-                                class="flex-[2] py-3 rounded-2xl bg-primary text-primary-foreground text-sm font-semibold flex items-center justify-center gap-1.5 active:scale-95 transition-all">
-                                {{ tutorialStep === TUTORIAL_STEPS.length - 1 ? '¡Empezar!' : 'Siguiente' }}
-                                <ChevronRight v-if="tutorialStep < TUTORIAL_STEPS.length - 1" class="w-4 h-4" />
-                                <Check v-else class="w-4 h-4" />
+                                class="flex items-center gap-1 bg-primary text-primary-foreground text-xs font-semibold rounded-full px-4 py-2 active:scale-95 transition-all">
+                                {{ tutorialStep === visibleSteps.length - 1 ? 'Entendido' : 'Siguiente' }}
+                                <ChevronRight v-if="tutorialStep < visibleSteps.length - 1" class="w-3.5 h-3.5" />
+                                <Check v-else class="w-3.5 h-3.5" />
                             </button>
                         </div>
                     </div>
                 </Transition>
             </div>
         </Transition>
-        <!-- ── END FIRST-TIME TUTORIAL OVERLAY ────────────────────────────── -->
+        <!-- ── END FIRST-TIME TUTORIAL ────────────────────────────────────── -->
     </div>
 </template>
 
@@ -1102,9 +1147,20 @@ onUnmounted(() => {
     transform: scale(0.95) translateY(10px);
 }
 
-/* Tutorial step transition */
-.step-enter-active { transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1); }
-.step-leave-active { transition: all 0.15s ease; }
-.step-enter-from   { opacity: 0; transform: translateX(24px); }
-.step-leave-to     { opacity: 0; transform: translateX(-24px); }
+/* Tutorial spotlight: dims everything except a ring around the target */
+.tour-spotlight {
+    box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.6), 0 0 0 2px var(--color-primary);
+    transition: top 0.3s cubic-bezier(0.16, 1, 0.3, 1),
+                left 0.3s cubic-bezier(0.16, 1, 0.3, 1),
+                width 0.3s cubic-bezier(0.16, 1, 0.3, 1),
+                height 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.tour-bubble { max-width: calc(100vw - 24px); }
+.tour-tail { box-shadow: -2px -2px 4px rgba(0, 0, 0, 0.04); }
+
+/* Tutorial step (bubble content) transition */
+.step-enter-active { transition: opacity 0.2s ease; }
+.step-leave-active { transition: opacity 0.12s ease; }
+.step-enter-from, .step-leave-to { opacity: 0; }
 </style>

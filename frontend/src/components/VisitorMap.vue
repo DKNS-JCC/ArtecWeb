@@ -1,4 +1,20 @@
 <script setup>
+/**
+ * @module components/VisitorMap
+ * @description
+ * Mapa interactivo que se muestra al **visitante** en el chat: dibuja el plano
+ * del museo, las zonas navegables y la posición en vivo del robot, y permite
+ * pedir que el robot le lleve a una zona (confirma la navegación con el
+ * backend).
+ *
+ * **Props:** ninguna.
+ *
+ * **Eventos**
+ * - `navigated` - Emitido cuando el visitante lanza una navegación a una zona.
+ *
+ * **Dependencias:** {@link module:services/chatService},
+ * {@link module:constants/mapCategories}, `lucide-vue-next`.
+ */
 import { ref, onMounted, onUnmounted, nextTick } from 'vue'
 import { chatService } from '@/services/chatService'
 import { Navigation, Loader2, X } from 'lucide-vue-next'
@@ -8,7 +24,7 @@ const emit = defineEmits(['navigated'])
 
 const API_ROOT = (import.meta.env.VITE_API_URL || '').replace('/api', '')
 
-// Brand terracotta accent for the live robot marker — mirrors the dark-theme
+// Brand terracotta accent for the live robot marker - mirrors the dark-theme
 // value of --color-primary. Canvas fillStyle/shadowColor need a literal color
 // (CSS custom properties aren't resolved in the 2D context), and the map
 // canvas is always a dark surface regardless of the site theme.
@@ -131,7 +147,7 @@ function draw() {
         ctx.fillText(label, x, by + bh / 2)
     }
 
-    // Robot position — navigation arrow (distinct from zone circles)
+    // Robot position - navigation arrow (distinct from zone circles)
     if (robotPos.value && mapData.value) {
         const { x, y } = worldToPixel(robotPos.value.x, robotPos.value.y)
         // Negate theta: image Y is flipped relative to ROS frame
@@ -306,7 +322,7 @@ function startPositionStream() {
             draw()
         } catch { /* ignore malformed event */ }
     })
-    // EventSource reconnects automatically on error — overlay is non-critical.
+    // EventSource reconnects automatically on error - overlay is non-critical.
 }
 
 // ── Lifecycle ─────────────────────────────────────────────────────────────────

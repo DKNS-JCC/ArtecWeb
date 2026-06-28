@@ -1,4 +1,14 @@
 <script setup>
+/**
+ * @module views/ForgotPasswordView
+ * @description
+ * Formulario para **solicitar el restablecimiento de contraseña**: el usuario
+ * introduce su email y recibe un enlace con token. Ruta `/forgot-password`.
+ *
+ * **Props:** ninguna. · **Eventos:** ninguno.
+ *
+ * **Dependencias:** {@link module:services/authService}, componentes de UI.
+ */
 import { ref } from 'vue'
 import { authService } from '@/services/authService'
 import { Input }  from '@/components/ui/input'
@@ -22,7 +32,7 @@ const handleSubmit = async () => {
         await authService.forgotPassword(email.value.trim())
         sent.value = true
     } catch {
-        // API always returns 200 — only network errors reach here
+        // API always returns 200 - only network errors reach here
         error.value = 'No se pudo conectar con el servidor. Inténtalo más tarde.'
     } finally {
         loading.value = false

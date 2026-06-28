@@ -1,4 +1,17 @@
 <script setup>
+/**
+ * @module components/ui/Label
+ * @description
+ * Etiqueta de formulario asociable a un control mediante `for`.
+ *
+ * **Props**
+ * - `class` `{String}` - Clases adicionales (se fusionan con `cn`).
+ * - `for` `{String}` - `id` del control asociado.
+ *
+ * **Slots:** por defecto (texto de la etiqueta). · **Eventos:** ninguno.
+ *
+ * **Dependencias:** {@link module:utils/cn}.
+ */
 import { computed } from 'vue'
 import { cn } from '@/lib/utils'
 

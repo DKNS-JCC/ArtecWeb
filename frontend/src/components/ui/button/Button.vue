@@ -1,4 +1,22 @@
 <script setup>
+/**
+ * @module components/ui/Button
+ * @description
+ * Botón base del sistema de UI (estilo *shadcn*), con variantes y tamaños vía
+ * `class-variance-authority`. Puede renderizarse como otra etiqueta con `as`.
+ *
+ * **Props**
+ * - `variant` `{String}` *(`default`)* - `default` | `destructive` | `outline` |
+ *   `secondary` | `ghost` | `link`.
+ * - `size` `{String}` *(`default`)* - `default` | `sm` | `lg` | `icon`.
+ * - `as` `{String}` *(`button`)* - Etiqueta/elemento a renderizar.
+ * - `class` `{String}` - Clases adicionales (se fusionan con `cn`).
+ * - `disabled` `{Boolean}` *(`false`)* - Deshabilita el botón.
+ *
+ * **Slots:** por defecto (contenido del botón). · **Eventos:** ninguno propio.
+ *
+ * **Dependencias:** `class-variance-authority`, {@link module:utils/cn}.
+ */
 import { computed } from 'vue'
 import { cva } from 'class-variance-authority'
 import { cn } from '@/lib/utils'

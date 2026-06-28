@@ -1,20 +1,40 @@
+/**
+ * @file Composable de *speech-to-text* del chat del visitante.
+ * @module composables/useSpeechToText
+ */
 import { ref, onBeforeUnmount } from 'vue'
 import { chatService } from '@/services/chatService'
 
-/**
- * Speech-to-Text composable — records the visitor's voice and sends it to the
- * backend's LOCAL Whisper model for transcription (no external/paid API).
- *
- * To keep the server free of native audio dependencies (ffmpeg), the heavy
- * lifting happens here: we capture the mic, decode it, downsample to 16 kHz
- * mono and encode a compact PCM-16 WAV that Whisper consumes directly.
- *
- * Usage: hold-to-talk → `start()` on press, `stopAndTranscribe()` on release,
- * which resolves with the recognised text (or '' if nothing was understood).
- */
-
 const TARGET_RATE = 16000
 
+/**
+ * Composable *Speech-to-Text* - graba la voz del visitante y la envía al modelo
+ * **Whisper local** del backend para transcribirla (sin API externa de pago).
+ *
+ * Para no añadir dependencias nativas de audio (ffmpeg) en el servidor, el
+ * trabajo pesado se hace aquí: se captura el micrófono, se decodifica, se
+ * reduce a 16 kHz mono y se codifica un WAV PCM-16 compacto que Whisper consume
+ * directamente.
+ *
+ * Uso (*hold-to-talk*): `start()` al pulsar, `stopAndTranscribe()` al soltar,
+ * que resuelve con el texto reconocido (o `''` si no se entendió nada).
+ *
+ * **Dependencias:** `vue`, {@link module:services/chatService},
+ * `MediaRecorder` / `AudioContext` del navegador.
+ *
+ * **Devuelve** un objeto con:
+ * - `supported` `{boolean}` - Si el navegador soporta grabación/transcripción.
+ * - `isRecording` `{Ref<boolean>}` - Hay una grabación en curso.
+ * - `isTranscribing` `{Ref<boolean>}` - Se está transcribiendo el audio.
+ * - `error` `{Ref<string|null>}` - Último error (o `null`).
+ * - `start()` `{Function}` - Comienza a grabar (`Promise<void>`).
+ * - `stopAndTranscribe()` `{Function}` - Detiene y transcribe (`Promise<string>`).
+ * - `cancel()` `{Function}` - Aborta la grabación sin transcribir.
+ *
+ * @function useSpeechToText
+ * @memberof module:composables/useSpeechToText
+ * @returns {Object}  API del composable: estado reactivo y controles de grabación.
+ */
 export function useSpeechToText() {
     const supported = typeof navigator !== 'undefined'
         && !!navigator.mediaDevices?.getUserMedia
@@ -122,7 +142,7 @@ export function useSpeechToText() {
 
 /**
  * Decodes a recorded audio Blob (webm/opus, mp4/aac…), downsamples it to
- * 16 kHz mono and encodes a PCM-16 WAV Blob — the format the backend parses.
+ * 16 kHz mono and encodes a PCM-16 WAV Blob - the format the backend parses.
  */
 async function blobToWav16k(blob) {
     const arrayBuffer = await blob.arrayBuffer()

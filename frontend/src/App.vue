@@ -1,4 +1,17 @@
 <script setup>
+/**
+ * @module components/App
+ * @description
+ * Componente raíz de la aplicación. Define el *layout* global (cabecera con
+ * logo, navegación según rol, conmutador de tema claro/oscuro y menú de
+ * usuario) y aloja el `<router-view>` donde se renderizan las vistas.
+ *
+ * **Props:** ninguna. · **Eventos:** ninguno.
+ *
+ * **Dependencias:** `vue-router`, `@vueuse/core` (tema), `lucide-vue-next`,
+ * {@link module:stores/auth}, {@link module:components/Logo},
+ * {@link module:components/ui/Button}.
+ */
 import { ref, computed } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useDark, useToggle } from '@vueuse/core'
@@ -49,7 +62,7 @@ router.afterEach(() => {
 
     <!-- Minimal Logo (Fixed Top Left) -->
     <div v-show="route.name !== 'chat'" class="fixed top-6 left-6 z-40">
-      <router-link to="/" class="flex items-center group transition-transform hover:scale-[1.02]" aria-label="Artec — inicio">
+      <router-link to="/" class="flex items-center group transition-transform hover:scale-[1.02]" aria-label="Artec - inicio">
         <Logo :size="40" wordmark />
       </router-link>
     </div>

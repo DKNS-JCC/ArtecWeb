@@ -1,4 +1,14 @@
 <script setup>
+/**
+ * @module views/HomeView
+ * @description
+ * Página de inicio (landing) pública. Presenta la propuesta de la guía robótica
+ * con un vídeo de fondo y los beneficios para el visitante. Ruta `/`.
+ *
+ * **Props:** ninguna. · **Eventos:** ninguno.
+ *
+ * **Dependencias:** `vue`, `lucide-vue-next`.
+ */
 import { ref, onMounted, onUnmounted } from 'vue';
 import { MapPin, MessageCircle, Users, ArrowRight, ChevronDown } from 'lucide-vue-next';
 
@@ -29,7 +39,7 @@ onUnmounted(() => window.removeEventListener('scroll', handleScroll));
 
 <template>
     <div>
-        <!-- HERO — Scroll-driven video -->
+        <!-- HERO - Scroll-driven video -->
         <div ref="containerRef" class="scroll-container">
             <div class="sticky-wrapper">
                 <video ref="videoRef" src="/output.mp4" preload="auto" muted playsinline class="video-bg" />
@@ -59,7 +69,7 @@ onUnmounted(() => window.removeEventListener('scroll', handleScroll));
             </div>
         </div>
 
-        <!-- SECCIÓN USUARIOS — amable, sin tecnicismos -->
+        <!-- SECCIÓN USUARIOS - amable, sin tecnicismos -->
         <section id="usuario" class="bg-background px-6 py-32">
             <div class="max-w-[68rem] mx-auto">
 
@@ -118,7 +128,7 @@ onUnmounted(() => window.removeEventListener('scroll', handleScroll));
 </template>
 
 <style scoped>
-/* Scroll-driven hero video — kept as scoped CSS for the sticky/overlay
+/* Scroll-driven hero video - kept as scoped CSS for the sticky/overlay
    mechanics that Tailwind utilities can't express cleanly. */
 .scroll-container {
     height: 350vh;

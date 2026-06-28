@@ -1,4 +1,21 @@
 <script setup>
+/**
+ * @module views/DashboardView
+ * @description
+ * Panel del **personal** (técnicos y administradores). Lista los robots con su
+ * estado en vivo (vía SSE), permite generar el QR de acceso y agrupa las
+ * pestañas de gestión: mapas, historial de chats, estadísticas e incidencias
+ * (un técnico solo ve Robots). Ruta `/dashboard` (requiere personal).
+ *
+ * **Props:** ninguna. · **Eventos:** ninguno.
+ *
+ * **Dependencias:** `vue-router`, {@link module:stores/auth},
+ * {@link module:services/robotService}, {@link module:services/authService},
+ * {@link module:services/museumService}, las pestañas
+ * {@link module:components/MapTab}, {@link module:components/ChatHistoryTab},
+ * {@link module:components/StatsTab}, {@link module:components/IncidentsTab},
+ * `qrcode`, componentes de UI y `lucide-vue-next`.
+ */
 import { ref, onMounted, onUnmounted, computed, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { robotService } from '@/services/robotService'
@@ -76,7 +93,7 @@ const startRobotStream = () => {
     })
 
     robotEventSource.onerror = () => {
-        // EventSource retries automatically — only show error if we never got data
+        // EventSource retries automatically - only show error if we never got data
         if (robots.value.length === 0) {
             loadingRobots.value = false
             errorRobots.value = 'No se pudo conectar con el servidor en tiempo real.'
@@ -102,7 +119,7 @@ const generateQrCodes = async () => {
 }
 
 // Robots arrive asynchronously over SSE (not just via fetchRobots), so generate
-// QRs whenever the set of robot ids changes — otherwise the first paint after an
+// QRs whenever the set of robot ids changes - otherwise the first paint after an
 // SSE load is stuck on "Generando QR…" until a manual refresh.
 watch(
     () => robots.value.map(r => r.id).join('|'),
@@ -110,7 +127,7 @@ watch(
     { immediate: true }
 )
 
-/** Manual refresh — still useful after mutations (connect/disconnect/update). */
+/** Manual refresh - still useful after mutations (connect/disconnect/update). */
 const fetchRobots = async () => {
     try {
         const fresh = await robotService.fetchAll()
@@ -197,7 +214,7 @@ const handleDeleteRobot = async () => {
 }
 
 const pendingCommandId = ref(null)
-const commandError = ref(null)   // { id, message } | null — scoped to the failing robot
+const commandError = ref(null)   // { id, message } | null - scoped to the failing robot
 
 const sendCommand = async (id, command) => {
     pendingCommandId.value = id
@@ -660,6 +677,9 @@ onUnmounted(() => {
                         <Button v-if="isStaff" @click="openRobotControl(robot.id)" variant="outline" size="sm" class="gap-1.5">
                             <Gamepad2 class="w-4 h-4" /> Control
                         </Button>
+                        <Button v-if="isStaff" @click="openEditRobotModal(robot)" variant="outline" size="sm" class="gap-1.5">
+                            <Settings class="w-4 h-4" /> Editar nombre / IP
+                        </Button>
                         <p v-if="commandError && commandError.id === robot.id" class="text-xs text-destructive">
                             {{ commandError.message }}
                         </p>
@@ -793,7 +813,7 @@ onUnmounted(() => {
 
                             <!-- Museum -->
                             <td v-if="isPlatformAdmin" class="px-6 py-4 text-xs text-muted-foreground">
-                                {{ member.museum_name || '—' }}
+                                {{ member.museum_name || '-' }}
                             </td>
 
                             <!-- Date -->
@@ -906,7 +926,7 @@ onUnmounted(() => {
                             <Label for="edit_robot_ip">IP / WebSockets</Label>
                             <Input id="edit_robot_ip" v-model="robotForm.ip" required placeholder="Ej: 192.168.1.100" />
                         </div>
-                        <div class="space-y-2">
+                        <div v-if="isPlatformAdmin" class="space-y-2">
                             <Label for="edit_robot_museum">Museo Asignado</Label>
                             <select id="edit_robot_museum" v-model="robotForm.museum_id"
                                 class="h-10 w-full rounded-sm border border-input bg-background px-3 text-sm text-foreground focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none">

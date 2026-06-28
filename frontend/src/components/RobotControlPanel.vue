@@ -1,14 +1,24 @@
 <script setup>
 /**
- * RobotControlPanel — full RViz-parity control panel for a single robot.
+ * @module components/RobotControlPanel
+ * @description
+ * Panel de control con **paridad RViz** para un robot. Funciones:
+ *  - Visor de mapa (OccupancyGrid renderizado en `<canvas>`, recargable).
+ *  - Superposición del escaneo láser sobre el lienzo del mapa.
+ *  - Pose AMCL en vivo (flecha de orientación en el lienzo).
+ *  - Envío de objetivo Nav2 haciendo clic en el mapa.
+ *  - Teleoperación (D-pad + teclado WASD / flechas).
+ *  - Cancelación de la navegación activa.
  *
- * Features:
- *  • Map viewer (OccupancyGrid rendered on <canvas>, refreshable)
- *  • Laser-scan overlay on the map canvas
- *  • Live AMCL pose (heading arrow on canvas)
- *  • Send Nav2 goal by clicking on the map
- *  • Teleoperation (D-pad + keyboard WASD / arrow keys)
- *  • Cancel active navigation
+ * **Props**
+ * - `robot` `{Object}` *(requerido)* - Robot a controlar; su `position` se
+ *   actualiza en tiempo real vía SSE.
+ *
+ * **Eventos**
+ * - `refresh` - Solicita al contenedor refrescar el estado del robot.
+ *
+ * **Dependencias:** {@link module:services/robotService}, `lucide-vue-next`,
+ * {@link module:components/ui/Button}.
  */
 import { ref, computed, onMounted, onUnmounted, watch, nextTick } from 'vue'
 import { robotService } from '@/services/robotService'
@@ -26,7 +36,7 @@ const emit = defineEmits(['refresh'])
 
 // ── Map ──────────────────────────────────────────────────────────────────────
 
-// Brand terracotta accent for the live pose arrow — mirrors the light-theme
+// Brand terracotta accent for the live pose arrow - mirrors the light-theme
 // value of --color-primary. Canvas fillStyle/strokeStyle need a literal color
 // (CSS custom properties aren't resolved in the 2D context), and the darker
 // shade reads better against the occupancy grid's white/grey/black palette.
@@ -35,7 +45,7 @@ const ROBOT_COLOR = '#B0461E'
 const mapCanvas  = ref(null)
 const mapLoading = ref(false)
 const mapError   = ref(null)
-const mapData    = ref(null)   // { info: {...}, data: [...] } — fetched once, on demand
+const mapData    = ref(null)   // { info: {...}, data: [...] } - fetched once, on demand
 const scanData   = ref(null)   // fetched once when panel opens, not polled
 
 // Pose comes for free from props.robot (updated in real-time via SSE).
@@ -369,7 +379,7 @@ const mapModeLabel = computed(() => ({
 // Current location = nearest waypoint to the live pose (from API/SSE).
 const currentLocation = computed(() => props.robot.current_location?.name || null)
 
-// Nearest obstacle distance from the latest LIDAR scan — the human-readable
+// Nearest obstacle distance from the latest LIDAR scan - the human-readable
 // form of "consultar el escaneo LIDAR". Picks the smallest valid range reading.
 const nearestObstacle = computed(() => {
     const s = scanData.value

@@ -1,4 +1,20 @@
 ﻿<script setup>
+/**
+ * @module components/MapTab
+ * @description
+ * Pestaña del panel para **gestionar mapas y zonas**: subir/eliminar mapas,
+ * editar zonas sobre un lienzo (mover, zoom, dibujar, categorizar), fijar el
+ * punto base y asignar/desasignar un mapa a un robot.
+ *
+ * **Props**
+ * - `robots` `{Array}` *(por defecto `[]`)* - Robots del museo, para asignarles un mapa.
+ *
+ * **Eventos:** ninguno.
+ *
+ * **Dependencias:** {@link module:stores/auth}, {@link module:services/mapService},
+ * {@link module:services/robotService}, {@link module:constants/mapCategories},
+ * componentes de {@link module:components/ui/Card} y `lucide-vue-next`.
+ */
 import { ref, computed, onMounted, onUnmounted, nextTick, watch } from 'vue'
 import { useAuthStore } from '@/stores/auth'
 import { mapService } from '@/services/mapService'

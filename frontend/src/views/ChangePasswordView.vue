@@ -1,4 +1,15 @@
 <script setup>
+/**
+ * @module views/ChangePasswordView
+ * @description
+ * Pantalla de **cambio de contraseña obligatorio**. Los *guards* del router
+ * llevan aquí a las cuentas con `must_change_password` hasta que la actualizan.
+ * Ruta `/change-password` (requiere sesión).
+ *
+ * **Props:** ninguna. · **Eventos:** ninguno.
+ *
+ * **Dependencias:** `vue-router`, {@link module:stores/auth}, componentes de UI.
+ */
 import { ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'

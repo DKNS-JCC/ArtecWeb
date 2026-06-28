@@ -1,11 +1,17 @@
 <script setup>
 /**
- * RobotControlView — dedicated full-page control panel for a single robot.
+ * @module views/RobotControlView
+ * @description
+ * Página completa de **control de un robot**. Accesible desde el botón "Control"
+ * de cada tarjeta de robot (técnicos y administradores). Reutiliza
+ * {@link module:components/RobotControlPanel} para la UI de mapa/escaneo/teleop y
+ * le suministra un objeto de robot en vivo desde el mismo flujo SSE del panel
+ * (pose en tiempo real, sin *polling*). Ruta `/robots/:id/control`.
  *
- * Reachable from the "Control" button on each robot card (technicians + admins).
- * Reuses RobotControlPanel for the actual map / scan / teleop UI and feeds it a
- * live robot object from the same SSE stream the dashboard uses (live pose, no
- * polling).
+ * **Props:** ninguna. · **Eventos:** ninguno.
+ *
+ * **Dependencias:** `vue-router`, {@link module:services/robotService},
+ * {@link module:components/RobotControlPanel}, componentes de UI.
  */
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'

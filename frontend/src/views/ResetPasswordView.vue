@@ -1,4 +1,15 @@
 <script setup>
+/**
+ * @module views/ResetPasswordView
+ * @description
+ * Formulario para **fijar una nueva contraseña** a partir del token recibido por
+ * correo (leído de la query). Ruta `/reset-password`.
+ *
+ * **Props:** ninguna. · **Eventos:** ninguno.
+ *
+ * **Dependencias:** `vue-router`, {@link module:services/authService},
+ * componentes de UI.
+ */
 import { ref, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { authService } from '@/services/authService'

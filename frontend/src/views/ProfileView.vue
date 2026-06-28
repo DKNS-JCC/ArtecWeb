@@ -1,4 +1,17 @@
 <script setup>
+/**
+ * @module views/ProfileView
+ * @description
+ * Perfil del **personal**: gestiona la imagen de avatar (subir/eliminar), da
+ * acceso al cambio de contraseña y al cierre de sesión. Ruta `/profile`
+ * (requiere personal).
+ *
+ * **Props:** ninguna. · **Eventos:** ninguno.
+ *
+ * **Dependencias:** `vue-router`, {@link module:stores/auth},
+ * {@link module:services/authService}, {@link module:components/ui/Button},
+ * `lucide-vue-next`.
+ */
 import { useRouter } from 'vue-router'
 import { ref, computed } from 'vue'
 import { useAuthStore } from '@/stores/auth'

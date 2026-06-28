@@ -8,7 +8,12 @@
     "dev:https": "cross-env VITE_HTTPS=1 vite",
     "build": "vite build",
     "preview": "vite preview",
-    "preview:https": "cross-env VITE_HTTPS=1 vite preview"
+    "preview:https": "cross-env VITE_HTTPS=1 vite preview",
+    "docs": "npm run docs:generate",
+    "docs:generate": "jsdoc -c jsdoc.json",
+    "docs:serve": "node scripts/serve-docs.mjs",
+    "docs:jsdoc": "jsdoc -c jsdoc.json",
+    "docs:components": "vue-docgen -c docgen.config.cjs"
   },
   "dependencies": {
     "@tailwindcss/vite": "^4.2.1",
@@ -28,6 +33,9 @@
     "@vitejs/plugin-basic-ssl": "^2.3.0",
     "@vitejs/plugin-vue": "^6.0.2",
     "cross-env": "^10.1.0",
-    "vite": "^7.3.1"
+    "docdash": "^2.0.2",
+    "jsdoc": "^4.0.5",
+    "vite": "^7.3.1",
+    "vue-docgen-cli": "^4.79.0"
   }
 }

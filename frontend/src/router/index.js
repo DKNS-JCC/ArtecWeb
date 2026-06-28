@@ -1,7 +1,32 @@
+/**
+ * @module config/router
+ * @description
+ * Configuración del router (Vue Router). Declara las rutas de la SPA con
+ * *lazy loading* y un *navigation guard* global que aplica las reglas de acceso
+ * por rol, apoyándose en {@link module:stores/auth}.
+ *
+ * **Rutas principales:** `/` (home), `/chat` (visitante), `/login`,
+ * `/change-password`, `/profile`, `/dashboard`, `/robots/:id/control`,
+ * `/r/:id` (escaneo QR), `/forgot-password`, `/reset-password`, `/403`, `/404`
+ * y un *catch-all* que redirige a `/404`. Las rutas con
+ * `meta.requiresAuth` exigen sesión y las de `meta.requiresStaff` exigen
+ * personal (técnico/admin).
+ *
+ * **Guard de navegación** (`beforeEach`): mantiene al visitante activo en el
+ * chat, protege rutas autenticadas y de personal, fuerza el cambio de
+ * contraseña obligatorio y evita volver a `login` con sesión iniciada.
+ *
+ * **Dependencias:** `vue-router`, {@link module:stores/auth}.
+ */
 import { createRouter, createWebHistory } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import HomeView from '../views/HomeView.vue'
 
+/**
+ * Instancia del router de la aplicación (objeto `Router` de Vue Router).
+ * @type {Object}
+ * @memberof module:config/router
+ */
 const router = createRouter({
     history: createWebHistory(import.meta.env.BASE_URL),
     routes: [
@@ -72,7 +97,7 @@ const router = createRouter({
             name: 'not-found',
             component: () => import('../views/NotFoundView.vue')
         },
-        // Catch-all — must be last
+        // Catch-all - must be last
         {
             path: '/:pathMatch(.*)*',
             redirect: '/404'
@@ -80,7 +105,7 @@ const router = createRouter({
     ]
 })
 
-// Navigation Guard — uses Pinia auth store (single source of truth)
+// Navigation Guard - uses Pinia auth store (single source of truth)
 router.beforeEach((to, from, next) => {
     const authStore = useAuthStore()
 

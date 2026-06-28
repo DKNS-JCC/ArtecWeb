@@ -1,4 +1,16 @@
 <script setup>
+/**
+ * @module views/LoginView
+ * @description
+ * Pantalla de inicio de sesión para el personal (técnicos y administradores).
+ * Tras autenticar, redirige según el rol. Ruta `/login`.
+ *
+ * **Props:** ninguna. · **Eventos:** ninguno.
+ *
+ * **Dependencias:** `vue-router`, {@link module:stores/auth}, componentes de UI
+ * ({@link module:components/ui/Button}, {@link module:components/ui/Input},
+ * {@link module:components/ui/Label}, {@link module:components/ui/Alert}).
+ */
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'

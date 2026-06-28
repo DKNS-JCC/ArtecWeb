@@ -1,0 +1,42 @@
+{
+  "tags": { "allowUnknownTags": true },
+  "source": {
+    "include": ["src", "vite.config.js"],
+    "includePattern": ".+\\.(js|vue)$",
+    "excludePattern": "(node_modules|dist|coverage|\\.test\\.|\\.spec\\.)"
+  },
+  "plugins": ["plugins/markdown", "./jsdoc/vue-script.cjs"],
+  "opts": {
+    "destination": "../docs/front",
+    "recurse": true,
+    "encoding": "utf8",
+    "readme": "./jsdoc/home.md",
+    "template": "node_modules/docdash"
+  },
+  "markdown": { "idInHeadings": true },
+  "templates": {
+    "cleverLinks": false,
+    "monospaceLinks": false
+  },
+  "docdash": {
+    "static": true,
+    "sort": true,
+    "search": true,
+    "collapse": true,
+    "wrap": true,
+    "typedefs": true,
+    "removeQuotes": "trim",
+    "private": false,
+    "sectionOrder": [
+      "Modules",
+      "Namespaces",
+      "Classes",
+      "Externals",
+      "Events",
+      "Mixins",
+      "Tutorials",
+      "Interfaces",
+      "Global"
+    ]
+  }
+}

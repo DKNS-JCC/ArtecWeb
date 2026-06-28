@@ -7,7 +7,14 @@
     "dev:frontend": "npm --prefix frontend run dev",
     "dev": "npm run dev:backend & npm run dev:frontend",
     "build": "npm --prefix frontend run build",
-    "start": "npm --prefix backend run start"
+    "start": "npm --prefix backend run start",
+    "docs:api": "npm --prefix backend run docs:api",
+    "docs:back": "npm --prefix backend run docs:jsdoc",
+    "docs:front": "npm --prefix frontend run docs:jsdoc",
+    "docs:components": "npm --prefix frontend run docs:components",
+    "docs:all": "npm run docs:api && npm run docs:back && npm run docs:front && npm run docs:components",
+    "docs:serve:back": "npm --prefix backend run docs:serve",
+    "docs:serve:front": "npm --prefix frontend run docs:serve"
   },
   "dependencies": {
     "docx": "^9.7.1",

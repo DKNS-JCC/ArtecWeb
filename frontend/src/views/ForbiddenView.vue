@@ -1,4 +1,14 @@
 <script setup>
+/**
+ * @module views/ForbiddenView
+ * @description
+ * Página de error **403 (Acceso prohibido)**. Se muestra cuando el usuario no
+ * tiene permisos para la ruta solicitada. Ruta `/403`.
+ *
+ * **Props:** ninguna. · **Eventos:** ninguno.
+ *
+ * **Dependencias:** {@link module:components/ui/Button}, `lucide-vue-next`.
+ */
 import { Button } from '@/components/ui/button'
 import { ArrowLeft } from 'lucide-vue-next'
 </script>

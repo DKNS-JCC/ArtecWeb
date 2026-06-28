@@ -1,4 +1,20 @@
 <script setup>
+/**
+ * @module components/ui/Alert
+ * @description
+ * Mensaje de aviso/estado con icono, con variantes de color vía
+ * `class-variance-authority`.
+ *
+ * **Props**
+ * - `variant` `{String}` *(`default`)* - Estilo del aviso (p. ej. `default`,
+ *   error, info…).
+ * - `class` `{String}` - Clases adicionales (se fusionan con `cn`).
+ *
+ * **Slots:** por defecto (texto del aviso). · **Eventos:** ninguno.
+ *
+ * **Dependencias:** `class-variance-authority`, {@link module:utils/cn},
+ * `lucide-vue-next`.
+ */
 import { computed } from 'vue'
 import { cva } from 'class-variance-authority'
 import { cn } from '@/lib/utils'

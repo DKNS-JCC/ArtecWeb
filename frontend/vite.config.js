@@ -1,3 +1,18 @@
+/**
+ * @module config/vite
+ * @description
+ * Configuración de Vite del frontend. Define el *build* y el servidor de
+ * desarrollo:
+ * - **Proxy** de `/api` y `/uploads` al backend, de modo que toda la app se
+ *   sirve desde un único origen (funciona en cualquier red sin IPs ni CORS).
+ * - **HTTPS opcional** (`VITE_HTTPS=1`) con certificado autofirmado local, que
+ *   el navegador exige para `getUserMedia()` (micrófono / speech-to-text) en
+ *   direcciones que no son `localhost`.
+ * - Alias `@` → `src` y carga de variables de entorno desde la raíz del repo.
+ *
+ * **Dependencias:** `vite`, `@vitejs/plugin-vue`, `@tailwindcss/vite`,
+ * `@vitejs/plugin-basic-ssl`.
+ */
 import { defineConfig } from 'vite'
 import vue from '@vitejs/plugin-vue'
 import tailwindcss from '@tailwindcss/vite'
@@ -19,7 +34,7 @@ const useHttps = process.env.VITE_HTTPS === '1' || process.env.VITE_HTTPS === 't
 //   • Phones load https://<this-pc-ip>:5173 and the API is a relative /api URL,
 //     so there is no IP to hard-code and no CORS.
 //   • Serving over HTTPS gives a secure context, which the browser REQUIRES for
-//     getUserMedia() — without it the microphone (speech-to-text) is blocked on
+//     getUserMedia() - without it the microphone (speech-to-text) is blocked on
 //     any non-localhost address.
 const proxy = {
   '/api':     { target: BACKEND, changeOrigin: true },
@@ -40,7 +55,7 @@ export default defineConfig({
   plugins: [
     vue(),
     tailwindcss(),
-    // Self-signed HTTPS (generated locally, no internet needed) — only when requested.
+    // Self-signed HTTPS (generated locally, no internet needed) - only when requested.
     ...(useHttps ? [basicSsl()] : []),
   ],
   resolve: {

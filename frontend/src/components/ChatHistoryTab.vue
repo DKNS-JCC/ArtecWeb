@@ -1,4 +1,16 @@
 <script setup>
+/**
+ * @module components/ChatHistoryTab
+ * @description
+ * Pestaña del panel que muestra el **historial de conversaciones** de los
+ * visitantes con la guía IA. Permite filtrar por robot y rango de fechas,
+ * paginar las sesiones y revisar/eliminar los mensajes de cada sesión.
+ *
+ * **Props:** ninguna. · **Eventos:** ninguno.
+ *
+ * **Dependencias:** {@link module:services/api}, {@link module:components/ui/Card},
+ * {@link module:components/ui/Button}, `lucide-vue-next`.
+ */
 import { ref, computed, onMounted, watch } from 'vue'
 import { api } from '@/services/api'
 import { Card, CardContent } from '@/components/ui/card'
@@ -51,7 +63,7 @@ const hasDateFilter  = computed(() => dateFrom.value || dateTo.value)
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function formatDate(iso) {
-    if (!iso) return '—'
+    if (!iso) return '-'
     return new Date(iso).toLocaleString('es-ES', {
         day: '2-digit', month: 'short', year: 'numeric',
         hour: '2-digit', minute: '2-digit'
@@ -199,7 +211,7 @@ onMounted(async () => {
         />
       </div>
 
-      <span class="text-xs text-muted-foreground">—</span>
+      <span class="text-xs text-muted-foreground">-</span>
 
       <!-- Date to -->
       <div class="relative">

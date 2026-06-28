@@ -1,7 +1,40 @@
+/**
+ * @module stores/auth
+ * @description
+ * Almacén de Pinia para la autenticación. Mantiene el token JWT y los datos del
+ * usuario, expone propiedades calculadas de rol y persiste la sesión en
+ * `localStorage`. Actúa como VistaModelo (MVVM) del flujo de acceso.
+ *
+ * Store *setup* de Pinia. Es la **fuente única de verdad** de la sesión y se
+ * usa también en los *navigation guards* del {@link module:config/router}.
+ *
+ * **Estado**
+ * - `token` `{Ref<string|null>}` - Token JWT en curso.
+ * - `user` `{Ref<Object|null>}` - Datos del usuario/visitante autenticado.
+ * - `language` `{Ref<string>}` - Idioma preferido (persistido).
+ *
+ * **Getters (computed)**
+ * - `isAuthenticated`, `isMuseumAdmin`, `isPlatformAdmin`, `isTechnician`,
+ *   `isStaff` (técnicos + admins), `isVisitor`, `mustChangePassword`.
+ *
+ * **Acciones**
+ * - `initFromStorage`, `login`, `createVisitor`, `pingVisitor`,
+ *   `checkVisitorStatus`, `endVisitor`, `changePassword`, `updateUserAvatar`,
+ *   `setLanguage`, `logout`.
+ *
+ * **Dependencias:** `pinia`, `vue` (`ref`/`computed`),
+ * {@link module:services/authService}.
+ */
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { authService } from '@/services/authService'
 
+/**
+ * Decodifica el *payload* de un JWT sin verificar la firma.
+ * @private
+ * @param {string} token  Token JWT.
+ * @returns {Object|null}  Payload decodificado o `null` si es inválido.
+ */
 function decodeToken(token) {
     try {
         return JSON.parse(atob(token.split('.')[1]))
@@ -10,6 +43,12 @@ function decodeToken(token) {
     }
 }
 
+/**
+ * Define y devuelve el store de autenticación.
+ * @function useAuthStore
+ * @memberof module:stores/auth
+ * @returns {Object}  API reactiva del store (estado, getters y acciones).
+ */
 export const useAuthStore = defineStore('auth', () => {
     const token = ref(null)
     const user = ref(null)
@@ -29,6 +68,7 @@ export const useAuthStore = defineStore('auth', () => {
     })
 
 
+    /** Rehidrata la sesión (token, usuario e idioma) desde `localStorage`. */
     function initFromStorage() {
         const savedToken = localStorage.getItem('artec_token')
         const savedUser = localStorage.getItem('artec_user')
@@ -42,6 +82,12 @@ export const useAuthStore = defineStore('auth', () => {
         }
     }
 
+    /**
+     * Guarda el token y el usuario en el estado y en `localStorage`.
+     * @private
+     * @param {string} newToken  Token JWT.
+     * @param {Object} newUser  Datos del usuario/visitante.
+     */
     function persist(newToken, newUser) {
         token.value = newToken
         user.value = newUser
@@ -49,23 +95,44 @@ export const useAuthStore = defineStore('auth', () => {
         localStorage.setItem('artec_user', JSON.stringify(newUser))
     }
 
+    /**
+     * Inicia sesión de personal/admin y persiste la sesión.
+     * @param {string} identifier  Email o nombre de usuario.
+     * @param {string} password  Contraseña.
+     * @returns {Promise<Object>}  Respuesta del servicio (token + usuario).
+     */
     async function login(identifier, password) {
         const data = await authService.login(identifier, password)
         persist(data.token, data.user)
         return data
     }
 
+    /**
+     * Crea una sesión de visitante (tras escanear el QR) y la persiste.
+     * @param {string} robotId  Robot escaneado.
+     * @param {string} name  Nombre del visitante.
+     * @param {string} [expertiseLevel='general']  Nivel de conocimiento.
+     * @returns {Promise<Object>}  Respuesta del servicio (token + visitante).
+     */
     async function createVisitor(robotId, name, expertiseLevel = 'general') {
         const data = await authService.createVisitor(robotId, name, expertiseLevel, language.value)
         persist(data.token, data.visitor)
         return data
     }
 
+    /**
+     * Envía un *heartbeat* para mantener viva la sesión del visitante.
+     * @returns {Promise<Object|undefined>}
+     */
     async function pingVisitor() {
         if (!isAuthenticated.value) return;
         return await authService.pingVisitor()
     }
 
+    /**
+     * Comprueba si la sesión del visitante sigue activa en el servidor.
+     * @returns {Promise<{active: boolean}>}
+     */
     async function checkVisitorStatus() {
         if (!isAuthenticated.value) return { active: false };
         try {
@@ -75,6 +142,7 @@ export const useAuthStore = defineStore('auth', () => {
         }
     }
 
+    /** Finaliza la sesión del visitante en el servidor y hace `logout()` local. */
     async function endVisitor() {
         if (!isAuthenticated.value) return;
         try {
@@ -85,6 +153,12 @@ export const useAuthStore = defineStore('auth', () => {
         logout()
     }
 
+    /**
+     * Cambia la contraseña y actualiza el token resultante.
+     * @param {string} currentPassword  Contraseña actual.
+     * @param {string} newPassword  Nueva contraseña.
+     * @returns {Promise<{token: string}>}
+     */
     async function changePassword(currentPassword, newPassword) {
         const data = await authService.changePassword(currentPassword, newPassword)
         token.value = data.token
@@ -92,6 +166,10 @@ export const useAuthStore = defineStore('auth', () => {
         return data
     }
 
+    /**
+     * Actualiza la URL del avatar del usuario en el estado y en `localStorage`.
+     * @param {string} avatarUrl  Nueva URL del avatar.
+     */
     function updateUserAvatar(avatarUrl) {
         if (user.value) {
             user.value.avatar = avatarUrl
@@ -99,6 +177,7 @@ export const useAuthStore = defineStore('auth', () => {
         }
     }
 
+    /** Cierra la sesión: limpia el estado y `localStorage`. */
     function logout() {
         token.value = null
         user.value = null
@@ -106,6 +185,10 @@ export const useAuthStore = defineStore('auth', () => {
         localStorage.removeItem('artec_user')
     }
 
+    /**
+     * Fija el idioma preferido y lo persiste.
+     * @param {string} lang  Código de idioma (p. ej. `es`, `en`).
+     */
     function setLanguage(lang) {
         language.value = lang
         localStorage.setItem('artec_language', lang)

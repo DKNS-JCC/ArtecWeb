@@ -1,4 +1,19 @@
 <script setup>
+/**
+ * @module views/ChatView
+ * @description
+ * Vista principal del **visitante**: chat con la guía IA, con voz local y
+ * gratuita (TTS para que el robot "hable" y STT para hablarle), mapa interactivo
+ * y confirmación de navegación a zonas. Ruta `/chat` (requiere sesión de
+ * visitante). El visitante queda retenido aquí hasta finalizar la sesión.
+ *
+ * **Props:** ninguna. · **Eventos:** ninguno.
+ *
+ * **Dependencias:** `vue-router`, {@link module:stores/auth},
+ * {@link module:services/chatService}, {@link module:components/VisitorMap},
+ * {@link module:composables/useTextToSpeech},
+ * {@link module:composables/useSpeechToText}, `lucide-vue-next`.
+ */
 import { ref, onMounted, onUnmounted, computed, nextTick } from 'vue';
 import { useRouter } from 'vue-router';
 import { useAuthStore } from '@/stores/auth';
@@ -58,7 +73,7 @@ const welcomeMessage = {
     time:   new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
 };
 
-/** Starter prompts shown until the visitor sends their first message — removes blank-page friction. */
+/** Starter prompts shown until the visitor sends their first message - removes blank-page friction. */
 const SUGGESTED_PROMPTS = [
     '¿Qué puedo ver por aquí?',
     'Llévame a la siguiente sala',
@@ -116,7 +131,7 @@ const updateExpertise = async (level) => {
             authStore.user.expertise_level = level;
             localStorage.setItem('artec_user', JSON.stringify(authStore.user));
         }
-    } catch { /* ignore — level update is best-effort */ }
+    } catch { /* ignore - level update is best-effort */ }
     finally {
         isUpdatingExpertise.value = false;
         showExpertiseModal.value = false;
@@ -174,7 +189,7 @@ const handleConfirmNav = async () => {
             time:            new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
         });
         tts.speakIfAuto(data.nav_message, navMsgId);
-        // Watch for the outcome so we can tell the visitor when it arrives — or fails.
+        // Watch for the outcome so we can tell the visitor when it arrives - or fails.
         trackArrival({ place_id: nav.place_id, place_name: nav.place_name, map_x: nav.map_x, map_y: nav.map_y });
     } catch (err) {
         messages.value.push({
@@ -450,7 +465,7 @@ const sendMessage = async () => {
                 map_y:      data.resolved_place.map_y,
             };
         } else if (data.intent === 'navigate_to' && !data.resolved_place?.map_x) {
-            // Place exists but has no coordinates — inform visitor
+            // Place exists but has no coordinates - inform visitor
             pendingNav.value = null;
         }
 
@@ -533,7 +548,7 @@ onUnmounted(() => {
                     :class="tts.autoSpeak.value
                         ? 'bg-primary/15 text-primary ring-1 ring-primary/30'
                         : 'bg-foreground/5 text-muted-foreground'"
-                    :title="tts.autoSpeak.value ? 'Voz activada — el robot lee sus respuestas' : 'Voz silenciada'">
+                    :title="tts.autoSpeak.value ? 'Voz activada - el robot lee sus respuestas' : 'Voz silenciada'">
                     <Volume2 v-if="tts.autoSpeak.value" class="w-4 h-4" :class="{ 'animate-pulse': tts.isSpeaking.value }" />
                     <VolumeX v-else class="w-4 h-4" />
                 </button>
@@ -578,7 +593,7 @@ onUnmounted(() => {
                 <div v-if="tts.supported && tts.autoSpeak.value"
                     class="flex items-center gap-1.5 text-center text-xs text-muted-foreground font-medium bg-foreground/5 rounded-full py-1.5 px-4 w-fit">
                     <Volume2 class="w-3.5 h-3.5 flex-shrink-0" />
-                    El robot lee sus respuestas en voz alta — toca el altavoz para silenciar
+                    El robot lee sus respuestas en voz alta - toca el altavoz para silenciar
                 </div>
             </div>
 

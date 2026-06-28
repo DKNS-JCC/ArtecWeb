@@ -1,4 +1,17 @@
 <script setup>
+/**
+ * @module components/StatsTab
+ * @description
+ * Pestaña del panel con las **estadísticas** del museo: totales de robots,
+ * visitantes y museos, tiempo medio de sesión y distribuciones (visitantes por
+ * día, nivel de experiencia, intenciones y actividad por robot).
+ *
+ * **Props:** ninguna. · **Eventos:** ninguno.
+ *
+ * **Dependencias:** {@link module:services/api}, {@link module:stores/auth},
+ * {@link module:components/ui/Card}, {@link module:components/ui/Button},
+ * `lucide-vue-next`.
+ */
 import { ref, computed, onMounted } from 'vue'
 import { api } from '@/services/api'
 import { useAuthStore } from '@/stores/auth'
@@ -48,12 +61,12 @@ const DONUT_C  = 2 * Math.PI * DONUT_R  // ≈ 226.19
 // ─── KPI helpers ─────────────────────────────────────────────────────────────
 
 function fmtTime(mins) {
-    if (!mins || mins <= 0) return '—'
+    if (!mins || mins <= 0) return '-'
     if (mins < 60) return `${mins.toFixed(1)} min`
     return `${Math.floor(mins / 60)}h ${Math.round(mins % 60)}m`
 }
 
-// ─── Bar chart — last 7 days ──────────────────────────────────────────────────
+// ─── Bar chart - last 7 days ──────────────────────────────────────────────────
 
 const PLOT_H = 80    // px in SVG coordinate space
 const SLOT_W = 40    // 280 / 7
@@ -82,7 +95,7 @@ const bars = computed(() => filledDays.value.map((d, i) => {
 
 const hasDayData = computed(() => bars.value.some(b => b.count > 0))
 
-// ─── Donut chart — expertise distribution ────────────────────────────────────
+// ─── Donut chart - expertise distribution ────────────────────────────────────
 
 const donutTotal = computed(() =>
     (stats.value.expertiseDist || []).reduce((s, d) => s + d.count, 0)
@@ -184,7 +197,7 @@ const robotMax  = computed(() => Math.max(1, ...(stats.value.robotActivity || []
               <Building2 class="w-4 h-4 text-amber-500" />
             </div>
           </div>
-          <div class="font-display text-3xl font-medium text-foreground">{{ stats.totalMuseums ?? '—' }}</div>
+          <div class="font-display text-3xl font-medium text-foreground">{{ stats.totalMuseums ?? '-' }}</div>
           <p class="text-xs text-muted-foreground mt-1">Instalaciones en la plataforma</p>
         </CardContent>
       </Card>
@@ -205,13 +218,13 @@ const robotMax  = computed(() => Math.max(1, ...(stats.value.robotActivity || []
       </Card>
     </div>
 
-    <!-- ── Charts — fila 1 ───────────────────────────────────────────────────── -->
+    <!-- ── Charts - fila 1 ───────────────────────────────────────────────────── -->
     <div class="grid gap-4 md:grid-cols-5 mb-4">
 
       <!-- Barras: visitantes últimos 7 días (3/5) -->
       <Card class="md:col-span-3">
         <CardHeader class="pb-1 px-5 pt-5">
-          <p class="text-sm font-medium text-foreground">Visitantes — últimos 7 días</p>
+          <p class="text-sm font-medium text-foreground">Visitantes - últimos 7 días</p>
         </CardHeader>
         <CardContent class="px-5 pb-5 pt-3">
           <div v-if="!loading && !hasDayData"
@@ -290,7 +303,7 @@ const robotMax  = computed(() => Math.max(1, ...(stats.value.robotActivity || []
       </Card>
     </div>
 
-    <!-- ── Charts — fila 2 ───────────────────────────────────────────────────── -->
+    <!-- ── Charts - fila 2 ───────────────────────────────────────────────────── -->
     <div class="grid gap-4 md:grid-cols-2">
 
       <!-- Intenciones más frecuentes -->

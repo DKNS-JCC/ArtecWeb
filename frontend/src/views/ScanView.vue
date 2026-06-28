@@ -1,4 +1,16 @@
 <script setup>
+/**
+ * @module views/ScanView
+ * @description
+ * Pantalla a la que se llega al **escanear el QR** de un robot (`/r/:id`).
+ * Comprueba la disponibilidad del robot, pide el nombre y el nivel de
+ * conocimiento del visitante y crea su sesión efímera, redirigiéndolo al chat.
+ *
+ * **Props:** ninguna. · **Eventos:** ninguno.
+ *
+ * **Dependencias:** `vue-router`, {@link module:stores/auth},
+ * {@link module:services/authService}, componentes de UI.
+ */
 import { onMounted, ref, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'

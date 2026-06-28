@@ -1,4 +1,14 @@
 <script setup>
+/**
+ * @module views/NotFoundView
+ * @description
+ * Página de error **404 (No encontrado)**. Destino del *catch-all* del router
+ * para rutas inexistentes. Ruta `/404`.
+ *
+ * **Props:** ninguna. · **Eventos:** ninguno.
+ *
+ * **Dependencias:** {@link module:components/ui/Button}, `lucide-vue-next`.
+ */
 import { Button } from '@/components/ui/button'
 import { ArrowLeft } from 'lucide-vue-next'
 </script>

@@ -1,4 +1,17 @@
 <script setup>
+/**
+ * @module components/IncidentsTab
+ * @description
+ * Pestaña del panel que lista las **incidencias operativas** (p. ej. fallos de
+ * navegación). Permite filtrar entre abiertas y todas, y marcar una incidencia
+ * como resuelta.
+ *
+ * **Props:** ninguna. · **Eventos:** ninguno.
+ *
+ * **Dependencias:** {@link module:services/incidentService},
+ * {@link module:stores/auth}, {@link module:components/ui/Button},
+ * `lucide-vue-next`.
+ */
 import { ref, computed, onMounted } from 'vue'
 import { incidentService } from '@/services/incidentService'
 import { useAuthStore } from '@/stores/auth'
@@ -47,7 +60,7 @@ const TYPE_LABELS = { nav_failed: 'Fallo de navegación' }
 const typeLabel = (t) => TYPE_LABELS[t] || t
 
 function formatWhen(ts) {
-    if (!ts) return '—'
+    if (!ts) return '-'
     // SQLite stores UTC without a zone marker; normalise so it renders in local time.
     const d = new Date(ts.includes('T') ? ts : ts.replace(' ', 'T') + 'Z')
     return d.toLocaleString('es-ES', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })

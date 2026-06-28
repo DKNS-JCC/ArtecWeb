@@ -1,19 +1,40 @@
-import { ref, shallowRef, onMounted, onBeforeUnmount } from 'vue'
-
 /**
- * Text-to-Speech composable — 100% local & free.
- *
- * Uses the browser's built-in `SpeechSynthesis` API, which renders speech with
- * the on-device OS voices (no network, no API key, no cost). It powers the
- * robot guide "speaking" its replies in the visitor's phone.
- *
- * Exposes both behaviours requested for the chat:
- *  - `autoSpeak` global toggle (persisted) → auto-read every robot reply.
- *  - `speak()` → replay any single message on demand (per-bubble button).
+ * @file Composable de *text-to-speech* del chat del visitante.
+ * @module composables/useTextToSpeech
  */
+import { ref, shallowRef, onMounted, onBeforeUnmount } from 'vue'
 
 const AUTO_SPEAK_KEY = 'artec_chat_autospeak'
 
+/**
+ * Composable *Text-to-Speech* - 100% local y gratuito.
+ *
+ * Usa la API `SpeechSynthesis` del navegador, que sintetiza voz con las voces
+ * del sistema operativo (sin red, sin clave de API, sin coste). Permite que la
+ * guía robótica "hable" sus respuestas en el móvil del visitante.
+ *
+ * Expone los dos comportamientos del chat:
+ *  - `autoSpeak`: interruptor global (persistido) → lee automáticamente cada
+ *    respuesta del robot.
+ *  - `speak()`: reproduce un mensaje concreto bajo demanda (botón por burbuja).
+ *
+ * **Dependencias:** `vue`, `SpeechSynthesis` / `SpeechSynthesisUtterance` del
+ * navegador.
+ *
+ * **Devuelve** un objeto con:
+ * - `supported` `{boolean}` - Si el navegador soporta síntesis de voz.
+ * - `isSpeaking` `{Ref<boolean>}` - Hay una locución en curso.
+ * - `speakingId` `{Ref<string|number|null>}` - Id del mensaje que se está leyendo.
+ * - `autoSpeak` `{Ref<boolean>}` - Lectura automática activada (persistida).
+ * - `toggleAutoSpeak()` `{Function}` - Alterna la lectura automática.
+ * - `speak(text, id?)` `{Function}` - Lee un texto en voz alta.
+ * - `speakIfAuto(text, id?)` `{Function}` - Lee solo si `autoSpeak` está activo.
+ * - `cancel()` `{Function}` - Detiene la locución actual.
+ *
+ * @function useTextToSpeech
+ * @memberof module:composables/useTextToSpeech
+ * @returns {Object}  API del composable: estado reactivo y controles de síntesis de voz.
+ */
 export function useTextToSpeech() {
     const synth = typeof window !== 'undefined' ? window.speechSynthesis : null
     const supported = !!synth && typeof window.SpeechSynthesisUtterance !== 'undefined'

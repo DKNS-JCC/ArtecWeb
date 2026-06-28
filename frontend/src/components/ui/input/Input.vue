@@ -1,4 +1,20 @@
 <script setup>
+/**
+ * @module components/ui/Input
+ * @description
+ * Campo de entrada de texto con enlace `v-model`. Estilo coherente con el
+ * sistema de UI.
+ *
+ * **Props**
+ * - `class` `{String}` - Clases adicionales (se fusionan con `cn`).
+ * - `type` `{String}` *(`text`)* - Tipo del `<input>`.
+ * - `modelValue` `{String|Number}` - Valor enlazado (`v-model`).
+ *
+ * **Eventos**
+ * - `update:modelValue` - Emitido al cambiar el valor (soporte de `v-model`).
+ *
+ * **Dependencias:** {@link module:utils/cn}.
+ */
 import { computed } from 'vue'
 import { cn } from '@/lib/utils'
 

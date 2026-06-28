@@ -1,10 +1,17 @@
 <script setup>
 /**
- * Artec brand mark — editorial "A".
- * A slab-serif "A" whose crossbar is the terracotta accent, echoing the
- * hairline rule used across the UI. Themed via CSS tokens (ink + primary).
+ * @module components/Logo
+ * @description
+ * Marca de Artec - una "A" editorial con slab-serif cuyo travesaño usa el
+ * acento terracota, en sintonía con la línea fina del resto de la UI. Se adapta
+ * al tema mediante tokens CSS (tinta + primario).
  *
- *   wordmark → append the "Artec" display wordmark beside the mark
+ * **Props**
+ * - `size` `{Number}` *(por defecto `80`)* - Tamaño del logotipo en píxeles.
+ * - `wordmark` `{Boolean}` *(por defecto `false`)* - Añade el logotipo de texto
+ *   "Artec" junto a la marca.
+ *
+ * **Eventos:** ninguno.
  */
 defineProps({
   size:     { type: Number,  default: 80 },

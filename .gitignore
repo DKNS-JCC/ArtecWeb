@@ -34,3 +34,4 @@ database/*.sqlite-*
 !database/.gitkeep
 
 /docs
+/ArtecWeb2_backup/

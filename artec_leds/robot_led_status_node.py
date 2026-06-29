@@ -33,8 +33,8 @@ Notes:
       False when the session ends. LEDs stay off (standby) until a session begins.
 
 Usage:
-    ros2 run led_lidar robot_led_status_node
-    ros2 run led_lidar robot_led_status_node --ros-args -p serial_port:=/dev/ttyUSB3
+    ros2 run artec_leds robot_led_status_node
+    ros2 run artec_leds robot_led_status_node --ros-args -p serial_port:=/dev/ttyUSB3
 """
 
 import threading
@@ -141,7 +141,15 @@ class RobotLedStatusNode(Node):
             if self._ser is not None:
                 return True
             try:
-                self._ser = serial.Serial(self._port, self._baud, timeout=0.1)
+                # Disable DTR/RTS to prevent ESP32 auto-reset on connect
+                ser = serial.Serial()
+                ser.port = self._port
+                ser.baudrate = self._baud
+                ser.timeout = 0.1
+                ser.dtr = False
+                ser.rts = False
+                ser.open()
+                self._ser = ser
                 self.get_logger().info(f'Serial opened: {self._port} @ {self._baud}')
                 return True
             except serial.SerialException:

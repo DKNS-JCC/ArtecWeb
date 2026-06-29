@@ -188,6 +188,7 @@ const messageText = ref('');
 const chatContainer = ref(null);
 const isSending     = ref(false);
 const showForcedEndModal = ref(false);
+const showFarewellModal = ref(false);
 
 const welcomeMessage = {
     id:     1,
@@ -528,6 +529,11 @@ const handleEndSession = async () => {
     stopArrivalTracking();
     sessionStorage.removeItem(STORAGE_KEY);
     await authStore.endVisitor();
+    showFarewellModal.value = true;
+};
+
+const goToMenu = () => {
+    showFarewellModal.value = false;
     router.push('/');
 };
 
@@ -997,6 +1003,46 @@ onUnmounted(() => {
             </div>
         </Transition>
         <!-- ── END FAREWELL CONFIRMATION MODAL ────────────────────────────── -->
+
+        <!-- ── FAREWELL THANK YOU MODAL ───────────────────────────────────── -->
+        <Transition name="modal">
+            <div v-if="showFarewellModal" class="fixed inset-0 z-[300] flex items-center justify-center p-4">
+                <!-- Backdrop -->
+                <div class="absolute inset-0 bg-black/50 backdrop-blur-sm"></div>
+
+                <!-- Modal Card -->
+                <div class="nav-modal relative w-full max-w-xs rounded-[28px] overflow-hidden shadow-2xl">
+                    <!-- Accent bar -->
+                    <div class="h-1.5 bg-primary"></div>
+
+                    <div class="bg-card px-6 pt-6 pb-5">
+                        <!-- Icon -->
+                        <div class="w-14 h-14 rounded-full bg-primary/10 flex items-center justify-center mx-auto mb-4">
+                            <Bot class="w-7 h-7 text-primary" />
+                        </div>
+
+                        <!-- Title -->
+                        <h2 class="font-display text-lg font-medium tracking-tight text-center text-foreground mb-3">Gracias por su visita</h2>
+
+                        <!-- Description -->
+                        <p class="text-center text-sm text-muted-foreground mb-5 leading-relaxed">
+                            Su sesión de guía ha concluido.
+                        </p>
+
+                        <!-- Actions -->
+                        <div class="flex flex-col gap-2.5">
+                            <button
+                                @click="goToMenu"
+                                class="w-full flex items-center justify-center gap-2 bg-primary hover:bg-primary/90 active:scale-[0.97] text-primary-foreground text-[15px] font-semibold rounded-2xl py-3 transition-all">
+                                <Check class="w-4.5 h-4.5" />
+                                Ir al menú
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </Transition>
+        <!-- ── END FAREWELL THANK YOU MODAL ───────────────────────────────── -->
 
         <!-- ── EXPERTISE LEVEL MODAL ──────────────────────────────────────── -->
         <Transition name="modal">

@@ -17,7 +17,6 @@ jest.mock('../services/rosService', () => ({
     on:                 jest.fn(),   // rosService is an EventEmitter (sseService subscribes)
 }));
 
-// ─── State ────────────────────────────────────────────────────────────────────
 
 let museum, museum2, superAdmin, adminUser, admin2, robot, robot2;
 let superToken, adminToken, admin2Token;
@@ -51,7 +50,6 @@ beforeAll(async () => {
 
 afterAll(done => { db.close(() => done()); });
 
-// ─── POST /api/robots ─────────────────────────────────────────────────────────
 
 describe('POST /api/robots', () => {
     test('superadmin can create a robot', async () => {
@@ -86,7 +84,6 @@ describe('POST /api/robots', () => {
     });
 });
 
-// ─── GET /api/robots ──────────────────────────────────────────────────────────
 
 describe('GET /api/robots', () => {
     test('superadmin sees all robots', async () => {
@@ -127,7 +124,6 @@ describe('GET /api/robots', () => {
     });
 });
 
-// ─── GET /api/robots/:id ──────────────────────────────────────────────────────
 
 describe('GET /api/robots/:id', () => {
     test('admin can get their own robot', async () => {
@@ -153,7 +149,6 @@ describe('GET /api/robots/:id', () => {
     });
 });
 
-// ─── PUT /api/robots/:id ──────────────────────────────────────────────────────
 
 describe('PUT /api/robots/:id', () => {
     test('admin can update robot name', async () => {
@@ -190,7 +185,6 @@ describe('PUT /api/robots/:id', () => {
     });
 });
 
-// ─── POST /api/robots/:id/command ─────────────────────────────────────────────
 
 describe('POST /api/robots/:id/command', () => {
     test('stop command updates status to idle', async () => {
@@ -235,7 +229,6 @@ describe('POST /api/robots/:id/command', () => {
     });
 });
 
-// ─── POST /api/robots/:id/force-end ──────────────────────────────────────────
 
 describe('POST /api/robots/:id/force-end', () => {
     let occupiedRobot, occupyingVisitor;
@@ -264,7 +257,6 @@ describe('POST /api/robots/:id/force-end', () => {
     });
 });
 
-// ─── Technician role access ─────────────────────────────────────────────────────
 // Technicians operate/monitor robots in their own museum, but cannot manage
 // the fleet (create robots, force-end sessions) or other admin areas.
 describe('Technician role', () => {

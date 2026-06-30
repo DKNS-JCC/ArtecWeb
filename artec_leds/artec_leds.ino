@@ -84,7 +84,6 @@ void readSerial() {
   }
 }
 
-// ── Animations ──────────────────────────────────────────────
 void animIdle() {
   float phase = (float)(millis() % 3000) / 3000.0f;
   float wave  = 0.5f + 0.5f * sinf(phase * TWO_PI);
@@ -224,7 +223,6 @@ void runAnimation() {
   }
 }
 
-// ── Main ────────────────────────────────────────────────────
 void setup() {
   Serial.begin(115200);
   FastLED.addLeds<LED_TYPE, LED_PIN, COLOR_ORDER>(leds, NUM_LEDS)

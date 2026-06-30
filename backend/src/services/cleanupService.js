@@ -4,9 +4,12 @@ const RETENTION_DAYS = Math.max(1, parseInt(process.env.CHAT_RETENTION_DAYS || '
 const CLEANUP_INTERVAL_MS = 24 * 60 * 60 * 1000;
 
 function dbRun(sql, params = []) {
-    return new Promise((resolve, reject) =>
-        db.run(sql, params, function (err) { err ? reject(err) : resolve(this.changes); })
-    );
+    return new Promise((resolve, reject) => {
+        db.run(sql, params, function (err) {
+            if (err) reject(err);
+            else resolve(this.changes);
+        });
+    });
 }
 
 async function runCleanup() {

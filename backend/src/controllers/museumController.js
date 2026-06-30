@@ -5,11 +5,25 @@ const path = require('path');
 const rosService = require('../services/rosService');
 const zoneCache = require('../utils/zoneCache');
 
-const dbGet = (sql, params = []) => new Promise((res, rej) => db.get(sql, params, (e, r) => (e ? rej(e) : res(r))));
-const dbAll = (sql, params = []) => new Promise((res, rej) => db.all(sql, params, (e, r) => (e ? rej(e) : res(r))));
-const dbRun = (sql, params = []) => new Promise((res, rej) => db.run(sql, params, function (e) { e ? rej(e) : res(this); }));
+const dbGet = (sql, params = []) => new Promise((resolve, reject) => {
+    db.get(sql, params, (err, row) => {
+        if (err) reject(err);
+        else resolve(row);
+    });
+});
+const dbAll = (sql, params = []) => new Promise((resolve, reject) => {
+    db.all(sql, params, (err, rows) => {
+        if (err) reject(err);
+        else resolve(rows || []);
+    });
+});
+const dbRun = (sql, params = []) => new Promise((resolve, reject) => {
+    db.run(sql, params, function (err) {
+        if (err) reject(err);
+        else resolve(this);
+    });
+});
 
-// GET /api/museums - List all museums
 exports.listMuseums = (req, res) => {
     db.all(`SELECT * FROM museums ORDER BY name ASC`, [], (err, rows) => {
         if (err) return res.status(500).json({ error: 'Error fetching museums' });

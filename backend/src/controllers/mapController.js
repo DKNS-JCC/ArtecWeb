@@ -10,17 +10,26 @@ const { BASE_CATEGORY } = require('../utils/geo');
 // Promisified DB helpers
 function dbGet(sql, params) {
     return new Promise((resolve, reject) => {
-        db.get(sql, params, (err, row) => err ? reject(err) : resolve(row));
+        db.get(sql, params, (err, row) => {
+            if (err) reject(err);
+            else resolve(row);
+        });
     });
 }
 function dbAll(sql, params) {
     return new Promise((resolve, reject) => {
-        db.all(sql, params, (err, rows) => err ? reject(err) : resolve(rows));
+        db.all(sql, params, (err, rows) => {
+            if (err) reject(err);
+            else resolve(rows);
+        });
     });
 }
 function dbRun(sql, params) {
     return new Promise((resolve, reject) => {
-        db.run(sql, params, function (err) { err ? reject(err) : resolve(this); });
+        db.run(sql, params, function (err) {
+            if (err) reject(err);
+            else resolve(this);
+        });
     });
 }
 
@@ -99,7 +108,6 @@ function parsePgm(buffer) {
 
 const UPLOAD_DIR = path.join(__dirname, '../../uploads/maps');
 
-// ─── MAP CRUD ─────────────────────────────────────────────────
 
 /**
  * POST /api/robots/:id/capture-map
@@ -258,7 +266,7 @@ exports.listMaps = async (req, res) => {
             [museum_id]
         );
         res.json(maps);
-    } catch (err) {
+    } catch (_err) {
         res.status(500).json({ error: 'Error al obtener los mapas' });
     }
 };
@@ -278,7 +286,7 @@ exports.getMap = async (req, res) => {
             return res.status(403).json({ error: 'No tienes acceso a este mapa' });
         }
         res.json(map);
-    } catch (err) {
+    } catch (_err) {
         res.status(500).json({ error: 'Error al obtener el mapa' });
     }
 };
@@ -308,12 +316,11 @@ exports.deleteMap = async (req, res) => {
         zoneCache.invalidate(map_id);
 
         res.json({ message: 'Mapa eliminado' });
-    } catch (err) {
+    } catch (_err) {
         res.status(500).json({ error: 'Error al eliminar el mapa' });
     }
 };
 
-// ─── ZONES CRUD ───────────────────────────────────────────────
 
 /**
  * GET /api/maps/:map_id/zones
@@ -330,7 +337,7 @@ exports.getZones = async (req, res) => {
         }
         const zones = await dbAll('SELECT * FROM zones WHERE map_id = ? ORDER BY created_at DESC', [map_id]);
         res.json(zones);
-    } catch (err) {
+    } catch (_err) {
         res.status(500).json({ error: 'Error al obtener las zonas' });
     }
 };
@@ -373,7 +380,7 @@ exports.createZone = async (req, res) => {
         zoneCache.invalidate(map_id);
         const zone = await dbGet('SELECT * FROM zones WHERE id = ?', [id]);
         res.status(201).json(zone);
-    } catch (err) {
+    } catch (_err) {
         res.status(500).json({ error: 'Error al crear la zona' });
     }
 };
@@ -417,7 +424,7 @@ exports.updateZone = async (req, res) => {
         zoneCache.invalidate(map_id);
         const updated = await dbGet('SELECT * FROM zones WHERE id = ?', [id]);
         res.json(updated);
-    } catch (err) {
+    } catch (_err) {
         res.status(500).json({ error: 'Error al actualizar la zona' });
     }
 };
@@ -442,7 +449,7 @@ exports.deleteZone = async (req, res) => {
         await dbRun('DELETE FROM zones WHERE id = ?', [id]);
         zoneCache.invalidate(map_id);
         res.json({ message: 'Zona eliminada' });
-    } catch (err) {
+    } catch (_err) {
         res.status(500).json({ error: 'Error al eliminar la zona' });
     }
 };

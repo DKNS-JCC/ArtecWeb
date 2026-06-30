@@ -8,7 +8,6 @@ const {
     VALID_INTENTS
 } = require('../services/aiService');
 
-// ─── sanitizeForPrompt ────────────────────────────────────────────────────────
 
 describe('sanitizeForPrompt', () => {
     test('removes control characters', () => {
@@ -41,7 +40,6 @@ describe('sanitizeForPrompt', () => {
     });
 });
 
-// ─── hasInjectionAttempt ──────────────────────────────────────────────────────
 
 describe('hasInjectionAttempt', () => {
     test('detects "ignora las instrucciones"', () => {
@@ -76,7 +74,6 @@ describe('hasInjectionAttempt', () => {
     });
 });
 
-// ─── safeName ─────────────────────────────────────────────────────────────────
 
 describe('safeName', () => {
     test('returns cleaned value for safe input', () => {
@@ -97,7 +94,6 @@ describe('safeName', () => {
     });
 });
 
-// ─── buildSystemPrompt ────────────────────────────────────────────────────────
 
 describe('buildSystemPrompt', () => {
     const baseContext = {
@@ -158,7 +154,6 @@ describe('buildSystemPrompt', () => {
     });
 });
 
-// ─── validateResponse ─────────────────────────────────────────────────────────
 
 describe('validateResponse', () => {
     test('returns valid response unchanged', () => {
@@ -201,7 +196,6 @@ describe('validateResponse', () => {
     });
 });
 
-// ─── fallbackInterpret ────────────────────────────────────────────────────────
 
 describe('fallbackInterpret', () => {
     test('detects greeting', () => {

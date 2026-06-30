@@ -63,7 +63,6 @@ class RobotLedStatusNode(Node):
     def __init__(self):
         super().__init__('robot_led_status')
 
-        # ── Parameters ───────────────────────────────────────
         self.declare_parameter('serial_port',        '/dev/esp32')
         self.declare_parameter('baud_rate',          115200)
         self.declare_parameter('result_display_secs', RESULT_DISPLAY_SECS)
@@ -74,7 +73,6 @@ class RobotLedStatusNode(Node):
         self._result_secs   = self.get_parameter('result_display_secs').value
         self._heartbeat_secs = self.get_parameter('heartbeat_secs').value
 
-        # ── Serial port (lazy connect) ──────────────────────
         self._ser      = None
         self._ser_lock = threading.Lock()
         self._connect_serial()
@@ -85,14 +83,12 @@ class RobotLedStatusNode(Node):
         else:
             self._retry_timer = None
 
-        # ── State tracking ───────────────────────────────────
         self._current_cmd   = ''
         self._is_navigating = False
         self._is_charging   = False
         self._in_session    = False   # True when a user has an active session
         self._result_timer  = None
 
-        # ── QoS ─────────────────────────────────────────────
         action_qos = QoSProfile(
             reliability=ReliabilityPolicy.RELIABLE,
             durability=DurabilityPolicy.TRANSIENT_LOCAL,
@@ -105,7 +101,6 @@ class RobotLedStatusNode(Node):
             depth=1,
         )
 
-        # ── Subscribers ──────────────────────────────────────
         for topic in ('/navigate_to_pose/_action/status',
                       '/navigate_through_poses/_action/status'):
             self.create_subscription(
@@ -118,17 +113,13 @@ class RobotLedStatusNode(Node):
         self.create_subscription(Bool,          '/session_active',         self._session_cb, 10)
         self.create_subscription(String,        '/led_command',            self._manual_cb,  10)
 
-        # ── Publisher ────────────────────────────────────────
         self._pub_state = self.create_publisher(String, '/led_state', 10)
 
-        # ── Timers ───────────────────────────────────────────
         self.create_timer(self._heartbeat_secs, self._heartbeat)
 
-        # ── ESP32 reader thread ─────────────────────────────
         self._reader = threading.Thread(target=self._read_serial, daemon=True)
         self._reader.start()
 
-        # ── Boot state: no session yet ───────────────────────
         self._send_command('standby', force=True)
         self.get_logger().info('Robot LED status node started (standby until session).')
 
@@ -319,8 +310,8 @@ class RobotLedStatusNode(Node):
             except serial.SerialException:
                 with self._ser_lock:
                     self._ser = None
-            except Exception:
-                pass
+            except Exception as e:
+                self.get_logger().debug(f'Ignored background read exception: {e}')
 
     # ═══════════════════════════════════════════════════════
     #  CLEANUP
@@ -334,8 +325,8 @@ class RobotLedStatusNode(Node):
                 try:
                     self._ser.write(b'standby\n')
                     self._ser.close()
-                except Exception:
-                    pass
+                except Exception as e:
+                    self.get_logger().debug(f'Ignored serial write standby exception: {e}')
                 self._ser = None
         super().destroy_node()
 
@@ -346,13 +337,11 @@ def main(args=None):
         node = RobotLedStatusNode()
         rclpy.spin(node)
     except KeyboardInterrupt:
+        # Exit cleanly on user interruption
         pass
     finally:
-        if rclpy.ok():
-            try:
-                node.destroy_node()
-            except Exception:
-                pass
+        if rclpy.ok() and 'node' in locals():
+            node.destroy_node()
         rclpy.shutdown()
 
 

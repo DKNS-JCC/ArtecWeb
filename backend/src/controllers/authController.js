@@ -10,11 +10,26 @@ const SALT_ROUNDS = 10;
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-// ──────── PUBLIC: Create Visitor Session ────────
+// Promise Helpers for Database
+const dbGet = (sql, params = []) => new Promise((resolve, reject) => {
+    db.get(sql, params, (err, row) => {
+        if (err) reject(err);
+        else resolve(row);
+    });
+});
+
+
+const dbRun = (sql, params = []) => new Promise((resolve, reject) => {
+    db.run(sql, params, function (err) {
+        if (err) reject(err);
+        else resolve(this);
+    });
+});
+
 const VALID_EXPERTISE_LEVELS = ['nino', 'general', 'estudiante', 'experto'];
 const VALID_LANGUAGES = ['es', 'en', 'fr', 'de', 'it'];
 
-exports.createVisitor = (req, res) => {
+exports.createVisitor = async (req, res) => {
     const { robotId, name, expertiseLevel, language } = req.body;
 
     if (!robotId) {
@@ -29,12 +44,8 @@ exports.createVisitor = (req, res) => {
     const now = new Date();
     const newLockTime = new Date(now.getTime() + 10 * 60000).toISOString();
 
-    // ── Pre-flight: the robot must actually be online before we reserve it. ──
-    // Otherwise the visitor gets a session against an offline robot and only
-    // discovers it when navigation later fails. We attempt the connection and
-    // wait for a real result (outside the transaction, so no write lock is held).
-    db.get('SELECT id, ip FROM robots WHERE id = ?', [robotId], async (preErr, preRobot) => {
-        if (preErr)    return res.status(500).json({ error: 'Error verificando el robot' });
+    try {
+        const preRobot = await dbGet('SELECT id, ip FROM robots WHERE id = ?', [robotId]);
         if (!preRobot) return res.status(404).json({ error: 'Robot no válido o no encontrado' });
 
         let online = rosService.getConnectionState(preRobot.id);
@@ -46,83 +57,70 @@ exports.createVisitor = (req, res) => {
             return res.status(503).json({ error: 'El robot no está disponible en este momento. Puede estar apagado o sin conexión. Inténtalo de nuevo en unos minutos.' });
         }
 
-        reserveRobot();
-    });
+        await reserveRobot();
+    } catch (preErr) {
+        console.error('Error verificando robot:', preErr);
+        return res.status(500).json({ error: 'Error verificando el robot' });
+    }
 
     // Use IMMEDIATE transaction to prevent race conditions on robot locking
-    function reserveRobot() {
-    db.run('BEGIN IMMEDIATE', (beginErr) => {
-        if (beginErr) return res.status(500).json({ error: 'Error interno del servidor' });
+    async function reserveRobot() {
+        try {
+            await dbRun('BEGIN IMMEDIATE');
 
-        db.get('SELECT id, name, museum_id, ip, locked_until FROM robots WHERE id = ?', [robotId], (err, robot) => {
-            if (err || !robot) {
-                return db.run('ROLLBACK', () => {
-                    if (err) return res.status(500).json({ error: 'Error verificando el robot' });
-                    res.status(404).json({ error: 'Robot no válido o no encontrado' });
-                });
+            const robot = await dbGet('SELECT id, name, museum_id, ip, locked_until FROM robots WHERE id = ?', [robotId]);
+            if (!robot) {
+                await dbRun('ROLLBACK');
+                return res.status(404).json({ error: 'Robot no válido o no encontrado' });
             }
 
             if (robot.locked_until && new Date(robot.locked_until) > now) {
-                return db.run('ROLLBACK', () => {
-                    res.status(403).json({ error: 'Este robot ya está siendo utilizado por otro visitante. Por favor, espera a que termine su visita.' });
-                });
+                await dbRun('ROLLBACK');
+                return res.status(403).json({ error: 'Este robot ya está siendo utilizado por otro visitante. Por favor, espera a que termine su visita.' });
             }
 
-            db.run('UPDATE robots SET locked_until = ?, current_visitor_id = ? WHERE id = ?', [newLockTime, visitorId, robot.id], (updErr) => {
-                if (updErr) {
-                    return db.run('ROLLBACK', () => {
-                        res.status(500).json({ error: 'Error reservando el robot' });
-                    });
-                }
+            await dbRun('UPDATE robots SET locked_until = ?, current_visitor_id = ? WHERE id = ?', [newLockTime, visitorId, robot.id]);
 
-                db.run(
-                    `INSERT INTO visitors (id, session_id, robot_id, name, expertise_level, language) VALUES (?, ?, ?, ?, ?, ?)`,
-                    [visitorId, sessionId, robot.id, visitorName, visitorExpertise, visitorLanguage],
-                    function (insErr) {
-                        if (insErr) {
-                            return db.run('ROLLBACK', () => {
-                                console.error('VISITOR ERROR:', insErr);
-                                res.status(500).json({ error: 'Error creating visitor session' });
-                            });
-                        }
+            await dbRun(
+                `INSERT INTO visitors (id, session_id, robot_id, name, expertise_level, language) VALUES (?, ?, ?, ?, ?, ?)`,
+                [visitorId, sessionId, robot.id, visitorName, visitorExpertise, visitorLanguage]
+            );
 
-                        db.run('COMMIT', (commitErr) => {
-                            if (commitErr) {
-                                return db.run('ROLLBACK', () => {
-                                    res.status(500).json({ error: 'Error interno del servidor' });
-                                });
-                            }
+            await dbRun('COMMIT');
 
-                            const token = jwt.sign(
-                                {
-                                    id: visitorId,
-                                    session_id: sessionId,
-                                    role: 'visitor',
-                                    robot_id: robot.id,
-                                    robot_name: robot.name,
-                                    museum_id: robot.museum_id,
-                                    name: visitorName,
-                                    expertise_level: visitorExpertise,
-                                    language: visitorLanguage
-                                },
-                                JWT_SECRET,
-                                { expiresIn: '12h' }
-                            );
+            const token = jwt.sign(
+                {
+                    id: visitorId,
+                    session_id: sessionId,
+                    role: 'visitor',
+                    robot_id: robot.id,
+                    robot_name: robot.name,
+                    museum_id: robot.museum_id,
+                    name: visitorName,
+                    expertise_level: visitorExpertise,
+                    language: visitorLanguage
+                },
+                JWT_SECRET,
+                { expiresIn: '12h' }
+            );
 
-                            res.status(201).json({
-                                message: 'Visitor session created',
-                                token,
-                                visitor: { id: visitorId, session_id: sessionId, role: 'visitor', robot_id: robot.id, robot_name: robot.name, name: visitorName, expertise_level: visitorExpertise, language: visitorLanguage }
-                            });
-
-                            // Wake the robot LEDs - a visitor is now active
-                            rosService.publishSessionActive(robot.id, true);
-                        });
-                    }
-                );
+            res.status(201).json({
+                message: 'Visitor session created',
+                token,
+                visitor: { id: visitorId, session_id: sessionId, role: 'visitor', robot_id: robot.id, robot_name: robot.name, name: visitorName, expertise_level: visitorExpertise, language: visitorLanguage }
             });
-        });
-    });
+
+            // Wake the robot LEDs - a visitor is now active
+            rosService.publishSessionActive(robot.id, true);
+        } catch (err) {
+            console.error('VISITOR ERROR:', err);
+            try {
+                await dbRun('ROLLBACK');
+            } catch (rollErr) {
+                console.warn('Rollback failed:', rollErr.message);
+            }
+            res.status(500).json({ error: 'Error reservando el robot' });
+        }
     }
 };
 
@@ -312,7 +310,6 @@ exports.createStaff = async (req, res) => {
     try {
         const passwordHash = await bcrypt.hash(tempPassword, SALT_ROUNDS);
 
-        // Fetch museum name for the email
         db.get('SELECT name FROM museums WHERE id = ?', [assignedMuseumId], (err, museumRow) => {
             if (err) return res.status(500).json({ error: 'Error checking museum' });
             if (!museumRow) return res.status(404).json({ error: 'Museum not found' });

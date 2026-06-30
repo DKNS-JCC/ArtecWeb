@@ -12,7 +12,7 @@ module.exports.authMiddleware = (req, res, next) => {
     try {
         req.user = jwt.verify(token, JWT_SECRET);
         next();
-    } catch (err) {
+    } catch {
         res.status(401).json({ error: 'Token is not valid' });
     }
 };

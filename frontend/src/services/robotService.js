@@ -69,7 +69,6 @@ export const robotService = /** @lends module:services/robotService.robotService
         return api.post(`/robots/${id}/force-end`)
     },
 
-    // ── ROS navigation ────────────────────────────────────────────────────────
 
     /**
      * Send a Nav2 goal pose.
@@ -101,7 +100,6 @@ export const robotService = /** @lends module:services/robotService.robotService
         return api.post(`/robots/${id}/go-to-base`, {})
     },
 
-    // ── ROS sensor data ───────────────────────────────────────────────────────
 
     /**
      * Obtiene el último mapa de ocupación (`/map`, OccupancyGrid).

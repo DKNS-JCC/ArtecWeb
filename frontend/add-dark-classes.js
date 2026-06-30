@@ -35,7 +35,6 @@ function processDirectory(dir) {
 
             if (content !== newContent) {
                 fs.writeFileSync(fullPath, newContent, 'utf8')
-                console.log(`Updated ${file}`)
             }
         }
     }

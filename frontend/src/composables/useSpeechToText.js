@@ -138,7 +138,6 @@ export function useSpeechToText() {
     }
 }
 
-// ── Audio conversion helpers ───────────────────────────────────────────────────
 
 /**
  * Decodes a recorded audio Blob (webm/opus, mp4/aac…), downsamples it to

@@ -21,7 +21,6 @@ class RosService extends EventEmitter {
         this.robots = new Map();
     }
 
-    // ── Internal helpers ──────────────────────────────────────────────────────
 
     async _ensureRoslib() {
         if (!ROSLIB) {
@@ -39,7 +38,6 @@ class RosService extends EventEmitter {
         this.emit('robot:update', { robotId, fields, timestamp: Date.now() });
     }
 
-    // ── Connection management ─────────────────────────────────────────────────
 
     async connect(robotId, ip, port = 9090) {
         await this._ensureRoslib();
@@ -138,7 +136,6 @@ class RosService extends EventEmitter {
         });
     }
 
-    // ── Topic initialisation ──────────────────────────────────────────────────
 
     _initTopics(robotId, robotState) {
         // ── Teleoperation (/cmd_vel_smoothed)
@@ -242,7 +239,7 @@ class RosService extends EventEmitter {
 
     _subscribeMap(robotState) {
         if (robotState.topics.map) {
-            try { robotState.topics.map.unsubscribe(); } catch (_) {}
+            try { robotState.topics.map.unsubscribe(); } catch (_) { /* ignore */ }
         }
         robotState.topics.map = new ROSLIB.Topic({
             ros:         robotState.ros,
@@ -263,7 +260,6 @@ class RosService extends EventEmitter {
         });
     }
 
-    // ── Navigation ────────────────────────────────────────────────────────────
 
     /**
      * Fire a Nav2 goal. `meta` (optional) describes the goal so the navStatus
@@ -289,7 +285,7 @@ class RosService extends EventEmitter {
         // Remember what this goal is for, so we can attribute the terminal result
         // to it. `ts` lets the status handler ignore a stale terminal status from
         // the *previous* goal that may still be the last list entry momentarily.
-        robot.activeGoal = { ...(meta || {}), x, y, ts: Date.now() };
+        robot.activeGoal = { ...meta, x, y, ts: Date.now() };
         // A fresh goal clears the previous failure marker shown on the dashboard.
         db.run(`UPDATE robots SET last_nav_error_at = NULL, last_nav_error_place = NULL WHERE id = ?`, [robotId]);
     }
@@ -305,7 +301,7 @@ class RosService extends EventEmitter {
         // An all-zero goal_id cancels every active goal for this action server.
         const request = {
             goal_info: {
-                goal_id: { uuid: new Array(16).fill(0) },
+                goal_id: { uuid: Array.from({ length: 16 }, () => 0) },
                 stamp:   { sec: 0, nanosec: 0 },
             },
         };
@@ -322,7 +318,6 @@ class RosService extends EventEmitter {
         });
     }
 
-    // ── Data accessors ────────────────────────────────────────────────────────
 
     getMap(robotId) {
         const robot = this.robots.get(robotId);
@@ -343,7 +338,7 @@ class RosService extends EventEmitter {
                 if (settled) return;
                 settled = true;
                 clearTimeout(timer);
-                try { topic.unsubscribe(); } catch (_) {}
+                try { topic.unsubscribe(); } catch (_) { /* ignore */ }
                 if (err) reject(err);
                 else resolve(result);
             };
@@ -400,7 +395,6 @@ class RosService extends EventEmitter {
         return robot.latestScan ?? null;
     }
 
-    // ── Session active signal ─────────────────────────────────────────────────
 
     /**
      * Publishes std_msgs/Bool to /session_active on the robot.
@@ -421,7 +415,6 @@ class RosService extends EventEmitter {
         console.log(`[ROS] /session_active → ${isActive} (robot ${robotId})`);
     }
 
-    // ── Session expiry monitor ────────────────────────────────────────────────
 
     /**
      * Runs every 60 s. If a robot's visitor lock has expired but the DB still

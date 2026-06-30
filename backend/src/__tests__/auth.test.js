@@ -22,7 +22,6 @@ jest.mock('../services/rosService', () => ({
     on:                   jest.fn(),
 }));
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
 
 let museum, adminUser, superAdminUser, robot;
 
@@ -44,7 +43,6 @@ afterAll(done => {
     db.close(done);
 });
 
-// ─── POST /api/auth/login ──────────────────────────────────────────────────────
 
 describe('POST /api/auth/login', () => {
     test('logs in with valid username + password', async () => {
@@ -92,7 +90,6 @@ describe('POST /api/auth/login', () => {
     });
 });
 
-// ─── POST /api/auth/visitor ───────────────────────────────────────────────────
 
 describe('POST /api/auth/visitor', () => {
     test('creates a visitor session for a free robot', async () => {
@@ -147,7 +144,6 @@ describe('POST /api/auth/visitor', () => {
     });
 });
 
-// ─── POST /api/auth/change-password ──────────────────────────────────────────
 
 describe('POST /api/auth/change-password', () => {
     let userForPwChange, token;
@@ -212,7 +208,6 @@ describe('POST /api/auth/change-password', () => {
     });
 });
 
-// ─── GET /api/admin/users ─────────────────────────────────────────────────────
 
 describe('GET /api/admin/users', () => {
     test('museum admin can list users in their museum', async () => {
@@ -242,7 +237,6 @@ describe('GET /api/admin/users', () => {
     });
 });
 
-// ─── POST /api/admin/create-staff ─────────────────────────────────────────────
 
 describe('POST /api/admin/create-staff', () => {
     test('museum admin can create a technician', async () => {
@@ -283,7 +277,6 @@ describe('POST /api/admin/create-staff', () => {
     });
 });
 
-// ─── GET /api/auth/visitor/status ─────────────────────────────────────────────
 
 describe('GET /api/auth/visitor/status', () => {
     test('returns active:true for an active visitor', async () => {

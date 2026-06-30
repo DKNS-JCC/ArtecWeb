@@ -6,7 +6,6 @@ const { clearAllTables, createMuseum, createRobot, createVisitor, lockRobot } = 
 
 const JWT_SECRET = process.env.JWT_SECRET;
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function mockReq(overrides = {}) {
     return { header: (h) => overrides.header?.(h) ?? null, ...overrides };
@@ -23,7 +22,6 @@ const next = jest.fn();
 
 beforeEach(() => next.mockClear());
 
-// ─── authMiddleware ────────────────────────────────────────────────────────────
 
 describe('authMiddleware', () => {
     test('calls next() with valid token', () => {
@@ -67,7 +65,6 @@ describe('authMiddleware', () => {
     });
 });
 
-// ─── adminMiddleware ──────────────────────────────────────────────────────────
 
 describe('adminMiddleware', () => {
     test('passes for museum_admin', () => {
@@ -98,7 +95,6 @@ describe('adminMiddleware', () => {
     });
 });
 
-// ─── superAdminMiddleware ─────────────────────────────────────────────────────
 
 describe('superAdminMiddleware', () => {
     test('passes for platform_admin', () => {
@@ -115,7 +111,6 @@ describe('superAdminMiddleware', () => {
     });
 });
 
-// ─── visitorMiddleware ────────────────────────────────────────────────────────
 
 describe('visitorMiddleware', () => {
     let museum, robot, visitor;

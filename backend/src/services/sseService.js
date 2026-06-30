@@ -22,13 +22,10 @@ const { findNearestZone } = require('../utils/geo');
 // clients: Map<res, { museumId: string|null, isSuperAdmin: boolean }>
 const clients = new Map();
 
-// positionClients: Map<res, { robotId: string }> - visitor map overlays that
-// only need their assigned robot's live pose (replaces the 3 s HTTP poll).
 const positionClients = new Map();
 
 const HEARTBEAT_MS = 25_000;
 
-// ── Helpers ───────────────────────────────────────────────────────────────────
 
 function send(res, event, data) {
     try {
@@ -98,7 +95,6 @@ async function broadcastRobot(robotId) {
     }
 }
 
-// ── Visitor position stream ─────────────────────────────────────────────────
 
 function dbGetPosition(robotId) {
     return new Promise((resolve) => {
@@ -138,7 +134,6 @@ function broadcastNav(robotId, payload) {
     }
 }
 
-// ── rosService event listeners ────────────────────────────────────────────────
 
 rosService.on('robot:update', ({ robotId }) => {
     broadcastRobot(robotId);
@@ -170,7 +165,6 @@ rosService.on('robot:nav_result', async ({ robotId, outcome, goal }) => {
     }
 });
 
-// ── Public API ────────────────────────────────────────────────────────────────
 
 /**
  * Register a new SSE client.

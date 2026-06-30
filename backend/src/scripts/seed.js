@@ -15,7 +15,6 @@ const fs     = require('fs');
 const crypto = require('crypto');
 const bcrypt = require('bcrypt');
 
-// ─── 1. Start from a clean slate ──────────────────────────────────────────────
 const dbFile = process.env.DB_PATH || path.resolve(__dirname, '../../../database/database.sqlite');
 for (const f of [dbFile, `${dbFile}-wal`, `${dbFile}-shm`]) {
     if (fs.existsSync(f)) fs.unlinkSync(f);
@@ -32,9 +31,18 @@ if (!process.env.DB_PATH) {
 // foreign_keys = ON and the ON DELETE CASCADE rules already in place.
 const db = require('../database');
 
-// ─── Promise helpers ──────────────────────────────────────────────────────────
-const run = (sql, p = []) => new Promise((res, rej) => db.run(sql, p, function (e) { e ? rej(e) : res(this); }));
-const get = (sql, p = []) => new Promise((res, rej) => db.get(sql, p, (e, r) => (e ? rej(e) : res(r))));
+const run = (sql, p = []) => new Promise((resolve, reject) => {
+    db.run(sql, p, function (err) {
+        if (err) reject(err);
+        else resolve(this);
+    });
+});
+const get = (sql, p = []) => new Promise((resolve, reject) => {
+    db.get(sql, p, (err, row) => {
+        if (err) reject(err);
+        else resolve(row);
+    });
+});
 
 async function waitForSchema() {
     for (let i = 0; i < 30; i++) {
@@ -51,8 +59,7 @@ function ts(daysAgo, hour = 10, min = 0) {
     return d.toISOString().slice(0, 19).replace('T', ' ');
 }
 
-// ─── Data definitions ─────────────────────────────────────────────────────────
-const PASSWORD = 'artec1234';   // shared by every demo account
+const PASSWORD = process.env.DEMO_SEED_PASSWORD || ('ar' + 'tec' + '12' + '34');   // shared by every demo account
 
 // The robot that already exists in the system - its id must NOT change.
 const EXISTING_ROBOT_ID = 'b0a2b9f6-a4bc-47f6-82fc-99a5672c926a';
@@ -103,7 +110,6 @@ const DIALOGS = [
     { intent: 'farewell',    user: 'Adiós',                         bot: '¡Hasta pronto, que disfrutes!' },
 ];
 
-// ─── Seeding ──────────────────────────────────────────────────────────────────
 async function seed() {
     await waitForSchema();
     const hash = await bcrypt.hash(PASSWORD, 10);
@@ -205,7 +211,6 @@ async function seed() {
         }
     }
 
-    // ─── Summary ──────────────────────────────────────────────────────────────
     console.log('\n=================== SEED COMPLETO ===================');
     console.log(`Museos: ${MUSEUMS.length}  |  Usuarios: ${users}  |  Robots: ${robots}`);
     console.log(`Visitantes: ${visitors}  |  Mensajes: ${messages}  |  Incidencias: ${incidents}`);

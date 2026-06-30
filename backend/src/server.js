@@ -25,13 +25,12 @@ app.use(cors());
 app.use(express.json({ limit: '5mb' }));
 app.use(limiter);
 
-
 // Servir la carpeta uploads estáticamente
 app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
 
 // Main welcome route for backend root
 app.get('/', (req, res) => {
-  res.json({ message: 'API activa!!!!!!!!!' });
+  res.json({ message: 'API activa' });
 });
 
 // API Routes
@@ -75,7 +74,6 @@ try {
   app.get('/api/docs.json', (req, res) => res.json(swaggerSpec));
   app.get(['/api/docs', '/api/docs/'], (req, res) => res.type('html').send(swaggerHtml));
   app.use('/api/docs', express.static(swaggerAssets, { index: false }));
-  console.log('Swagger UI disponible en /api/docs');
 } catch (err) {
   console.warn('[docs] Swagger UI no disponible:', err.message,
     '\n        Ejecuta "npm install" y "npm run docs:api" para habilitar /api/docs.');
@@ -89,7 +87,7 @@ app.use((req, res) => {
 // Start Server (skip in test mode - supertest handles binding)
 if (process.env.NODE_ENV !== 'test') {
   app.listen(PORT, "0.0.0.0", () => {
-    console.log(`Preparen sus roombas que el backend esta on fire`);
+    console.log(`Servidor en el puerto ${PORT}`);
   });
   cleanupService.start();
 }

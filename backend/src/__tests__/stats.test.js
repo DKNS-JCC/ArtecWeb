@@ -15,7 +15,6 @@ jest.mock('../services/rosService', () => ({
     on:                 jest.fn(),   // rosService is an EventEmitter (sseService subscribes)
 }));
 
-// ─── State ────────────────────────────────────────────────────────────────────
 
 let museum, superAdmin, adminUser, superToken, adminToken;
 
@@ -49,7 +48,6 @@ beforeAll(async () => {
 
 afterAll(done => { db.close(() => done()); });
 
-// ─── GET /api/admin/stats ─────────────────────────────────────────────────────
 
 describe('GET /api/admin/stats', () => {
     test('platform admin gets global stats with totalMuseums', async () => {

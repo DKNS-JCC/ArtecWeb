@@ -6,21 +6,25 @@ const { sendPasswordResetEmail } = require('../utils/emailService');
 const SALT_ROUNDS   = 10;
 const TOKEN_TTL_MS  = 60 * 60 * 1000; // 1 hour
 
-// ─── DB Helpers ───────────────────────────────────────────────────────────────
 
 function dbGet(sql, params) {
-    return new Promise((resolve, reject) =>
-        db.get(sql, params, (err, row) => err ? reject(err) : resolve(row))
-    );
+    return new Promise((resolve, reject) => {
+        db.get(sql, params, (err, row) => {
+            if (err) reject(err);
+            else resolve(row);
+        });
+    });
 }
 
 function dbRun(sql, params) {
-    return new Promise((resolve, reject) =>
-        db.run(sql, params, function (err) { err ? reject(err) : resolve(this); })
-    );
+    return new Promise((resolve, reject) => {
+        db.run(sql, params, function (err) {
+            if (err) reject(err);
+            else resolve(this);
+        });
+    });
 }
 
-// ─── POST /api/auth/forgot-password ──────────────────────────────────────────
 // Accepts an email address and - if it matches a staff account - sends a
 // password-reset link. Always returns 200 to prevent email enumeration.
 
@@ -68,7 +72,6 @@ exports.forgotPassword = async (req, res) => {
     }
 };
 
-// ─── POST /api/auth/reset-password ───────────────────────────────────────────
 // Validates the token and updates the user's password.
 
 exports.resetPassword = async (req, res) => {

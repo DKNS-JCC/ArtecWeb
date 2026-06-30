@@ -9,21 +9,25 @@ const jwt     = require('jsonwebtoken');
 const JWT_SECRET   = process.env.JWT_SECRET;
 const SALT_ROUNDS  = 1; // Minimal rounds for test speed
 
-// ─── DB Promise Helpers ───────────────────────────────────────────────────────
 
 function dbRun(db, sql, params = []) {
     return new Promise((resolve, reject) => {
-        db.run(sql, params, function (err) { err ? reject(err) : resolve(this); });
+        db.run(sql, params, function (err) {
+            if (err) reject(err);
+            else resolve(this);
+        });
     });
 }
 
 function dbGet(db, sql, params = []) {
     return new Promise((resolve, reject) => {
-        db.get(sql, params, (err, row) => err ? reject(err) : resolve(row));
+        db.get(sql, params, (err, row) => {
+            if (err) reject(err);
+            else resolve(row);
+        });
     });
 }
 
-// ─── Truncate helpers ─────────────────────────────────────────────────────────
 
 /**
  * Waits for the DB schema to be ready (sqlite3 initialises asynchronously).
@@ -49,7 +53,6 @@ async function clearAllTables(db) {
     }
 }
 
-// ─── Entity creators ──────────────────────────────────────────────────────────
 
 async function createMuseum(db, overrides = {}) {
     const id   = overrides.id   || crypto.randomUUID();
@@ -132,7 +135,6 @@ async function createZone(db, overrides = {}) {
     return { id, map_id: mapId, name, description, map_x: mapX, map_y: mapY };
 }
 
-// ─── Token generators ─────────────────────────────────────────────────────────
 
 function makeAdminToken(user) {
     return jwt.sign(

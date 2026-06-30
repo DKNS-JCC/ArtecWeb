@@ -91,7 +91,6 @@ void runAnimation() {
   }
 }
 
-// ── IDLE ─────────────────────────────────────────────────────
 void animIdle() {
   unsigned long t     = millis();
   float         phase = (float)(t % 3000) / 3000.0f;
@@ -104,7 +103,6 @@ void animIdle() {
   FastLED.show();
 }
 
-// ── NAVIGATE ─────────────────────────────────────────────────
 void animNavigate() {
   static const int TAIL_LEN = 22;
   unsigned long t   = millis();
@@ -128,7 +126,6 @@ void animNavigate() {
   FastLED.show();
 }
 
-// ── SUCCESS ──────────────────────────────────────────────────
 void animSuccess() {
   unsigned long elapsed = millis() - stateMs;
   if (elapsed < 800) {
@@ -147,7 +144,6 @@ void animSuccess() {
   FastLED.show();
 }
 
-// ── ERROR ────────────────────────────────────────────────────
 void animError() {
   unsigned long elapsed = millis() - stateMs;
   if (elapsed < 1500) {
@@ -164,7 +160,6 @@ void animError() {
   FastLED.show();
 }
 
-// ── CHARGING ─────────────────────────────────────────────────
 void animCharging() {
   static const int   BAND  = 20;
   static const float CYCLE = 1800.0f;
@@ -193,7 +188,6 @@ void animCharging() {
   FastLED.show();
 }
 
-// ── STANDBY ──────────────────────────────────────────────────
 void animStandby() {
   fill_solid(leds, NUM_LEDS, CRGB::Black);
   FastLED.show();

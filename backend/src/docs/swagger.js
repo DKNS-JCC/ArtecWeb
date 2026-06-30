@@ -49,7 +49,6 @@ const PUBLIC = [
 // Verbo legible para construir un resumen aproximado de cada operación.
 const VERB = { get: 'Consultar', post: 'Enviar', put: 'Actualizar', patch: 'Modificar', delete: 'Eliminar' };
 
-// ── Helpers de enriquecimiento ──
 const jsonBody = (properties, required, example) => ({
   required: true,
   content: { 'application/json': { schema: { type: 'object', required: required || [], properties }, example } },
@@ -60,7 +59,6 @@ const multipartBody = (properties, required) => ({
 });
 const r = (description, example) => ({ description, content: { 'application/json': { example } } });
 
-// ── Enriquecimiento manual de los endpoints más importantes ──
 // Clave: "METHOD /ruta" (con la ruta en formato OpenAPI, p. ej. {id}).
 const ENRICH = {
   'POST /auth/login': {
@@ -69,7 +67,7 @@ const ENRICH = {
     requestBody: jsonBody(
       { identifier: { type: 'string', description: 'Nombre de usuario o correo electrónico' }, password: { type: 'string' } },
       ['identifier', 'password'],
-      { identifier: 'admin', password: 'TuContrasena123' }
+      { identifier: 'admin', password: 'password_ejemplo' }
     ),
     responses: {
       200: r('Inicio de sesión correcto', { message: 'Login successful', token: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...', must_change_password: false, user: { id: 'a1b2c3', name: 'admin', email: 'admin@museo.es', role: 'museum_admin', avatar: null, museum_id: 'm-001' } }),
@@ -111,7 +109,7 @@ const ENRICH = {
     requestBody: jsonBody(
       { token: { type: 'string', description: 'Token recibido en el enlace del correo' }, new_password: { type: 'string', description: 'Mínimo 6 caracteres' } },
       ['token', 'new_password'],
-      { token: 'a1b2c3d4...', new_password: 'NuevaContrasena123' }
+      { token: 'a1b2c3d4...', new_password: 'nueva_contrasena_ejemplo' }
     ),
     responses: {
       200: r('Contraseña actualizada', { message: 'Password reset successfully' }),
@@ -124,7 +122,7 @@ const ENRICH = {
     requestBody: jsonBody(
       { current_password: { type: 'string' }, new_password: { type: 'string', description: 'Mínimo 6 caracteres' } },
       ['current_password', 'new_password'],
-      { current_password: 'Temporal123', new_password: 'NuevaContrasena123' }
+      { current_password: 'contrasena_actual_ejemplo', new_password: 'nueva_contrasena_ejemplo' }
     ),
     responses: {
       200: r('Contraseña cambiada', { message: 'Password changed successfully', token: 'eyJ...' }),

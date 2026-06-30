@@ -54,7 +54,6 @@ const LANGUAGE_NAMES = {
     it: 'Italian (italiano)',
 };
 
-// ─── Prompt Sanitization ──────────────────────────────────────────────────────
 
 /**
  * Strips control characters, JSON-breaking chars, and trims to maxLength.
@@ -103,7 +102,6 @@ function safeName(value, fallback, maxLength = 60) {
     return cleaned;
 }
 
-// ─── System Prompt Builder ────────────────────────────────────────────────────
 
 /**
  * Builds the system prompt in English and tells the model which language to
@@ -182,7 +180,6 @@ RESPOND ONLY with this exact JSON, no extra text:
 }`;
 }
 
-// ─── Gemini API Call ──────────────────────────────────────────────────────────
 
 async function callGemini(message, history, systemPrompt) {
     const contents = [];
@@ -255,7 +252,6 @@ async function callGemini(message, history, systemPrompt) {
     }
 }
 
-// ─── Response Validation ──────────────────────────────────────────────────────
 
 function validateResponse(parsed) {
     if (!parsed || typeof parsed !== 'object') {
@@ -286,7 +282,6 @@ function validateResponse(parsed) {
     return parsed;
 }
 
-// ─── Keyword Fallback ─────────────────────────────────────────────────────────
 
 const FALLBACK_RESPONSES = {
     es: {
@@ -379,7 +374,6 @@ function fallbackInterpret(message, language = 'es') {
     return { intent: 'none', params: {}, ...fallbacks.none };
 }
 
-// ─── Public API ───────────────────────────────────────────────────────────────
 
 async function interpret(message, history, context) {
     if (!GEMINI_API_KEY) {

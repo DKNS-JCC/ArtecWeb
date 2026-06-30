@@ -1,26 +1,33 @@
 const db = require('../database');
 
-// ─── DB Helpers ───────────────────────────────────────────────────────────────
 
 function dbAll(sql, params) {
-    return new Promise((resolve, reject) =>
-        db.all(sql, params, (err, rows) => err ? reject(err) : resolve(rows))
-    );
+    return new Promise((resolve, reject) => {
+        db.all(sql, params, (err, rows) => {
+            if (err) reject(err);
+            else resolve(rows);
+        });
+    });
 }
 
 function dbGet(sql, params) {
-    return new Promise((resolve, reject) =>
-        db.get(sql, params, (err, row) => err ? reject(err) : resolve(row))
-    );
+    return new Promise((resolve, reject) => {
+        db.get(sql, params, (err, row) => {
+            if (err) reject(err);
+            else resolve(row);
+        });
+    });
 }
 
 function dbRun(sql, params) {
-    return new Promise((resolve, reject) =>
-        db.run(sql, params, function (err) { err ? reject(err) : resolve(this); })
-    );
+    return new Promise((resolve, reject) => {
+        db.run(sql, params, function (err) {
+            if (err) reject(err);
+            else resolve(this);
+        });
+    });
 }
 
-// ─── GET /api/chat-history/sessions ──────────────────────────────────────────
 // Lists sessions (soft-deleted excluded). Supports robot_id, date_from, date_to filters.
 
 exports.listSessions = async (req, res) => {
@@ -107,7 +114,6 @@ exports.listSessions = async (req, res) => {
     }
 };
 
-// ─── GET /api/chat-history/sessions/:session_id/messages ─────────────────────
 // Returns the ordered conversation for one session (paginated, max 500).
 
 exports.getSessionMessages = async (req, res) => {
@@ -154,7 +160,6 @@ exports.getSessionMessages = async (req, res) => {
     }
 };
 
-// ─── DELETE /api/chat-history/sessions/:session_id ───────────────────────────
 // Soft-deletes a session: hidden in history, still counted in stats.
 
 exports.deleteSession = async (req, res) => {
@@ -188,7 +193,6 @@ exports.deleteSession = async (req, res) => {
     }
 };
 
-// ─── GET /api/chat-history/robots ─────────────────────────────────────────────
 // Convenience: list robots the admin can see (for the filter dropdown).
 
 exports.listRobotsForFilter = async (req, res) => {
@@ -203,7 +207,7 @@ exports.listRobotsForFilter = async (req, res) => {
             isSuperAdmin ? [] : [museumId]
         );
         res.json(rows);
-    } catch (err) {
+    } catch (_err) {
         res.status(500).json({ error: 'Error cargando robots' });
     }
 };

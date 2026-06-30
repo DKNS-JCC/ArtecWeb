@@ -6,7 +6,6 @@ const {
     createZone, makeVisitorToken, makeAdminToken, createUser
 } = require('./helpers/fixtures');
 
-// ─── Mock AI service ──────────────────────────────────────────────────────────
 // We isolate unit tests from the real Gemini API
 
 jest.mock('../services/aiService', () => ({
@@ -16,7 +15,6 @@ jest.mock('../services/aiService', () => ({
 
 const aiService = require('../services/aiService');
 
-// ─── Test state ───────────────────────────────────────────────────────────────
 
 let museum, robot, visitor, zone, visitorToken;
 
@@ -45,7 +43,6 @@ afterAll(done => { db.close(() => done()); });
 
 beforeEach(() => aiService.interpret.mockClear());
 
-// ─── POST /api/chat/message ───────────────────────────────────────────────────
 
 describe('POST /api/chat/message', () => {
     test('returns AI response for a valid message', async () => {

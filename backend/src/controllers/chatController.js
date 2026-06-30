@@ -7,27 +7,34 @@ const { findNearestZone, BASE_CATEGORY } = require('../utils/geo');
 const MAX_MESSAGE_LENGTH = 500;
 const HISTORY_LIMIT = 8;  // Slightly more context for better AI coherence
 
-// ─── DB Helpers ───────────────────────────────────────────────────────────────
 
 function dbGet(sql, params) {
     return new Promise((resolve, reject) => {
-        db.get(sql, params, (err, row) => err ? reject(err) : resolve(row));
+        db.get(sql, params, (err, row) => {
+            if (err) reject(err);
+            else resolve(row);
+        });
     });
 }
 
 function dbAll(sql, params) {
     return new Promise((resolve, reject) => {
-        db.all(sql, params, (err, rows) => err ? reject(err) : resolve(rows));
+        db.all(sql, params, (err, rows) => {
+            if (err) reject(err);
+            else resolve(rows);
+        });
     });
 }
 
 function dbRun(sql, params) {
     return new Promise((resolve, reject) => {
-        db.run(sql, params, function (err) { err ? reject(err) : resolve(this); });
+        db.run(sql, params, function (err) {
+            if (err) reject(err);
+            else resolve(this);
+        });
     });
 }
 
-// ─── Place Resolution ─────────────────────────────────────────────────────────
 
 /**
  * Resolves an AI-returned place_name to a known zone using:
@@ -53,7 +60,6 @@ function resolvePlace(placeName, places) {
     return match || null;
 }
 
-// ─── Handler ──────────────────────────────────────────────────────────────────
 
 /**
  * POST /api/chat/message
@@ -72,7 +78,6 @@ exports.handleMessage = async (req, res) => {
     }
 
     try {
-        // Load museum context
         const museum = await dbGet('SELECT name FROM museums WHERE id = ?', [museum_id]);
 
         // Load zones from the map assigned to the robot (if any).
@@ -94,7 +99,6 @@ exports.handleMessage = async (req, res) => {
         );
         const history = recentMessages.reverse();
 
-        // Build AI context
         const context = {
             robotName:      robot_name || 'Robot Guía',
             visitorName:    visitorName || 'Visitante',
@@ -109,7 +113,6 @@ exports.handleMessage = async (req, res) => {
         // Call AI service
         const aiResult = await aiService.interpret(message, history, context);
 
-        // ── Place resolution for navigate_to ──────────────────────────────
         let resolvedPlace = null;
         if (aiResult.intent === 'navigate_to') {
             const requestedName = aiResult.params?.place_name || '';
@@ -129,7 +132,6 @@ exports.handleMessage = async (req, res) => {
                 // AI suggested a place that doesn't exist - downgrade intent
                 aiResult.intent = 'none';
                 aiResult.confidence = 0.3;
-                // Build a helpful response listing available places
                 const availableNames = places.map(p => `"${p.name}"`).join(', ');
                 aiResult.response = availableNames.length > 0
                     ? `Lo siento, no conozco el lugar "${requestedName}". Los lugares disponibles en este museo son: ${availableNames}.`
@@ -137,7 +139,6 @@ exports.handleMessage = async (req, res) => {
             }
         }
 
-        // ── Persist messages ──────────────────────────────────────────────
         await dbRun(
             'INSERT INTO chat_messages (id, visitor_id, session_id, robot_id, role, content) VALUES (?,?,?,?,?,?)',
             [crypto.randomUUID(), visitorId, session_id, robot_id, 'user', message]
@@ -147,7 +148,6 @@ exports.handleMessage = async (req, res) => {
             [crypto.randomUUID(), visitorId, session_id, robot_id, 'assistant', aiResult.response, aiResult.intent]
         );
 
-        // ── Respond ───────────────────────────────────────────────────────
         res.json({
             response:       aiResult.response,
             intent:         aiResult.intent,

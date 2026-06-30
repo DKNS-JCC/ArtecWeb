@@ -20,7 +20,7 @@ const sendWelcomeEmail = async (toEmail, name, tempPassword, role, museumName) =
     const loginUrl = process.env.APP_URL || 'http://localhost:5173/login';
 
     try {
-        const info = await transporter.sendMail({
+        await transporter.sendMail({
             from: `"Artec Robotics" <${process.env.GMAIL_USER}>`,
             to: toEmail,
             subject: 'Bienvenido a Artec Robotics - Credenciales de Acceso',
@@ -51,7 +51,6 @@ const sendWelcomeEmail = async (toEmail, name, tempPassword, role, museumName) =
             `
         });
 
-        console.log('Welcome email sent:', info.messageId);
         return true;
     } catch (error) {
         console.error('Error sending welcome email:', error);
@@ -70,7 +69,7 @@ const sendPasswordResetEmail = async (toEmail, name, rawToken) => {
     const resetUrl = `${appUrl}/reset-password?token=${rawToken}`;
 
     try {
-        const info = await transporter.sendMail({
+        await transporter.sendMail({
             from:    `"Artec Robotics" <${process.env.GMAIL_USER}>`,
             to:      toEmail,
             subject: 'Recuperación de contraseña - Artec Robotics',
@@ -99,7 +98,6 @@ const sendPasswordResetEmail = async (toEmail, name, rawToken) => {
                 </div>
             `
         });
-        console.log('Password reset email sent:', info.messageId);
         return true;
     } catch (error) {
         console.error('Error sending password reset email:', error);

@@ -14,7 +14,6 @@ const API_BASE = import.meta.env.VITE_API_URL || '/api'
  * @memberof module:services/mapService
  */
 export const mapService = /** @lends module:services/mapService.mapService */ {
-    // ─── Maps ────────────────────────────────────────────────
     /**
      * Lista los mapas de un museo.
      * @param {string} museumId  Identificador del museo.
@@ -66,7 +65,6 @@ export const mapService = /** @lends module:services/mapService.mapService */ {
         return api.delete(`/maps/${mapId}`)
     },
 
-    // ─── Zones ───────────────────────────────────────────────
     /**
      * Lista las zonas de un mapa.
      * @param {string} mapId  Identificador del mapa.
@@ -117,7 +115,6 @@ export const mapService = /** @lends module:services/mapService.mapService */ {
         return api.post(`/robots/${robotId}/capture-map`, { name })
     },
 
-    // ─── Robot map assignment ─────────────────────────────────
     /**
      * Asigna un mapa a un robot.
      * @param {string} robotId  Identificador del robot.

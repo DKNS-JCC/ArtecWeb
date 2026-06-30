@@ -59,5 +59,4 @@ createServer(async (req, res) => {
   }
 }).listen(PORT, () => {
   console.log(`Documentación del frontend en  http://localhost:${PORT}/`)
-  console.log('Pulsa Ctrl+C para detener.')
 })

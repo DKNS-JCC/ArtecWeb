@@ -457,6 +457,24 @@ exports.listUsers = (req, res) => {
 const fs = require('fs');
 const path = require('path');
 
+/**
+ * Borra del disco el archivo de un avatar anterior, de forma segura: solo elimina
+ * dentro del directorio de avatares (evita path traversal) e ignora que el archivo
+ * ya no exista. No hace nada si no había avatar previo.
+ * @param {string|null} oldAvatar  URL relativa del avatar anterior (o null).
+ */
+function borrarAvatarAntiguo(oldAvatar) {
+    if (!oldAvatar) return;
+    const avatarsDir   = path.resolve(path.join(__dirname, '../../uploads/avatars'));
+    const resolvedFile = path.resolve(path.join(avatarsDir, oldAvatar.split('/').pop()));
+    if (!resolvedFile.startsWith(avatarsDir)) return;
+    fs.unlink(resolvedFile, (unlinkErr) => {
+        if (unlinkErr && unlinkErr.code !== 'ENOENT') {
+            console.error('Error borrando avatar antiguo:', unlinkErr);
+        }
+    });
+}
+
 exports.uploadAvatar = (req, res) => {
     const userId = req.user.id;
 
@@ -483,21 +501,8 @@ exports.uploadAvatar = (req, res) => {
                 return res.status(500).json({ error: 'Error interno guardando la imagen' });
             }
 
-            // Si había un avatar antiguo, borrar el archivo
-            if (oldAvatar) {
-                const oldFileName = oldAvatar.split('/').pop();
-                const oldFilePath = path.join(__dirname, '../../uploads/avatars', oldFileName);
-                // Sanea para borrar solo del directorio exacto
-                const resolvedDir = path.resolve(path.join(__dirname, '../../uploads/avatars'));
-                const resolvedFile = path.resolve(oldFilePath);
-                if (resolvedFile.startsWith(resolvedDir)) {
-                    fs.unlink(resolvedFile, (unlinkErr) => {
-                        if (unlinkErr && unlinkErr.code !== 'ENOENT') {
-                            console.error('Error borrando avatar antiguo:', unlinkErr);
-                        }
-                    });
-                }
-            }
+            // Si había un avatar antiguo, borrar el archivo del disco
+            borrarAvatarAntiguo(oldAvatar);
 
             res.json({
                 message: 'Avatar actualizado con éxito',
@@ -509,7 +514,6 @@ exports.uploadAvatar = (req, res) => {
 
 exports.deleteAvatar = (req, res) => {
     const userId = req.user.id;
-    const db = require('../database');
 
     db.get('SELECT avatar FROM users WHERE id = ?', [userId], (err, row) => {
         if (err) {
@@ -529,18 +533,7 @@ exports.deleteAvatar = (req, res) => {
                 return res.status(500).json({ error: 'Error actualizando base de datos' });
             }
 
-            const oldFileName = oldAvatar.split('/').pop();
-            const oldFilePath = path.join(__dirname, '../../uploads/avatars', oldFileName);
-            const resolvedDir = path.resolve(path.join(__dirname, '../../uploads/avatars'));
-            const resolvedFile = path.resolve(oldFilePath);
-
-            if (resolvedFile.startsWith(resolvedDir)) {
-                fs.unlink(resolvedFile, (unlinkErr) => {
-                    if (unlinkErr && unlinkErr.code !== 'ENOENT') {
-                        console.error('Error borrando archivo de avatar:', unlinkErr);
-                    }
-                });
-            }
+            borrarAvatarAntiguo(oldAvatar);
 
             res.json({
                 message: 'Avatar eliminado con éxito',

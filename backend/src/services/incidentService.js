@@ -1,37 +1,11 @@
 const crypto = require('crypto');
-const db = require('../database');
+const { dbGet, dbAll, dbRun } = require('../utils/db');
 
 /**
  * Registro de incidencias operativas. Ahora mismo registra fallos de navegación (un
  * goal de Nav2 que terminó ABORTED) para que los técnicos puedan revisarlos a posteriori,
  * aunque ningún administrador estuviera mirando el panel en vivo cuando ocurrió.
  */
-
-function dbGet(sql, params) {
-    return new Promise((resolve) => {
-        db.get(sql, params, (err, row) => {
-            resolve(err ? null : row);
-        });
-    });
-}
-
-function dbAll(sql, params) {
-    return new Promise((resolve, reject) => {
-        db.all(sql, params, (err, rows) => {
-            if (err) reject(err);
-            else resolve(rows || []);
-        });
-    });
-}
-
-function dbRun(sql, params) {
-    return new Promise((resolve, reject) => {
-        db.run(sql, params, function (err) {
-            if (err) reject(err);
-            else resolve(this);
-        });
-    });
-}
 
 /**
  * Registra un fallo de navegación y marca el robot para que el panel pueda mostrarlo

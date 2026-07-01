@@ -1,10 +1,7 @@
 const db = require('../database');
 const rosService = require('./rosService');
 const { BASE_CATEGORY } = require('../utils/geo');
-
-function dbGet(sql, params) {
-    return new Promise((resolve) => db.get(sql, params, (err, row) => resolve(err ? null : row)));
-}
+const { dbGet } = require('../utils/db');
 
 /**
  * Envía un robot al punto base de su mapa (su ubicación de origen / de retorno).
@@ -17,13 +14,18 @@ function dbGet(sql, params) {
  * @returns {Promise<Object>} Resultado con la forma: { ok: boolean, reason?: string, base?: object, error?: string }
  */
 async function sendRobotToBase(robotId) {
-    const robot = await dbGet('SELECT map_id, museum_id FROM robots WHERE id = ?', [robotId]);
-    if (!robot?.map_id) return { ok: false, reason: 'no_map' };
+    let robot, base;
+    try {
+        robot = await dbGet('SELECT map_id, museum_id FROM robots WHERE id = ?', [robotId]);
+        if (!robot?.map_id) return { ok: false, reason: 'no_map' };
 
-    const base = await dbGet(
-        'SELECT name, map_x, map_y FROM zones WHERE map_id = ? AND category = ? LIMIT 1',
-        [robot.map_id, BASE_CATEGORY]
-    );
+        base = await dbGet(
+            'SELECT name, map_x, map_y FROM zones WHERE map_id = ? AND category = ? LIMIT 1',
+            [robot.map_id, BASE_CATEGORY]
+        );
+    } catch (e) {
+        return { ok: false, reason: 'db_error', error: e.message };
+    }
     if (!base || base.map_x == null || base.map_y == null) return { ok: false, reason: 'no_base' };
 
     if (!rosService.getConnectionState(robotId)) return { ok: false, reason: 'not_connected' };

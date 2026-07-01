@@ -10,21 +10,7 @@ const SALT_ROUNDS = 10;
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-// Helpers de base de datos basados en promesas
-const dbGet = (sql, params = []) => new Promise((resolve, reject) => {
-    db.get(sql, params, (err, row) => {
-        if (err) reject(err);
-        else resolve(row);
-    });
-});
-
-
-const dbRun = (sql, params = []) => new Promise((resolve, reject) => {
-    db.run(sql, params, function (err) {
-        if (err) reject(err);
-        else resolve(this);
-    });
-});
+const { dbGet, dbRun } = require('../utils/db');
 
 const VALID_EXPERTISE_LEVELS = ['nino', 'general', 'estudiante', 'experto'];
 const VALID_LANGUAGES = ['es', 'en', 'fr', 'de', 'it'];

@@ -2,36 +2,11 @@ const crypto = require('crypto');
 const fs = require('fs');
 const path = require('path');
 const sharp = require('sharp');
-const db = require('../database');
 const rosService = require('../services/rosService');
 const zoneCache = require('../utils/zoneCache');
 const { BASE_CATEGORY } = require('../utils/geo');
 
-// Helpers de BD basados en promesas
-function dbGet(sql, params) {
-    return new Promise((resolve, reject) => {
-        db.get(sql, params, (err, row) => {
-            if (err) reject(err);
-            else resolve(row);
-        });
-    });
-}
-function dbAll(sql, params) {
-    return new Promise((resolve, reject) => {
-        db.all(sql, params, (err, rows) => {
-            if (err) reject(err);
-            else resolve(rows);
-        });
-    });
-}
-function dbRun(sql, params) {
-    return new Promise((resolve, reject) => {
-        db.run(sql, params, function (err) {
-            if (err) reject(err);
-            else resolve(this);
-        });
-    });
-}
+const { dbGet, dbAll, dbRun } = require('../utils/db');
 
 /**
  * Parsea un archivo YAML de map_saver de ROS para extraer la resolución y el origen.

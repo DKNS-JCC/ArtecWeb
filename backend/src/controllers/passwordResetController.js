@@ -1,29 +1,11 @@
 const crypto = require('crypto');
 const bcrypt = require('bcrypt');
-const db     = require('../database');
+const { dbGet, dbRun } = require('../utils/db');
 const { sendPasswordResetEmail } = require('../utils/emailService');
 
 const SALT_ROUNDS   = 10;
 const TOKEN_TTL_MS  = 60 * 60 * 1000; // 1 hora
 
-
-function dbGet(sql, params) {
-    return new Promise((resolve, reject) => {
-        db.get(sql, params, (err, row) => {
-            if (err) reject(err);
-            else resolve(row);
-        });
-    });
-}
-
-function dbRun(sql, params) {
-    return new Promise((resolve, reject) => {
-        db.run(sql, params, function (err) {
-            if (err) reject(err);
-            else resolve(this);
-        });
-    });
-}
 
 // Acepta una dirección de correo y - si coincide con una cuenta de personal - envía
 // un enlace de recuperación de contraseña. Siempre devuelve 200 para evitar la enumeración de correos.

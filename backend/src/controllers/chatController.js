@@ -1,5 +1,4 @@
 const crypto = require('crypto');
-const db = require('../database');
 const aiService = require('../services/aiService');
 const sttService = require('../services/sttService');
 const { findNearestZone, BASE_CATEGORY } = require('../utils/geo');
@@ -8,32 +7,7 @@ const MAX_MESSAGE_LENGTH = 500;
 const HISTORY_LIMIT = 8;  // Un poco más de contexto para mejorar la coherencia de la IA
 
 
-function dbGet(sql, params) {
-    return new Promise((resolve, reject) => {
-        db.get(sql, params, (err, row) => {
-            if (err) reject(err);
-            else resolve(row);
-        });
-    });
-}
-
-function dbAll(sql, params) {
-    return new Promise((resolve, reject) => {
-        db.all(sql, params, (err, rows) => {
-            if (err) reject(err);
-            else resolve(rows);
-        });
-    });
-}
-
-function dbRun(sql, params) {
-    return new Promise((resolve, reject) => {
-        db.run(sql, params, function (err) {
-            if (err) reject(err);
-            else resolve(this);
-        });
-    });
-}
+const { dbGet, dbAll, dbRun } = require('../utils/db');
 
 
 /**

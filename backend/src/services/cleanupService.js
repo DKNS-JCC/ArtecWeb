@@ -1,24 +1,15 @@
-const db = require('../database');
+const { dbRun } = require('../utils/db');
 
 const RETENTION_DAYS = Math.max(1, parseInt(process.env.CHAT_RETENTION_DAYS || '90'));
 const CLEANUP_INTERVAL_MS = 24 * 60 * 60 * 1000;
 
-function dbRun(sql, params = []) {
-    return new Promise((resolve, reject) => {
-        db.run(sql, params, function (err) {
-            if (err) reject(err);
-            else resolve(this.changes);
-        });
-    });
-}
-
 async function runCleanup() {
     const cutoff = `datetime('now', '-${RETENTION_DAYS} days')`;
     try {
-        const msgs = await dbRun(`DELETE FROM chat_messages WHERE created_at < ${cutoff}`);
-        const sessions = await dbRun(
+        const msgs = (await dbRun(`DELETE FROM chat_messages WHERE created_at < ${cutoff}`)).changes;
+        const sessions = (await dbRun(
             `DELETE FROM visitors WHERE ended_at IS NOT NULL AND ended_at < ${cutoff}`
-        );
+        )).changes;
         if (msgs > 0 || sessions > 0) {
             console.log(`[Cleanup] Removed ${msgs} messages, ${sessions} sessions (retention: ${RETENTION_DAYS}d)`);
         }

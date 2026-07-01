@@ -1,4 +1,4 @@
-﻿<script setup>
+<script setup>
 /**
  * @module components/MapTab
  * @description

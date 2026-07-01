@@ -109,27 +109,27 @@ const router = createRouter({
 router.beforeEach((to, from, next) => {
     const authStore = useAuthStore()
 
-    // 0. Force active visitors to stay in the chat until they end the session
+    // 1. Force active visitors to stay in the chat until they end the session
     if (authStore.isAuthenticated && authStore.isVisitor && to.name !== 'chat') {
         return next({ name: 'chat' })
     }
 
-    // 1. Protect any route requiring auth
+    // 2. Protect any route requiring auth
     if (to.meta.requiresAuth && !authStore.isAuthenticated) {
         return next({ name: 'login' })
     }
 
-    // 1.5 Protect staff routes (like profile) from visitors
+    // 3. Protect staff routes (like profile) from visitors
     if (to.meta.requiresStaff && authStore.user?.role === 'visitor') {
         return next({ name: 'home' })
     }
 
-    // 3. If authenticated admin with must_change_password, force them to change it
+    // 4. If authenticated admin with must_change_password, force them to change it
     if (authStore.isAuthenticated && authStore.mustChangePassword && to.name !== 'change-password') {
         return next({ name: 'change-password' })
     }
 
-    // 4. Already logged in → skip login pages
+    // 5. Already logged in → skip login pages
     if (to.name === 'login' && authStore.isAuthenticated && !authStore.mustChangePassword) {
         return next(authStore.isStaff ? { name: 'dashboard' } : { name: 'home' })
     }

@@ -33,8 +33,8 @@ async function getTranscriber() {
     if (!transcriberPromise) {
         transcriberPromise = (async () => {
             const { pipeline, env } = await import('@xenova/transformers');
-            // We only ever run local inference - never hit a remote inference API.
-            env.allowRemoteModels = true;   // allow first-time model download from the hub
+            // La inferencia siempre es local; solo se permite descargar el modelo del hub la primera vez y después funciona offline.
+            env.allowRemoteModels = true;   // permite la descarga inicial del modelo desde el hub
             env.allowLocalModels  = true;
             console.log(`[STT] Loading local Whisper model "${WHISPER_MODEL}" (first run downloads & caches it)...`);
             const asr = await pipeline('automatic-speech-recognition', WHISPER_MODEL);

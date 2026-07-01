@@ -242,7 +242,6 @@ async function callGemini(message, history, systemPrompt) {
         }
 
         const data = await res.json();
-        //console.log('[AI] response:', JSON.stringify(data));
         const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
         if (!text) throw new Error('Empty response from Gemini');
 

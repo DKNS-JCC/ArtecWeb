@@ -690,7 +690,6 @@ onUnmounted(() => {
                             <div v-else class="w-24 h-24 mx-auto flex items-center justify-center text-xs text-muted-foreground">Generando QR…</div>
                             <Button v-if="qrCodes[robot.id]" as="a" :href="qrCodes[robot.id]" :download="`qr-${robot.name || robot.id}.png`" size="sm" class="mt-2"
                             >Descargar</Button>
-                            -
                             <Button as="a" :href="buildVisitUrl(robot.id)" target="_blank" variant="outline" size="sm" class="mt-2"
                             >Chat</Button>
                         </div>

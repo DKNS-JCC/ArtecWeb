@@ -33,5 +33,8 @@ database/*.sqlite
 database/*.sqlite-*
 !database/.gitkeep
 
+# Documentación generada (se regenera con npm run docs:all)
+backend/src/docs/swagger-output.json
+
 /docs
 /ArtecWeb2_backup/

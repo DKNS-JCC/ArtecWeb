@@ -59,7 +59,7 @@ function ts(daysAgo, hour = 10, min = 0) {
     return d.toISOString().slice(0, 19).replace('T', ' ');
 }
 
-const PASSWORD = process.env.DEMO_SEED_PASSWORD || ('ar' + 'tec' + '12' + '34');   // shared by every demo account
+const PASSWORD = process.env.DEMO_SEED_PASSWORD || 'artec1234';   // shared by every demo account
 
 // The robot that already exists in the system - its id must NOT change.
 const EXISTING_ROBOT_ID = 'b0a2b9f6-a4bc-47f6-82fc-99a5672c926a';

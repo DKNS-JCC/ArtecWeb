@@ -80,8 +80,8 @@ exports.resetPassword = async (req, res) => {
     if (!token || !new_password) {
         return res.status(400).json({ error: 'Token y nueva contraseña son requeridos' });
     }
-    if (new_password.length < 6) {
-        return res.status(400).json({ error: 'La contraseña debe tener al menos 6 caracteres' });
+    if (new_password.length < 8) {
+        return res.status(400).json({ error: 'La contraseña debe tener al menos 8 caracteres' });
     }
 
     try {

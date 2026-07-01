@@ -5,7 +5,7 @@ const crypto = require('crypto');
 const rosService = require('../services/rosService');
 const navService = require('../services/navService');
 
-const JWT_SECRET = process.env.JWT_SECRET || 'super-secret-artec-key';
+const { JWT_SECRET } = require('../config/secrets');
 const SALT_ROUNDS = 10;
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -239,8 +239,8 @@ exports.changePassword = async (req, res) => {
     if (!current_password || !new_password) {
         return res.status(400).json({ error: 'La contraseña actual y la nueva son obligatorias' });
     }
-    if (new_password.length < 6) {
-        return res.status(400).json({ error: 'La nueva contraseña debe tener al menos 6 caracteres' });
+    if (new_password.length < 8) {
+        return res.status(400).json({ error: 'La nueva contraseña debe tener al menos 8 caracteres' });
     }
 
     db.get(`SELECT * FROM users WHERE id = ?`, [userId], async (err, user) => {

@@ -1,6 +1,6 @@
 const jwt = require('jsonwebtoken');
 
-const JWT_SECRET = process.env.JWT_SECRET || 'super-secret-artec-key';
+const { JWT_SECRET } = require('../config/secrets');
 
 module.exports.authMiddleware = (req, res, next) => {
     const authHeader = req.header('Authorization');

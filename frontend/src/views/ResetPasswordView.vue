@@ -35,8 +35,8 @@ onMounted(() => {
 
 const handleSubmit = async () => {
     error.value = ''
-    if (newPassword.value.length < 6) {
-        error.value = 'La contraseña debe tener al menos 6 caracteres.'
+    if (newPassword.value.length < 8) {
+        error.value = 'La contraseña debe tener al menos 8 caracteres.'
         return
     }
     if (newPassword.value !== confirm.value) {

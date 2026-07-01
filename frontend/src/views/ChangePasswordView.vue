@@ -38,8 +38,8 @@ const handleChange = async () => {
         errorMsg.value = 'Las contraseñas no coinciden.'
         return
     }
-    if (newPassword.value.length < 6) {
-        errorMsg.value = 'La contraseña debe tener al menos 6 caracteres.'
+    if (newPassword.value.length < 8) {
+        errorMsg.value = 'La contraseña debe tener al menos 8 caracteres.'
         return
     }
 

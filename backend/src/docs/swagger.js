@@ -107,7 +107,7 @@ const ENRICH = {
     summary: 'Restablecer contraseña con token',
     description: 'Establece una contraseña nueva a partir del token de un solo uso recibido por correo (válido 1 h).',
     requestBody: jsonBody(
-      { token: { type: 'string', description: 'Token recibido en el enlace del correo' }, new_password: { type: 'string', description: 'Mínimo 6 caracteres' } },
+      { token: { type: 'string', description: 'Token recibido en el enlace del correo' }, new_password: { type: 'string', description: 'Mínimo 8 caracteres' } },
       ['token', 'new_password'],
       { token: 'a1b2c3d4...', new_password: 'nueva_contrasena_ejemplo' }
     ),
@@ -120,13 +120,13 @@ const ENRICH = {
     summary: 'Cambiar la contraseña propia',
     description: 'Cambia la contraseña del usuario autenticado. Devuelve un token nuevo. Es el flujo del cambio obligatorio en el primer acceso del personal.',
     requestBody: jsonBody(
-      { current_password: { type: 'string' }, new_password: { type: 'string', description: 'Mínimo 6 caracteres' } },
+      { current_password: { type: 'string' }, new_password: { type: 'string', description: 'Mínimo 8 caracteres' } },
       ['current_password', 'new_password'],
       { current_password: 'contrasena_actual_ejemplo', new_password: 'nueva_contrasena_ejemplo' }
     ),
     responses: {
       200: r('Contraseña cambiada', { message: 'Contraseña cambiada correctamente', token: 'eyJ...' }),
-      400: r('Datos inválidos', { error: 'La nueva contraseña debe tener al menos 6 caracteres' }),
+      400: r('Datos inválidos', { error: 'La nueva contraseña debe tener al menos 8 caracteres' }),
       401: r('Contraseña actual incorrecta', { error: 'La contraseña actual es incorrecta' }),
     },
   },

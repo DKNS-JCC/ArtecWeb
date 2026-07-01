@@ -50,7 +50,7 @@ const logout = () => {
   router.push('/')
 }
 
-// Close menu on route change
+// Cierra el menú al cambiar de ruta
 router.afterEach(() => {
   menuOpen.value = false
 })
@@ -60,16 +60,16 @@ router.afterEach(() => {
   <div
     class="min-h-screen flex flex-col font-sans antialiased bg-background text-foreground transition-colors duration-300 relative">
 
-    <!-- Minimal Logo (Fixed Top Left) -->
+    <!-- Logo minimalista (fijo arriba a la izquierda) -->
     <div v-show="route.name !== 'chat'" class="fixed top-6 left-6 z-40">
       <router-link to="/" class="flex items-center group transition-transform hover:scale-[1.02]" aria-label="Artec - inicio">
         <Logo :size="40" wordmark />
       </router-link>
     </div>
 
-    <!-- Top Right Actions -->
+    <!-- Acciones (arriba a la derecha) -->
     <div v-show="route.name !== 'chat'" class="fixed top-6 right-6 z-50 flex items-center gap-3">
-      <!-- User profile/login button (Hidden for Visitors) -->
+      <!-- Botón de perfil/login (oculto para visitantes) -->
       <router-link v-if="!isVisitor" :to="isAuthenticated ? '/profile' : '/login'"
         class="w-12 h-12 rounded-full bg-card/80 backdrop-blur-md border border-border shadow-sm flex items-center justify-center transition-all hover:scale-105 hover:shadow-md cursor-pointer pointer-events-auto overflow-hidden"
         :title="isAuthenticated ? 'Mi Perfil' : 'Iniciar Sesión'">
@@ -78,7 +78,7 @@ router.afterEach(() => {
         <User v-else class="w-5 h-5" :class="isAuthenticated ? 'text-primary' : 'text-muted-foreground'" />
       </router-link>
 
-      <!-- Theme Toggle -->
+      <!-- Conmutador de tema -->
       <button @click="toggleDark()"
         class="w-12 h-12 rounded-full bg-card/80 backdrop-blur-md border border-border shadow-sm flex items-center justify-center transition-all hover:scale-105 hover:shadow-md focus:outline-none pointer-events-auto"
         aria-label="Alternar modo oscuro">
@@ -86,7 +86,7 @@ router.afterEach(() => {
         <Moon v-else class="w-5 h-5 text-muted-foreground" />
       </button>
 
-      <!-- Hidden Navigation Trigger -->
+      <!-- Disparador de navegación oculto -->
       <button @click="toggleMenu"
         class="w-12 h-12 rounded-full bg-card/80 backdrop-blur-md border border-border shadow-sm flex flex-col items-center justify-center gap-[4px] transition-all hover:scale-105 hover:shadow-md focus:outline-none pointer-events-auto"
         aria-label="Abrir menú">
@@ -99,7 +99,7 @@ router.afterEach(() => {
       </button>
     </div>
 
-    <!-- Fullscreen Overlay Navigation -->
+    <!-- Navegación superpuesta a pantalla completa -->
     <transition name="menu-fade">
       <div v-show="menuOpen"
         class="fixed inset-0 z-40 bg-background/95 backdrop-blur-3xl flex flex-col items-center justify-center">
@@ -124,7 +124,7 @@ router.afterEach(() => {
       </div>
     </transition>
 
-    <!-- Main Content -->
+    <!-- Contenido principal -->
     <main class="flex-1 relative w-full">
       <router-view v-slot="{ Component }">
         <transition name="fade" mode="out-in">
@@ -137,7 +137,7 @@ router.afterEach(() => {
 </template>
 
 <style>
-/* Route Transitions */
+/* Transiciones de ruta */
 .fade-enter-active,
 .fade-leave-active {
   transition: opacity 0.3s ease, transform 0.3s ease;
@@ -149,7 +149,7 @@ router.afterEach(() => {
   transform: translateY(10px);
 }
 
-/* Fullscreen Menu Overlay Transition */
+/* Transición del overlay del menú a pantalla completa */
 .menu-fade-enter-active,
 .menu-fade-leave-active {
   transition: opacity 0.4s cubic-bezier(0.16, 1, 0.3, 1);

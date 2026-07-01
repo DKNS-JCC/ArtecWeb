@@ -60,7 +60,7 @@ const handleSubmit = async () => {
     <div class="min-h-screen flex items-center justify-center bg-background px-6 py-12">
         <div class="w-full max-w-[26rem]">
 
-            <!-- Masthead, like the head of a catalogue entry -->
+            <!-- Cabecera, como el encabezado de una entrada de catálogo -->
             <header class="reveal" style="animation-delay: 40ms">
                 <h1 class="font-display text-5xl font-medium tracking-tight leading-[0.95] mb-3">
                     Nueva contraseña
@@ -72,14 +72,14 @@ const handleSubmit = async () => {
 
             <hr class="hairline my-8 reveal" style="animation-delay: 120ms" />
 
-            <!-- Success -->
+            <!-- Éxito -->
             <div v-if="success" class="space-y-3 reveal" style="animation-delay: 200ms">
                 <p class="eyebrow text-primary">Listo</p>
                 <p class="text-foreground font-medium">¡Contraseña actualizada!</p>
                 <p class="text-sm text-muted-foreground">Redirigiendo al inicio de sesión…</p>
             </div>
 
-            <!-- Invalid token (no token in URL) -->
+            <!-- Token inválido (sin token en la URL) -->
             <div v-else-if="!token" class="space-y-7 reveal" style="animation-delay: 200ms">
                 <div class="space-y-3">
                     <p class="eyebrow text-destructive">Enlace inválido</p>
@@ -90,7 +90,7 @@ const handleSubmit = async () => {
                 </router-link>
             </div>
 
-            <!-- Form -->
+            <!-- Formulario -->
             <form v-else @submit.prevent="handleSubmit" class="space-y-7 reveal" style="animation-delay: 200ms">
                 <Alert v-if="error" variant="destructive">{{ error }}</Alert>
 

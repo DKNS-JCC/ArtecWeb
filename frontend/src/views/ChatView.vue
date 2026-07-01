@@ -26,21 +26,21 @@ import { useSpeechToText } from '@/composables/useSpeechToText';
 const router   = useRouter();
 const authStore = useAuthStore();
 
-// ── Voice: TTS (robot speaks) + STT (visitor talks), both local & free ────────
+// ── Voz: TTS (habla el robot) + STT (habla el visitante), ambos locales y gratuitos ────────
 const tts = useTextToSpeech();
 const stt = useSpeechToText();
 
-// ── First-time tutorial (coachmarks) ──────────────────────────────────────────
-// Spotlights each real control and anchors a small speech-bubble next to it, with
-// a tail pointing at the element. Positions are measured live from the DOM so the
-// bubble follows the actual button regardless of screen size.
+// ── Tutorial de la primera vez (coachmarks) ──────────────────────────────────────────
+// Ilumina cada control real y ancla junto a él una pequeña burbuja de diálogo, con
+// una cola que apunta al elemento. Las posiciones se miden en vivo desde el DOM para que
+// la burbuja siga al botón real independientemente del tamaño de pantalla.
 const TUTORIAL_KEY = 'artec_chat_tutorial_done';
 
 /**
- * Each step targets a real element via its `data-tour` attribute. `place`
- * decides which side of the element the bubble sits on ('below' for header
- * controls, 'above' for footer controls). Steps whose target isn't on screen
- * (e.g. voice unsupported) are skipped automatically.
+ * Cada paso apunta a un elemento real mediante su atributo `data-tour`. `place`
+ * decide en qué lado del elemento se coloca la burbuja ('below' para los controles de
+ * la cabecera, 'above' para los del pie). Los pasos cuyo objetivo no está en pantalla
+ * (p. ej. voz no soportada) se omiten automáticamente.
  */
 const TUTORIAL_STEPS = [
     {
@@ -67,9 +67,9 @@ const TUTORIAL_STEPS = [
 
 const showTutorial = ref(false);
 const tutorialStep = ref(0);
-const targetRect   = ref(null);   // bounding box of the current step's element
+const targetRect   = ref(null);   // caja delimitadora del elemento del paso actual
 
-/** Visible steps: drop any whose target element isn't currently rendered. */
+/** Pasos visibles: descarta aquellos cuyo elemento objetivo no esté renderizado ahora mismo. */
 const visibleSteps = computed(() =>
     TUTORIAL_STEPS.filter(s => document.querySelector(`[data-tour="${s.target}"]`))
 );
@@ -78,7 +78,7 @@ const currentTutorialStep = computed(() => visibleSteps.value[tutorialStep.value
 
 const VIEWPORT = () => ({ w: window.innerWidth, h: window.innerHeight });
 
-/** Re-measure the highlighted element so the spotlight and bubble track it. */
+/** Vuelve a medir el elemento resaltado para que el foco y la burbuja lo sigan. */
 const measureTarget = () => {
     const step = currentTutorialStep.value;
     if (!step) { targetRect.value = null; return; }
@@ -89,7 +89,7 @@ const measureTarget = () => {
                          bottom: r.bottom, right: r.right, cx: r.left + r.width / 2 };
 };
 
-/** Spotlight cutout: a padded ring over the element with a huge outer shadow. */
+/** Recorte del foco: un anillo con relleno sobre el elemento con una sombra exterior enorme. */
 const spotlightStyle = computed(() => {
     const r = targetRect.value;
     if (!r) return { display: 'none' };
@@ -104,7 +104,7 @@ const spotlightStyle = computed(() => {
 
 const BUBBLE_W = 280;
 
-/** Bubble box, clamped to the viewport and offset above/below the element. */
+/** Caja de la burbuja, ajustada al viewport y desplazada encima/debajo del elemento. */
 const bubbleStyle = computed(() => {
     const r = targetRect.value;
     const step = currentTutorialStep.value;
@@ -119,7 +119,7 @@ const bubbleStyle = computed(() => {
     return style;
 });
 
-/** Horizontal offset of the bubble tail so it points at the element centre. */
+/** Desplazamiento horizontal de la cola de la burbuja para que apunte al centro del elemento. */
 const tailStyle = computed(() => {
     const r = targetRect.value;
     if (!r) return { display: 'none' };
@@ -153,7 +153,7 @@ const closeTutorial = () => {
     localStorage.setItem(TUTORIAL_KEY, '1');
 };
 
-/** One-time onboarding hint for the (non-obvious) hold-to-talk gesture. */
+/** Pista de onboarding puntual para el gesto (poco obvio) de mantener pulsado para hablar. */
 const showMicHint = ref(false);
 let micHintTimer  = null;
 const dismissMicHint = () => {
@@ -161,11 +161,11 @@ const dismissMicHint = () => {
     if (micHintTimer) { clearTimeout(micHintTimer); micHintTimer = null; }
 };
 
-/** Hold-to-talk: record while pressed, transcribe on release, then send. */
+/** Mantener pulsado para hablar: graba mientras se pulsa, transcribe al soltar y envía. */
 const handleMicDown = async () => {
     if (isSending.value || stt.isTranscribing.value) return;
     dismissMicHint();
-    tts.cancel();                       // don't capture the robot's own voice
+    tts.cancel();                       // no captures la propia voz del robot
     await stt.start();
 };
 
@@ -197,7 +197,7 @@ const welcomeMessage = {
     time:   new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
 };
 
-/** Starter prompts shown until the visitor sends their first message - removes blank-page friction. */
+/** Sugerencias iniciales mostradas hasta que el visitante envía su primer mensaje - elimina la fricción de la página en blanco. */
 const SUGGESTED_PROMPTS = [
     '¿Qué puedo ver por aquí?',
     'Llévame a la siguiente sala',
@@ -227,10 +227,10 @@ function saveMessages() {
 const messages  = ref(loadMessages());
 const showMap   = ref(false);
 
-/** First-time guidance: suggested prompts vanish once the conversation actually starts. */
+/** Guía de la primera vez: las sugerencias desaparecen cuando la conversación arranca de verdad. */
 const showSuggestions = computed(() => messages.value.length === 1 && !isSending.value);
 
-// ── Expertise level ───────────────────────────────────────────────────────────
+// ── Nivel de conocimiento ───────────────────────────────────────────────────────────
 const showExpertiseModal  = ref(false);
 const isUpdatingExpertise = ref(false);
 
@@ -262,7 +262,7 @@ const updateExpertise = async (level) => {
     }
 };
 
-// ── Map navigation handler ────────────────────────────────────────────────────
+// ── Manejador de navegación del mapa ────────────────────────────────────────────────────
 const handleMapNavigated = (navMessage, zoneName, errMsg, coords) => {
     showMap.value = false;
     const mapMsgId = Date.now();
@@ -277,7 +277,7 @@ const handleMapNavigated = (navMessage, zoneName, errMsg, coords) => {
         time:           new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
     });
     tts.speakIfAuto(text, mapMsgId);
-    // On a successful map-launched navigation, watch for the outcome too.
+    // En una navegación lanzada desde el mapa con éxito, vigila también el resultado.
     if (navMessage && coords) {
         trackArrival({ place_id: coords.place_id, place_name: zoneName, map_x: coords.map_x, map_y: coords.map_y });
     }
@@ -285,12 +285,12 @@ const handleMapNavigated = (navMessage, zoneName, errMsg, coords) => {
     nextTick(() => scrollToBottom());
 };
 
-// ── Navigation confirmation state ─────────────────────────────────────────────
+// ── Estado de confirmación de navegación ─────────────────────────────────────────────
 
 /**
- * Set when the AI returns intent=navigate_to with a valid resolved_place.
- * Cleared on confirm, cancel, or new navigate_to.
- * Shape: { place_id, place_name, map_x, map_y } | null
+ * Se fija cuando la IA devuelve intent=navigate_to con un resolved_place válido.
+ * Se limpia al confirmar, cancelar o con un nuevo navigate_to.
+ * Forma: { place_id, place_name, map_x, map_y } | null
  */
 const pendingNav    = ref(null);
 const isConfirming  = ref(false);
@@ -313,7 +313,7 @@ const handleConfirmNav = async () => {
             time:            new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
         });
         tts.speakIfAuto(data.nav_message, navMsgId);
-        // Watch for the outcome so we can tell the visitor when it arrives - or fails.
+        // Vigila el resultado para poder avisar al visitante cuando llegue - o falle.
         trackArrival({ place_id: nav.place_id, place_name: nav.place_name, map_x: nav.map_x, map_y: nav.map_y });
     } catch (err) {
         messages.value.push({
@@ -334,21 +334,21 @@ const handleCancelNav = () => {
     pendingNav.value = null;
 };
 
-// ── Navigation outcome tracking ───────────────────────────────────────────────
+// ── Seguimiento del resultado de navegación ───────────────────────────────────────────────
 
 /**
- * Once a navigation starts the visitor has no idea what happened. We open the
- * live stream (same one the map overlay uses) and react to the outcome:
- *   • The robot reports SUCCEEDED  → "I've arrived" + offer to talk about the place.
- *   • The robot reports ABORTED    → "I couldn't get there" + a retry button.
- * The authoritative signal is the server's `nav` event; proximity on the live
- * pose is kept as a fallback in case that event is missed.
+ * Cuando arranca una navegación el visitante no sabe qué ha pasado. Abrimos el
+ * stream en vivo (el mismo que usa el overlay del mapa) y reaccionamos al resultado:
+ *   • El robot informa SUCCEEDED  → "He llegado" + ofrecer hablar del lugar.
+ *   • El robot informa ABORTED    → "No pude llegar" + un botón de reintentar.
+ * La señal autoritativa es el evento `nav` del servidor; la proximidad en la pose
+ * en vivo se mantiene como fallback por si se pierde ese evento.
  */
-const ARRIVAL_RADIUS_M   = 1.2;      // how close (meters) counts as "arrived" (fallback)
+const ARRIVAL_RADIUS_M   = 1.2;      // cómo de cerca (metros) cuenta como "llegado" (fallback)
 const ARRIVAL_TIMEOUT_MS = 240_000;  // stop listening after 4 min as a safety net
 
 const arrivalTarget = ref(null);     // { place_id, place_name, map_x, map_y } | null
-let arrivalSource   = null;          // EventSource for the pose/nav stream
+let arrivalSource   = null;          // EventSource para el stream de pose/navegación
 let arrivalTimeout  = null;
 
 const stopArrivalTracking = () => {
@@ -399,7 +399,7 @@ const announceNavFailure = () => {
 };
 
 const trackArrival = (target) => {
-    // A new destination supersedes any in-flight tracking.
+    // Un destino nuevo reemplaza cualquier seguimiento en curso.
     stopArrivalTracking();
     if (!target || target.map_x == null || target.map_y == null) return;
     arrivalTarget.value = target;
@@ -411,7 +411,7 @@ const trackArrival = (target) => {
 
     arrivalSource = new EventSource(url);
 
-    // Authoritative outcome from the robot's Nav2 result.
+    // Resultado autoritativo del Nav2 del robot.
     arrivalSource.addEventListener('nav', (e) => {
         if (!arrivalTarget.value) return;
         let data;
@@ -420,7 +420,7 @@ const trackArrival = (target) => {
         else if (data.outcome === 'aborted') announceNavFailure();
     });
 
-    // Fallback: if we get close enough on the live pose, treat it as arrived.
+    // Fallback: si nos acercamos lo suficiente según la pose en vivo, se trata como llegada.
     arrivalSource.addEventListener('position', (e) => {
         if (!arrivalTarget.value) return;
         let pose;
@@ -429,12 +429,12 @@ const trackArrival = (target) => {
         const dist = Math.hypot(pose.x - arrivalTarget.value.map_x, pose.y - arrivalTarget.value.map_y);
         if (dist <= ARRIVAL_RADIUS_M) announceArrival();
     });
-    // EventSource auto-reconnects on error; this feedback is best-effort.
+    // EventSource se reconecta solo ante errores; este feedback es best-effort.
 
     arrivalTimeout = setTimeout(stopArrivalTracking, ARRIVAL_TIMEOUT_MS);
 };
 
-/** Re-issue a navigation to the same place after a failure (retry button). */
+/** Reenvía una navegación al mismo lugar tras un fallo (botón de reintentar). */
 const retryNav = async (msg) => {
     if (!msg?.placeId || isConfirming.value) return;
     isConfirming.value = true;
@@ -467,11 +467,11 @@ const retryNav = async (msg) => {
     }
 };
 
-// ── Farewell confirmation state ───────────────────────────────────────────────
+// ── Estado de confirmación de despedida ───────────────────────────────────────────────
 
 /**
- * Set when the AI detects a farewell intent. Offers to end the visit via a
- * confirmation modal (same pattern as navigate_to) instead of closing abruptly.
+ * Se fija cuando la IA detecta una intención de despedida. Ofrece finalizar la visita
+ * mediante un modal de confirmación (mismo patrón que navigate_to) en vez de cerrar de golpe.
  */
 const pendingFarewell = ref(false);
 
@@ -484,7 +484,7 @@ const handleCancelFarewell = () => {
     pendingFarewell.value = false;
 };
 
-// ── Session timer (10 min) ────────────────────────────────────────────────────
+// ── Temporizador de sesión (10 min) ────────────────────────────────────────────────────
 
 const timeLeft = ref(EXCLUSIVITY_TIME_SEC);
 let timerInterval = null;
@@ -560,7 +560,7 @@ const sendMessage = async () => {
     messageText.value = '';
     scrollToBottom();
 
-    // Typing indicator
+    // Indicador de "escribiendo"
     isSending.value = true;
     const typingId = Date.now() + 1;
     messages.value.push({ id: typingId, sender: 'robot', text: null, isTyping: true, time: '' });
@@ -569,11 +569,11 @@ const sendMessage = async () => {
     try {
         const data = await chatService.sendMessage(text);
 
-        // Remove typing indicator
+        // Quita el indicador de "escribiendo"
         const idx = messages.value.findIndex(m => m.id === typingId);
         if (idx !== -1) messages.value.splice(idx, 1);
 
-        // Add robot response
+        // Añade la respuesta del robot
         const robotMsgId = Date.now() + 2;
         messages.value.push({
             id:     robotMsgId,
@@ -584,7 +584,7 @@ const sendMessage = async () => {
         });
         tts.speakIfAuto(data.response, robotMsgId);
 
-        // ── Navigation confirmation gate ──────────────────────────────────
+        // ── Puerta de confirmación de navegación ──────────────────────────────────
         if (data.intent === 'navigate_to' && data.resolved_place?.map_x != null) {
             // Replace any previous pending nav
             pendingNav.value = {
@@ -594,11 +594,11 @@ const sendMessage = async () => {
                 map_y:      data.resolved_place.map_y,
             };
         } else if (data.intent === 'navigate_to' && !data.resolved_place?.map_x) {
-            // Place exists but has no coordinates - inform visitor
+            // El lugar existe pero no tiene coordenadas - informa al visitante
             pendingNav.value = null;
         }
 
-        // ── Farewell gate: offer to end the visit (same modal pattern as nav) ─
+        // ── Puerta de despedida: ofrece finalizar la visita (mismo patrón de modal que nav) ─
         if (data.intent === 'farewell') {
             pendingFarewell.value = true;
         }
@@ -607,7 +607,7 @@ const sendMessage = async () => {
         const idx = messages.value.findIndex(m => m.id === typingId);
         if (idx !== -1) messages.value.splice(idx, 1);
 
-        // Session was ended/reassigned by an admin (or it expired) → force out.
+        // Un admin finalizó/reasignó la sesión (o expiró) → expulsa.
         if (err.status === 403) {
             handleForcedEndSession();
             return;
@@ -627,7 +627,7 @@ const sendMessage = async () => {
     }
 };
 
-/** Fires a starter prompt as if the visitor had typed and sent it themselves. */
+/** Lanza una sugerencia inicial como si el visitante la hubiera escrito y enviado él mismo. */
 const sendSuggestion = (prompt) => {
     if (isSending.value) return;
     messageText.value = prompt;
@@ -641,7 +641,7 @@ onMounted(() => {
     scrollToBottom();
     window.addEventListener('resize', onViewportChange);
     if (!localStorage.getItem(TUTORIAL_KEY)) {
-        // Wait for the first paint so every control is measurable.
+        // Espera al primer render para que todos los controles sean medibles.
         nextTick(() => startTutorial());
     } else if (stt.supported) {
         showMicHint.value = true;
@@ -660,7 +660,7 @@ onUnmounted(() => {
 <template>
     <div class="bg-background font-sans min-h-[100dvh] flex flex-col fixed inset-0 z-[100] sm:relative sm:z-auto sm:max-w-md sm:mx-auto sm:border-x">
 
-        <!-- HEADER -->
+        <!-- CABECERA -->
         <header class="glass-header z-10 flex-shrink-0 flex items-center justify-between px-4 py-3 border-b border-foreground/5">
             <button @click="handleEndSession" class="flex flex-col items-center justify-center text-destructive hover:opacity-80 active:scale-95 transition-all">
                 <LogOut class="w-5 h-5 mb-0.5" />
@@ -678,7 +678,7 @@ onUnmounted(() => {
             </div>
 
             <div class="flex items-center gap-2">
-                <!-- Auto-voice toggle (robot reads its replies aloud) -->
+                <!-- Conmutador de voz automática (el robot lee sus respuestas en voz alta) -->
                 <button v-if="tts.supported" data-tour="volume" @click="tts.toggleAutoSpeak()"
                     class="w-9 h-9 rounded-full flex items-center justify-center transition-all active:scale-95"
                     :class="tts.autoSpeak.value
@@ -700,7 +700,7 @@ onUnmounted(() => {
             </div>
         </header>
 
-        <!-- TIMER WARNING BANNER (2 min remaining) -->
+        <!-- BANNER DE AVISO DE TIEMPO (quedan 2 min) -->
         <Transition name="banner">
             <div v-if="isTimeWarning"
                 class="flex-shrink-0 flex items-center justify-between px-4 py-2.5 bg-amber-50 dark:bg-amber-900/20 border-b border-amber-200 dark:border-amber-700/30">
@@ -715,7 +715,7 @@ onUnmounted(() => {
             </div>
         </Transition>
 
-        <!-- MAP VIEW -->
+        <!-- VISTA DE MAPA -->
         <VisitorMap v-if="showMap" class="flex-1 min-h-0" @navigated="handleMapNavigated" />
 
         <!-- CHAT MESSAGES -->
@@ -725,7 +725,7 @@ onUnmounted(() => {
                 <div class="text-center text-xs text-muted-foreground font-medium uppercase tracking-wider bg-foreground/5 rounded-full py-1.5 px-4 w-fit">
                     Conectado
                 </div>
-                <!-- Sets expectations before the robot speaks aloud for the first time -->
+                <!-- Prepara al usuario antes de que el robot hable en voz alta por primera vez -->
                 <div v-if="tts.supported && tts.autoSpeak.value"
                     class="flex items-center gap-1.5 text-center text-xs text-muted-foreground font-medium bg-foreground/5 rounded-full py-1.5 px-4 w-fit">
                     <Volume2 class="w-3.5 h-3.5 flex-shrink-0" />
@@ -736,7 +736,7 @@ onUnmounted(() => {
             <div v-for="msg in messages" :key="msg.id" class="flex flex-col w-full"
                  :class="msg.sender === 'user' ? 'items-end' : 'items-start'">
 
-                <!-- Nav-executing confirmation badge -->
+                <!-- Insignia de confirmación de navegación en curso -->
                 <div v-if="msg.isNavExecuting" class="max-w-[85%] mb-1">
                     <div class="flex items-center gap-1.5 bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-700/40 text-emerald-700 dark:text-emerald-300 text-xs font-semibold px-3 py-1.5 rounded-full">
                         <Navigation class="w-3.5 h-3.5 flex-shrink-0" />
@@ -744,7 +744,7 @@ onUnmounted(() => {
                     </div>
                 </div>
 
-                <!-- Arrival badge -->
+                <!-- Insignia de llegada -->
                 <div v-if="msg.isArrival" class="max-w-[85%] mb-1">
                     <div class="flex items-center gap-1.5 bg-primary/10 border border-primary/30 text-primary text-xs font-semibold px-3 py-1.5 rounded-full">
                         <MapPin class="w-3.5 h-3.5 flex-shrink-0" />
@@ -752,7 +752,7 @@ onUnmounted(() => {
                     </div>
                 </div>
 
-                <!-- Navigation-failure badge -->
+                <!-- Insignia de fallo de navegación -->
                 <div v-if="msg.isNavError" class="max-w-[85%] mb-1">
                     <div class="flex items-center gap-1.5 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-700/40 text-red-700 dark:text-red-300 text-xs font-semibold px-3 py-1.5 rounded-full">
                         <AlertTriangle class="w-3.5 h-3.5 flex-shrink-0" />
@@ -760,7 +760,7 @@ onUnmounted(() => {
                     </div>
                 </div>
 
-                <!-- Bubble -->
+                <!-- Burbuja -->
                 <div class="relative max-w-[80%] rounded-2xl px-4 py-2.5 shadow-sm text-[0.95rem] leading-snug break-words"
                     :class="[
                         msg.sender === 'user'
@@ -776,7 +776,7 @@ onUnmounted(() => {
                     <template v-else>{{ msg.text }}</template>
                 </div>
 
-                <!-- Retry action after a navigation failure -->
+                <!-- Acción de reintentar tras un fallo de navegación -->
                 <button v-if="msg.isNavError && msg.placeId"
                     @click="retryNav(msg)"
                     :disabled="isConfirming"
@@ -788,7 +788,7 @@ onUnmounted(() => {
 
                 <div v-if="!msg.isTyping" class="flex items-center gap-1.5 mt-1 mx-1">
                     <span class="text-[0.65rem] text-muted-foreground">{{ msg.time }}</span>
-                    <!-- Per-message replay (text-to-speech) on robot bubbles -->
+                    <!-- Reproducción por mensaje (text-to-speech) en las burbujas del robot -->
                     <button v-if="tts.supported && msg.sender === 'robot' && msg.text"
                         @click="tts.speakingId.value === msg.id ? tts.cancel() : tts.speak(msg.text, msg.id)"
                         class="text-muted-foreground hover:text-primary transition-colors active:scale-90"
@@ -799,7 +799,7 @@ onUnmounted(() => {
                 </div>
             </div>
 
-            <!-- Starter prompts: removes blank-page friction on first contact -->
+            <!-- Sugerencias iniciales: eliminan la fricción de la página en blanco en el primer contacto -->
             <div v-if="showSuggestions" class="flex flex-wrap gap-2 pl-1">
                 <button v-for="prompt in SUGGESTED_PROMPTS" :key="prompt"
                     type="button" @click="sendSuggestion(prompt)"
@@ -810,11 +810,11 @@ onUnmounted(() => {
 
         </main>
 
-        <!-- INPUT FOOTER: absolute only in chat mode (map mode uses normal flow so the sheet isn't hidden) -->
+        <!-- PIE DE ENTRADA: absoluto solo en modo chat (el modo mapa usa flujo normal para no ocultar el panel) -->
         <footer class="glass-footer p-3 sm:pb-3 pb-safe border-t border-foreground/5 flex-shrink-0"
             :class="showMap ? 'relative' : 'absolute bottom-0 left-0 right-0'">
 
-            <!-- One-time hint: hold-to-talk isn't an obvious gesture on a phone -->
+            <!-- Pista puntual: mantener pulsado para hablar no es un gesto obvio en el móvil -->
             <Transition name="banner">
                 <p v-if="showMicHint && !stt.isRecording.value && !stt.isTranscribing.value && !messageText.trim()"
                     class="text-center text-[0.7rem] text-muted-foreground pb-1.5">
@@ -822,7 +822,7 @@ onUnmounted(() => {
                 </p>
             </Transition>
 
-            <!-- Voice status banner (recording / transcribing / mic error) -->
+            <!-- Banner de estado de voz (grabando / transcribiendo / error de micro) -->
             <Transition name="banner">
                 <div v-if="stt.isRecording.value || stt.isTranscribing.value || stt.error.value"
                     class="flex items-center justify-center gap-2 pb-2.5 text-sm font-medium"
@@ -863,7 +863,7 @@ onUnmounted(() => {
                     @keydown.enter.prevent="sendMessage"
                 ></textarea>
 
-                <!-- Hold-to-talk microphone (local Whisper speech-to-text) -->
+                <!-- Micrófono de mantener pulsado para hablar (speech-to-text con Whisper local) -->
                 <button v-if="stt.supported && !messageText.trim()"
                     type="button"
                     data-tour="mic"
@@ -892,7 +892,7 @@ onUnmounted(() => {
             </form>
         </footer>
 
-        <!-- FORCED END MODAL -->
+        <!-- MODAL DE FIN FORZADO -->
         <div v-if="showForcedEndModal" class="fixed inset-0 bg-foreground/40 backdrop-blur-sm z-[200] flex items-center justify-center p-4">
             <div class="bg-card w-full max-w-sm rounded-[32px] p-8 text-center shadow-2xl">
                 <div class="w-16 h-16 bg-red-100 dark:bg-red-900/30 text-red-500 rounded-full flex items-center justify-center mx-auto mb-4">
@@ -904,13 +904,13 @@ onUnmounted(() => {
             </div>
         </div>
 
-        <!-- ── NAVIGATION CONFIRMATION MODAL ──────────────────────────────── -->
+        <!-- ── MODAL DE CONFIRMACIÓN DE NAVEGACIÓN ──────────────────────────────── -->
         <Transition name="modal">
             <div v-if="pendingNav" class="fixed inset-0 z-[300] flex items-center justify-center p-4" @click.self="handleCancelNav">
                 <!-- Backdrop -->
                 <div class="absolute inset-0 bg-black/50 backdrop-blur-sm"></div>
 
-                <!-- Modal Card -->
+                <!-- Tarjeta del modal -->
                 <div class="nav-modal relative w-full max-w-xs rounded-[28px] overflow-hidden shadow-2xl">
                     <!-- Accent bar -->
                     <div class="h-1.5 bg-primary"></div>
@@ -956,15 +956,15 @@ onUnmounted(() => {
                 </div>
             </div>
         </Transition>
-        <!-- ── END NAVIGATION CONFIRMATION MODAL ─────────────────────────── -->
+        <!-- ── FIN MODAL DE CONFIRMACIÓN DE NAVEGACIÓN ─────────────────────────── -->
 
-        <!-- ── FAREWELL (END VISIT) CONFIRMATION MODAL ────────────────────── -->
+        <!-- ── MODAL DE CONFIRMACIÓN DE DESPEDIDA (FIN DE VISITA) ────────────────────── -->
         <Transition name="modal">
             <div v-if="pendingFarewell" class="fixed inset-0 z-[300] flex items-center justify-center p-4" @click.self="handleCancelFarewell">
                 <!-- Backdrop -->
                 <div class="absolute inset-0 bg-black/50 backdrop-blur-sm"></div>
 
-                <!-- Modal Card -->
+                <!-- Tarjeta del modal -->
                 <div class="nav-modal relative w-full max-w-xs rounded-[28px] overflow-hidden shadow-2xl">
                     <!-- Accent bar -->
                     <div class="h-1.5 bg-destructive"></div>
@@ -1002,15 +1002,15 @@ onUnmounted(() => {
                 </div>
             </div>
         </Transition>
-        <!-- ── END FAREWELL CONFIRMATION MODAL ────────────────────────────── -->
+        <!-- ── FIN MODAL DE CONFIRMACIÓN DE DESPEDIDA ────────────────────────────── -->
 
-        <!-- ── FAREWELL THANK YOU MODAL ───────────────────────────────────── -->
+        <!-- ── MODAL DE AGRADECIMIENTO DE DESPEDIDA ───────────────────────────────────── -->
         <Transition name="modal">
             <div v-if="showFarewellModal" class="fixed inset-0 z-[300] flex items-center justify-center p-4">
                 <!-- Backdrop -->
                 <div class="absolute inset-0 bg-black/50 backdrop-blur-sm"></div>
 
-                <!-- Modal Card -->
+                <!-- Tarjeta del modal -->
                 <div class="nav-modal relative w-full max-w-xs rounded-[28px] overflow-hidden shadow-2xl">
                     <!-- Accent bar -->
                     <div class="h-1.5 bg-primary"></div>
@@ -1042,9 +1042,9 @@ onUnmounted(() => {
                 </div>
             </div>
         </Transition>
-        <!-- ── END FAREWELL THANK YOU MODAL ───────────────────────────────── -->
+        <!-- ── FIN MODAL DE AGRADECIMIENTO DE DESPEDIDA ───────────────────────────────── -->
 
-        <!-- ── EXPERTISE LEVEL MODAL ──────────────────────────────────────── -->
+        <!-- ── MODAL DE NIVEL DE CONOCIMIENTO ──────────────────────────────────────── -->
         <Transition name="modal">
             <div v-if="showExpertiseModal"
                 class="fixed inset-0 z-[300] flex items-end justify-center sm:items-center"
@@ -1073,28 +1073,28 @@ onUnmounted(() => {
                 </div>
             </div>
         </Transition>
-        <!-- ── END EXPERTISE LEVEL MODAL ──────────────────────────────────── -->
+        <!-- ── FIN MODAL DE NIVEL DE CONOCIMIENTO ──────────────────────────────────── -->
 
-        <!-- ── FIRST-TIME TUTORIAL (COACHMARKS) ──────────────────────────── -->
+        <!-- ── TUTORIAL DE LA PRIMERA VEZ (COACHMARKS) ──────────────────────────── -->
         <Transition name="modal">
             <div v-if="showTutorial && currentTutorialStep" class="fixed inset-0 z-[400]">
 
-                <!-- Dim layer + spotlight cutout over the highlighted control.
-                     Click anywhere on the dim layer advances to the next step. -->
+                <!-- Capa de oscurecimiento + recorte de foco sobre el control resaltado.
+                     Hacer clic en cualquier parte de la capa avanza al siguiente paso. -->
                 <div class="absolute inset-0" @click="nextTutorialStep" />
                 <div class="tour-spotlight absolute rounded-2xl pointer-events-none" :style="spotlightStyle" />
 
-                <!-- Speech bubble anchored next to the element -->
+                <!-- Burbuja de diálogo anclada junto al elemento -->
                 <Transition name="step" mode="out-in">
                     <div :key="tutorialStep" class="tour-bubble absolute bg-card rounded-2xl shadow-2xl px-4 pt-3.5 pb-3"
                         :style="bubbleStyle">
 
-                        <!-- Tail: a rotated square sitting on the edge facing the element -->
+                        <!-- Cola: un cuadrado rotado apoyado en el borde que mira al elemento -->
                         <div class="tour-tail absolute w-3.5 h-3.5 bg-card rotate-45"
                             :class="currentTutorialStep.place === 'below' ? '-top-1.5' : '-bottom-1.5'"
                             :style="tailStyle" />
 
-                        <!-- Step counter -->
+                        <!-- Contador de pasos -->
                         <div class="flex items-center justify-between mb-1.5">
                             <span class="text-[0.65rem] font-semibold uppercase tracking-wider text-primary">
                                 Paso {{ tutorialStep + 1 }} de {{ visibleSteps.length }}
@@ -1130,7 +1130,7 @@ onUnmounted(() => {
                 </Transition>
             </div>
         </Transition>
-        <!-- ── END FIRST-TIME TUTORIAL ────────────────────────────────────── -->
+        <!-- ── FIN TUTORIAL DE LA PRIMERA VEZ ────────────────────────────────────── -->
     </div>
 </template>
 
@@ -1160,7 +1160,7 @@ onUnmounted(() => {
     animation: slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
-/* Timer warning banner transition */
+/* Transición del banner de aviso de tiempo */
 .banner-enter-active, .banner-leave-active { transition: all 0.3s ease; }
 .banner-enter-from, .banner-leave-to { opacity: 0; transform: translateY(-8px); max-height: 0; }
 .banner-enter-to, .banner-leave-from { max-height: 60px; }
@@ -1193,7 +1193,7 @@ onUnmounted(() => {
     transform: scale(0.95) translateY(10px);
 }
 
-/* Tutorial spotlight: dims everything except a ring around the target */
+/* Foco del tutorial: oscurece todo excepto un anillo alrededor del objetivo */
 .tour-spotlight {
     box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.6), 0 0 0 2px var(--color-primary);
     transition: top 0.3s cubic-bezier(0.16, 1, 0.3, 1),
@@ -1205,7 +1205,7 @@ onUnmounted(() => {
 .tour-bubble { max-width: calc(100vw - 24px); }
 .tour-tail { box-shadow: -2px -2px 4px rgba(0, 0, 0, 0.04); }
 
-/* Tutorial step (bubble content) transition */
+/* Transición del paso del tutorial (contenido de la burbuja) */
 .step-enter-active { transition: opacity 0.2s ease; }
 .step-leave-active { transition: opacity 0.12s ease; }
 .step-enter-from, .step-leave-to { opacity: 0; }

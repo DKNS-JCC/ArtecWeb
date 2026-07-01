@@ -32,7 +32,7 @@ const handleSubmit = async () => {
         await authService.forgotPassword(email.value.trim())
         sent.value = true
     } catch {
-        // API always returns 200 - only network errors reach here
+        // La API siempre devuelve 200 - aquí solo llegan errores de red
         error.value = 'No se pudo conectar con el servidor. Inténtalo más tarde.'
     } finally {
         loading.value = false
@@ -44,7 +44,7 @@ const handleSubmit = async () => {
     <div class="min-h-screen flex items-center justify-center bg-background px-6 py-12">
         <div class="w-full max-w-[26rem]">
 
-            <!-- Masthead, like the head of a catalogue entry -->
+            <!-- Cabecera, como el encabezado de una entrada de catálogo -->
             <header class="reveal" style="animation-delay: 40ms">
                 <h1 class="font-display text-5xl font-medium tracking-tight leading-[0.95] mb-3">
                     Recuperar contraseña
@@ -56,7 +56,7 @@ const handleSubmit = async () => {
 
             <hr class="hairline my-8 reveal" style="animation-delay: 120ms" />
 
-            <!-- Success state -->
+            <!-- Estado de éxito -->
             <div v-if="sent" class="space-y-7 reveal" style="animation-delay: 200ms">
                 <p class="text-foreground leading-relaxed">
                     Si <strong>{{ email }}</strong> está registrado, recibirás un enlace en los próximos minutos.
@@ -67,7 +67,7 @@ const handleSubmit = async () => {
                 </router-link>
             </div>
 
-            <!-- Form state -->
+            <!-- Estado del formulario -->
             <form v-else @submit.prevent="handleSubmit" class="space-y-7 reveal" style="animation-delay: 200ms">
                 <Alert v-if="error" variant="destructive">{{ error }}</Alert>
 

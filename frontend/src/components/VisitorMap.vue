@@ -24,10 +24,10 @@ const emit = defineEmits(['navigated'])
 
 const API_ROOT = (import.meta.env.VITE_API_URL || '').replace('/api', '')
 
-// Brand terracotta accent for the live robot marker - mirrors the dark-theme
-// value of --color-primary. Canvas fillStyle/shadowColor need a literal color
-// (CSS custom properties aren't resolved in the 2D context), and the map
-// canvas is always a dark surface regardless of the site theme.
+// Acento terracota de marca para el marcador del robot en vivo - refleja el valor de
+// --color-primary del tema oscuro. fillStyle/shadowColor del canvas necesitan un color
+// literal (las custom properties de CSS no se resuelven en el contexto 2D), y el lienzo
+// del mapa es siempre una superficie oscura independientemente del tema del sitio.
 const ROBOT_COLOR = '#D9743E'
 
 const canvasRef    = ref(null)
@@ -125,7 +125,7 @@ function draw() {
         ctx.lineWidth   = 2 / scale.value
         ctx.stroke()
 
-        // Label bubble (always visible)
+        // Burbuja de etiqueta (siempre visible)
         const label    = zone.name.length > 14 ? zone.name.slice(0, 14) + '…' : zone.name
         const fontSize = Math.max(8, 11 / scale.value)
         ctx.font       = `600 ${fontSize}px -apple-system, sans-serif`
@@ -147,7 +147,7 @@ function draw() {
         ctx.fillText(label, x, by + bh / 2)
     }
 
-    // Robot position - navigation arrow (distinct from zone circles)
+    // Posición del robot - flecha de navegación (distinta de los círculos de zona)
     if (robotPos.value && mapData.value) {
         const { x, y } = worldToPixel(robotPos.value.x, robotPos.value.y)
         // Negate theta: image Y is flipped relative to ROS frame
@@ -301,9 +301,9 @@ function dismissZone() {
     draw()
 }
 
-// ── Robot position stream (SSE) ───────────────────────────────────────────────
-// Replaces HTTP polling: the server pushes the live pose over one connection,
-// so the overlay stays real-time without hitting the rate limiter.
+// ── Stream de posición del robot (SSE) ───────────────────────────────────────────────
+// Sustituye el sondeo HTTP: el servidor envía la pose en vivo por una única conexión,
+// así el overlay se mantiene en tiempo real sin golpear el limitador de tasa.
 let positionSource = null
 
 function startPositionStream() {
@@ -322,10 +322,10 @@ function startPositionStream() {
             draw()
         } catch { /* ignore malformed event */ }
     })
-    // EventSource reconnects automatically on error - overlay is non-critical.
+    // EventSource se reconecta automáticamente ante errores - el overlay no es crítico.
 }
 
-// ── Lifecycle ─────────────────────────────────────────────────────────────────
+// ── Ciclo de vida ─────────────────────────────────────────────────────────────────
 let resizeObserver = null
 
 onMounted(async () => {
@@ -348,7 +348,7 @@ onMounted(async () => {
         loading.value = false
     }
 
-    // Open the live position stream (server pushes the pose, no polling)
+    // Abre el stream de posición en vivo (el servidor envía la pose, sin polling)
     startPositionStream()
 
     resizeObserver = new ResizeObserver(() => { if (mapImage.value) { fitMapToCanvas(); draw() } })
@@ -364,7 +364,7 @@ onUnmounted(() => {
 <template>
     <div class="flex flex-col h-full bg-[#0f0f1a]">
 
-        <!-- Loading -->
+        <!-- Cargando -->
         <div v-if="loading" class="flex-1 flex flex-col items-center justify-center gap-3">
             <Loader2 class="w-8 h-8 animate-spin text-primary" />
             <p class="text-sm text-white/50">Cargando mapa...</p>
@@ -395,7 +395,7 @@ onUnmounted(() => {
                 @touchend="onTouchEnd"
             />
 
-            <!-- Hint when no zone is selected -->
+            <!-- Pista cuando no hay ninguna zona seleccionada -->
             <div v-if="zones.length > 0 && !selectedZone"
                 class="absolute bottom-4 left-1/2 -translate-x-1/2 bg-black/60 backdrop-blur-sm text-white text-xs px-3 py-1.5 rounded-full pointer-events-none whitespace-nowrap">
                 Toca una zona para navegar
@@ -413,7 +413,7 @@ onUnmounted(() => {
             <div v-if="selectedZone"
                 class="flex-shrink-0 bg-card rounded-t-3xl px-5 pt-4 pb-6 shadow-2xl border-t border-foreground/10">
 
-                <!-- Handle -->
+                <!-- Tirador -->
                 <div class="w-10 h-1 bg-foreground/20 rounded-full mx-auto mb-4" />
 
                 <!-- Zone info -->
@@ -431,7 +431,7 @@ onUnmounted(() => {
                     {{ selectedZone.description || 'Sin descripción.' }}
                 </p>
 
-                <!-- Navigation error -->
+                <!-- Error de navegación -->
                 <p v-if="navError" class="text-xs text-destructive mb-3 text-center">{{ navError }}</p>
 
                 <!-- Actions -->

@@ -40,14 +40,14 @@ export function useTextToSpeech() {
     const supported = !!synth && typeof window.SpeechSynthesisUtterance !== 'undefined'
 
     const isSpeaking = ref(false)
-    const speakingId = ref(null)               // id of the message currently being spoken
+    const speakingId = ref(null)               // id del mensaje que se está leyendo en este momento
     const autoSpeak  = ref(loadAutoSpeakPref())
     const spanishVoice = shallowRef(null)
 
     function loadAutoSpeakPref() {
         try {
             const saved = localStorage.getItem(AUTO_SPEAK_KEY)
-            return saved === null ? true : saved === '1'   // on by default (immersive guide)
+            return saved === null ? true : saved === '1'   // activado por defecto (guía inmersiva)
         } catch {
             return true
         }
@@ -55,19 +55,19 @@ export function useTextToSpeech() {
 
     function toggleAutoSpeak() {
         autoSpeak.value = !autoSpeak.value
-        try { localStorage.setItem(AUTO_SPEAK_KEY, autoSpeak.value ? '1' : '0') } catch { /* ignore */ }
+        try { localStorage.setItem(AUTO_SPEAK_KEY, autoSpeak.value ? '1' : '0') } catch { /* ignorar */ }
         if (!autoSpeak.value) cancel()
     }
 
-    /** Picks the most natural Spanish voice available on the device. */
+    /** Elige la voz en español más natural disponible en el dispositivo. */
     function pickVoice() {
         if (!synth) return
         const voices = synth.getVoices()
         if (!voices.length) return
 
         const spanish = voices.filter(v => /^es(-|_|$)/i.test(v.lang))
-        // Prefer es-ES, then any Spanish; favour local (offline) voices, then
-        // higher-quality "natural/neural/enhanced/premium" voices when present.
+        // Prefiere es-ES, luego cualquier español; favorece las voces locales (offline) y,
+        // cuando existan, las de mayor calidad ("natural/neural/enhanced/premium").
         const score = (v) => {
             let s = 0
             if (/^es-ES/i.test(v.lang)) s += 4
@@ -79,10 +79,10 @@ export function useTextToSpeech() {
     }
 
     /**
-     * Speaks the given text aloud. Cancels any in-progress utterance first so
-     * a new reply never overlaps the previous one.
+     * Lee en voz alta el texto dado. Cancela antes cualquier locución en curso
+     * para que una respuesta nueva nunca se solape con la anterior.
      * @param {string} text
-     * @param {string|number} [id]  message id, to drive per-bubble UI state.
+     * @param {string|number} [id]  id del mensaje, para el estado de UI por burbuja.
      */
     function speak(text, id = null) {
         if (!supported || !text) return
@@ -103,7 +103,7 @@ export function useTextToSpeech() {
         synth.speak(utter)
     }
 
-    /** Speaks only when the global auto-read toggle is on (used for new replies). */
+    /** Lee solo cuando el interruptor global de lectura automática está activo (para respuestas nuevas). */
     function speakIfAuto(text, id = null) {
         if (autoSpeak.value) speak(text, id)
     }
@@ -118,7 +118,7 @@ export function useTextToSpeech() {
     onMounted(() => {
         if (!supported) return
         pickVoice()
-        // Voices load asynchronously in most browsers (and lazily on iOS).
+        // Las voces cargan de forma asíncrona en la mayoría de navegadores (y de forma perezosa en iOS).
         synth.addEventListener?.('voiceschanged', pickVoice)
     })
 

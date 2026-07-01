@@ -48,7 +48,7 @@ export function useSpeechToText() {
     let chunks        = []
     let stream        = null
 
-    /** Begins capturing microphone audio. Resolves once recording is live. */
+    /** Comienza a capturar el audio del micrófono. Se resuelve cuando la grabación está activa. */
     async function start() {
         if (!supported || isRecording.value || isTranscribing.value) return
         error.value = null
@@ -70,8 +70,8 @@ export function useSpeechToText() {
     }
 
     /**
-     * Stops recording, transcribes the clip via the local Whisper backend and
-     * resolves with the recognised text. Returns '' on cancel/empty/failure.
+     * Detiene la grabación, transcribe el clip mediante el backend de Whisper local
+     * y se resuelve con el texto reconocido. Devuelve '' si se cancela/vacío/falla.
      */
     function stopAndTranscribe() {
         return new Promise((resolve) => {
@@ -105,7 +105,7 @@ export function useSpeechToText() {
         })
     }
 
-    /** Aborts the current recording without transcribing. */
+    /** Aborta la grabación actual sin transcribir. */
     function cancel() {
         if (mediaRecorder && isRecording.value) {
             mediaRecorder.onstop = () => cleanupStream()
@@ -140,8 +140,8 @@ export function useSpeechToText() {
 
 
 /**
- * Decodes a recorded audio Blob (webm/opus, mp4/aac…), downsamples it to
- * 16 kHz mono and encodes a PCM-16 WAV Blob - the format the backend parses.
+ * Decodifica un Blob de audio grabado (webm/opus, mp4/aac…), lo reduce a
+ * 16 kHz mono y codifica un Blob WAV PCM-16 - el formato que parsea el backend.
  */
 async function blobToWav16k(blob) {
     const arrayBuffer = await blob.arrayBuffer()
@@ -155,7 +155,7 @@ async function blobToWav16k(blob) {
         decodeCtx.close()
     }
 
-    // Render to a 16 kHz mono buffer via an offline graph (handles resampling).
+    // Renderiza a un buffer mono de 16 kHz mediante un grafo offline (gestiona el remuestreo).
     const frameCount = Math.ceil(decoded.duration * TARGET_RATE)
     const offline = new OfflineAudioContext(1, frameCount, TARGET_RATE)
     const source = offline.createBufferSource()
@@ -167,7 +167,7 @@ async function blobToWav16k(blob) {
     return encodeWav(rendered.getChannelData(0), TARGET_RATE)
 }
 
-/** Encodes a mono Float32 sample array as a 16-bit PCM WAV Blob. */
+/** Codifica un array de muestras Float32 mono como un Blob WAV PCM de 16 bits. */
 function encodeWav(samples, sampleRate) {
     const buffer = new ArrayBuffer(44 + samples.length * 2)
     const view = new DataView(buffer)
@@ -180,13 +180,13 @@ function encodeWav(samples, sampleRate) {
     view.setUint32(4, 36 + samples.length * 2, true)
     writeString(8, 'WAVE')
     writeString(12, 'fmt ')
-    view.setUint32(16, 16, true)            // PCM chunk size
-    view.setUint16(20, 1, true)             // audio format = PCM
+    view.setUint32(16, 16, true)            // tamaño del chunk PCM
+    view.setUint16(20, 1, true)             // formato de audio = PCM
     view.setUint16(22, 1, true)             // mono
     view.setUint32(24, sampleRate, true)
-    view.setUint32(28, sampleRate * 2, true) // byte rate
-    view.setUint16(32, 2, true)             // block align
-    view.setUint16(34, 16, true)            // bits per sample
+    view.setUint32(28, sampleRate * 2, true) // tasa de bytes
+    view.setUint16(32, 2, true)             // alineación de bloque
+    view.setUint16(34, 16, true)            // bits por muestra
     writeString(36, 'data')
     view.setUint32(40, samples.length * 2, true)
 

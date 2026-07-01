@@ -28,12 +28,12 @@ const router = useRouter()
 const robotId = route.params.id
 
 const robot   = ref(null)
-const ready   = ref(false)   // first SSE snapshot received
+const ready   = ref(false)   // primera instantánea SSE recibida
 const error   = ref(null)
 
 let robotEventSource = null
 
-// ── SSE: live robot state (mirrors DashboardView.startRobotStream) ─────────────
+// ── SSE: estado del robot en vivo (refleja DashboardView.startRobotStream) ─────────────
 const startRobotStream = () => {
     if (robotEventSource) robotEventSource.close()
 
@@ -49,7 +49,7 @@ const startRobotStream = () => {
         try {
             const data = JSON.parse(e.data)
             if (data.id === robotId) robot.value = data
-        } catch { /* ignore malformed event */ }
+        } catch { /* ignora eventos malformados */ }
     })
 
     robotEventSource.addEventListener('ready', () => {
@@ -62,7 +62,7 @@ const startRobotStream = () => {
     }
 }
 
-// ── Connect / disconnect ──────────────────────────────────────────────────────
+// ── Conectar / desconectar ──────────────────────────────────────────────────────
 const pending = ref(false)
 const commandError = ref(null)
 
@@ -78,13 +78,13 @@ const sendCommand = async (command) => {
     }
 }
 
-// RobotControlPanel emits 'refresh' after cancel-nav / go-to-base; the SSE stream
-// already pushes the fresh state, so no manual refetch is needed here.
+// RobotControlPanel emite 'refresh' tras cancel-nav / go-to-base; el stream SSE
+// ya envía el estado fresco, así que aquí no hace falta un re-fetch manual.
 const onPanelRefresh = () => {}
 
 const goBack = () => router.push({ name: 'dashboard' })
 
-// "Robot not found" once the snapshot has arrived but no matching robot appeared.
+// "Robot no encontrado" una vez que ha llegado la instantánea pero no apareció ningún robot que coincida.
 const notFound = computed(() => ready.value && !robot.value)
 
 onMounted(startRobotStream)
@@ -93,7 +93,7 @@ onUnmounted(() => { if (robotEventSource) robotEventSource.close() })
 
 <template>
     <div class="px-4 py-8 max-w-6xl mx-auto min-h-[calc(100vh-4rem)]">
-        <!-- Header -->
+        <!-- Cabecera -->
         <div class="flex items-center justify-between gap-4 mb-6">
             <div class="flex items-center gap-3 min-w-0">
                 <Button @click="goBack" variant="ghost" size="icon" class="rounded-full shrink-0" title="Volver al panel">
@@ -127,7 +127,7 @@ onUnmounted(() => { if (robotEventSource) robotEventSource.close() })
 
         <p v-if="commandError" class="text-sm text-destructive mb-4">{{ commandError }}</p>
 
-        <!-- States -->
+        <!-- Estados -->
         <div v-if="!ready && !robot" class="flex justify-center items-center h-64">
             <Loader2 class="w-8 h-8 animate-spin text-primary" />
         </div>
@@ -140,7 +140,7 @@ onUnmounted(() => { if (robotEventSource) robotEventSource.close() })
             <p>Robot no encontrado o no tienes acceso a él.</p>
         </Alert>
 
-        <!-- Control panel -->
+        <!-- Panel de control -->
         <Card v-else-if="robot" class="p-6">
             <RobotControlPanel :robot="robot" @refresh="onPanelRefresh" />
         </Card>

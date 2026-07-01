@@ -22,7 +22,7 @@ import { RefreshCw, Building2, Users, Clock, Bot, TrendingUp } from 'lucide-vue-
 const authStore = useAuthStore()
 const isPlatformAdmin = computed(() => authStore.isPlatformAdmin)
 
-// ─── State ────────────────────────────────────────────────────────────────────
+// ─── Estado ────────────────────────────────────────────────────────────────────
 
 const stats = ref({
     totalRobots: 0, activeRobots: 0, totalVisitors: 0, avgSessionTime: 0,
@@ -95,7 +95,7 @@ const bars = computed(() => filledDays.value.map((d, i) => {
 
 const hasDayData = computed(() => bars.value.some(b => b.count > 0))
 
-// ─── Donut chart - expertise distribution ────────────────────────────────────
+// ─── Gráfico de donut - distribución por nivel ────────────────────────────────────
 
 const donutTotal = computed(() =>
     (stats.value.expertiseDist || []).reduce((s, d) => s + d.count, 0)
@@ -129,7 +129,7 @@ const robotMax  = computed(() => Math.max(1, ...(stats.value.robotActivity || []
 
 <template>
   <div>
-    <!-- Header -->
+    <!-- Cabecera -->
     <div class="flex justify-between items-center mb-6">
       <h2 class="font-display text-xl font-medium tracking-tight text-foreground">Estadísticas del Sistema</h2>
       <Button @click="fetchStats" variant="outline" size="sm" class="gap-2" :disabled="loading">
@@ -232,7 +232,7 @@ const robotMax  = computed(() => Math.max(1, ...(stats.value.robotActivity || []
             Sin visitas en los últimos 7 días
           </div>
           <svg v-else viewBox="0 0 280 105" class="w-full" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Gráfico de visitas diarias">
-            <!-- Grid lines -->
+            <!-- Líneas de la cuadrícula -->
             <line x1="0" :y1="PLOT_H * 0.75" x2="280" :y2="PLOT_H * 0.75" stroke="currentColor" stroke-opacity="0.07" stroke-width="1"/>
             <line x1="0" :y1="PLOT_H * 0.5"  x2="280" :y2="PLOT_H * 0.5"  stroke="currentColor" stroke-opacity="0.07" stroke-width="1"/>
             <line x1="0" :y1="PLOT_H * 0.25" x2="280" :y2="PLOT_H * 0.25" stroke="currentColor" stroke-opacity="0.07" stroke-width="1"/>

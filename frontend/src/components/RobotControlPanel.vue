@@ -34,27 +34,27 @@ const props = defineProps({
 
 const emit = defineEmits(['refresh'])
 
-// ── Map ──────────────────────────────────────────────────────────────────────
+// ── Mapa ──────────────────────────────────────────────────────────────────────
 
-// Brand terracotta accent for the live pose arrow - mirrors the light-theme
-// value of --color-primary. Canvas fillStyle/strokeStyle need a literal color
-// (CSS custom properties aren't resolved in the 2D context), and the darker
-// shade reads better against the occupancy grid's white/grey/black palette.
+// Acento terracota de marca para la flecha de pose en vivo - refleja el valor de
+// --color-primary del tema claro. fillStyle/strokeStyle del canvas necesitan un color
+// literal (las custom properties de CSS no se resuelven en el contexto 2D), y el tono
+// más oscuro se lee mejor sobre la paleta blanco/gris/negro del mapa de ocupación.
 const ROBOT_COLOR = '#B0461E'
 
 const mapCanvas  = ref(null)
 const mapLoading = ref(false)
 const mapError   = ref(null)
-const mapData    = ref(null)   // { info: {...}, data: [...] } - fetched once, on demand
-const scanData   = ref(null)   // fetched once when panel opens, not polled
+const mapData    = ref(null)   // { info: {...}, data: [...] } - se obtiene una vez, bajo demanda
+const scanData   = ref(null)   // se obtiene una vez al abrir el panel, sin polling
 
-// Pose comes for free from props.robot (updated in real-time via SSE).
-// No HTTP request needed.
+// La pose llega gratis desde props.robot (actualizada en tiempo real vía SSE).
+// No hace falta ninguna petición HTTP.
 const pose = computed(() => props.robot.position ?? null)
 
-// Interaction mode: 'none' | 'nav-goal'
+// Modo de interacción: 'none' | 'nav-goal'
 const mapMode    = ref('none')
-const pendingClick = ref(null) // { x, y } in map coords
+const pendingClick = ref(null) // { x, y } en coordenadas del mapa
 
 const loadMap = async () => {
     mapLoading.value = true
@@ -72,12 +72,12 @@ const loadScan = async () => {
     try { scanData.value = await robotService.getScan(props.robot.id) } catch (_) {}
 }
 
-// Refresh both the occupancy grid and the laser scan (and thus the nearest-obstacle
-// readout) in one click.
+// Refresca de una sola vez el mapa de ocupación y el escaneo láser (y con ello la
+// lectura del obstáculo más cercano).
 const refreshSensors = () => { loadMap(); loadScan(); }
 
-// Redraw when map data or the live pose from SSE changes.
-// Scan is overlaid only once (static after fetch).
+// Redibuja cuando cambian los datos del mapa o la pose en vivo de SSE.
+// El escaneo se superpone una sola vez (estático tras obtenerlo).
 watch([mapData, pose, scanData], () => { nextTick(drawCanvas) })
 
 const drawCanvas = () => {
@@ -95,7 +95,7 @@ const drawCanvas = () => {
 
     for (let i = 0; i < data.length; i++) {
         const v = data[i]
-        // -1 = unknown (grey), 0 = free (white), 100 = occupied (black)
+        // -1 = desconocido (gris), 0 = libre (blanco), 100 = ocupado (negro)
         let r, g, b
         if (v === -1)      { r = 127; g = 127; b = 127 }
         else if (v === 0)  { r = 255; g = 255; b = 255 }
@@ -109,7 +109,7 @@ const drawCanvas = () => {
     }
     ctx.putImageData(img, 0, 0)
 
-    // ── Laser scan overlay (static snapshot, no polling) ─────────────────────
+    // ── Superposición del escaneo láser (instantánea estática, sin polling) ─────────────────────
     if (scanData.value && pose.value) {
         const scan       = scanData.value
         const robotTheta = pose.value.theta ?? 0
@@ -140,7 +140,7 @@ const drawCanvas = () => {
         ctx.restore()
     }
 
-    // ── Robot pose arrow (live from SSE via props.robot.position) ─────────────
+    // ── Flecha de pose del robot (en vivo desde SSE vía props.robot.position) ─────────────
     if (pose.value) {
         const theta = pose.value.theta ?? 0
         const { info } = mapData.value
@@ -162,7 +162,7 @@ const drawCanvas = () => {
         ctx.restore()
     }
 
-    // ── Pending click marker ──────────────────────────────────────────────────
+    // ── Marcador de clic pendiente ──────────────────────────────────────────────────
     if (pendingClick.value) {
         const { info } = mapData.value
         const cx = (pendingClick.value.x - info.origin.position.x) / info.resolution
@@ -177,7 +177,7 @@ const drawCanvas = () => {
     }
 }
 
-// ── Map interaction (nav-goal) ────────────────────────────────────────────────
+// ── Interacción con el mapa (nav-goal) ────────────────────────────────────────────────
 
 const canvasToWorld = (e) => {
     const canvas  = mapCanvas.value
@@ -192,7 +192,7 @@ const canvasToWorld = (e) => {
     return { wx, wy }
 }
 
-// State for orientation drag
+// Estado para el arrastre de orientación
 const dragging     = ref(false)
 const dragStart    = ref(null)  // { wx, wy }
 
@@ -234,7 +234,7 @@ const onCanvasMouseup = async (e) => {
     }
 }
 
-// ── Navigation controls ───────────────────────────────────────────────────────
+// ── Controles de navegación ───────────────────────────────────────────────────────
 
 const navStatus   = ref(null)
 const navLoading  = ref(false)
@@ -269,7 +269,7 @@ const goToBase = async () => {
     }
 }
 
-// ── Teleoperation ─────────────────────────────────────────────────────────────
+// ── Teleoperación ─────────────────────────────────────────────────────────────
 
 const LINEAR_SPEED  = 0.3  // m/s
 const ANGULAR_SPEED = 0.8  // rad/s
@@ -318,7 +318,7 @@ const onKeyup = (e) => {
     }
 }
 
-// Dpad buttons
+// Botones del D-pad
 const dpadDown  = ref(null)  // { lx, az }
 let dpadTimer   = null
 
@@ -334,8 +334,8 @@ const endDpad = () => {
     stopRobot()
 }
 
-// ── Lifecycle ─────────────────────────────────────────────────────────────────
-// No polling. Pose is live via SSE (props.robot). Map and scan are one-shot HTTP.
+// ── Ciclo de vida ─────────────────────────────────────────────────────────────────
+// Sin polling. La pose llega en vivo por SSE (props.robot). El mapa y el escaneo son HTTP de una sola vez.
 
 onMounted(() => {
     window.addEventListener('keydown', onKeydown)
@@ -363,7 +363,7 @@ watch(() => props.robot.connected, (connected) => {
     }
 })
 
-// ── Computed helpers ──────────────────────────────────────────────────────────
+// ── Helpers computados ──────────────────────────────────────────────────────────
 
 const poseText = computed(() => {
     if (!pose.value) return null
@@ -376,11 +376,11 @@ const mapModeLabel = computed(() => ({
     'nav-goal':     'Modo: Clic → Arrastrar para establecer objetivo',
 }[mapMode.value]))
 
-// Current location = nearest waypoint to the live pose (from API/SSE).
+// Ubicación actual = waypoint más cercano a la pose en vivo (desde API/SSE).
 const currentLocation = computed(() => props.robot.current_location?.name || null)
 
-// Nearest obstacle distance from the latest LIDAR scan - the human-readable
-// form of "consultar el escaneo LIDAR". Picks the smallest valid range reading.
+// Distancia al obstáculo más cercano del último escaneo LIDAR - la forma legible
+// de "consultar el escaneo LIDAR". Toma la menor lectura de rango válida.
 const nearestObstacle = computed(() => {
     const s = scanData.value
     if (!s || !Array.isArray(s.ranges)) return null
@@ -399,12 +399,12 @@ const nearestObstacle = computed(() => {
 <template>
     <div class="grid gap-6 lg:grid-cols-3">
 
-        <!-- ── Map section ─────────────────────────────────────────────────── -->
+        <!-- ── Sección del mapa ─────────────────────────────────────────────────── -->
         <div class="lg:col-span-2 space-y-2">
             <div class="flex flex-wrap gap-2 items-center justify-between">
                 <span class="text-sm font-semibold text-foreground">Mapa en Vivo</span>
                 <div class="flex gap-1.5 flex-wrap">
-                    <!-- Mode toggles -->
+                    <!-- Conmutadores de modo -->
                     <Button size="sm" variant="outline" @click="refreshSensors" :disabled="!robot.connected || mapLoading" class="h-7 px-2 text-xs gap-1">
                         <Loader2 v-if="mapLoading" class="w-3 h-3 animate-spin" />
                         <RotateCcw v-else class="w-3 h-3" />
@@ -433,33 +433,33 @@ const nearestObstacle = computed(() => {
                 </div>
             </div>
 
-            <!-- Current location (nearest waypoint) -->
+            <!-- Ubicación actual (waypoint más cercano) -->
             <p v-if="currentLocation" class="text-xs flex items-center gap-1 text-muted-foreground">
                 <MapPin class="w-3 h-3 text-primary shrink-0" />
                 Ubicación actual: <span class="font-medium text-foreground">{{ currentLocation }}</span>
             </p>
 
-            <!-- Mode hint -->
+            <!-- Pista del modo -->
             <p v-if="mapMode !== 'none'" class="text-xs px-2 py-1 rounded-sm bg-green-500/10 text-green-700 dark:text-green-400">
                 {{ mapModeLabel }}
             </p>
 
-            <!-- Status / error bar -->
+            <!-- Barra de estado / error -->
             <p v-if="navStatus" class="text-xs text-muted-foreground font-mono">{{ navStatus }}</p>
             <p v-if="mapError"  class="text-xs text-destructive">{{ mapError }}</p>
 
-            <!-- AMCL pose readout -->
+            <!-- Lectura de la pose AMCL -->
             <p v-if="poseText" class="text-xs font-mono text-muted-foreground">
                 AMCL → {{ poseText }}
             </p>
 
-            <!-- Nearest obstacle from the LIDAR scan -->
+            <!-- Obstáculo más cercano del escaneo LIDAR -->
             <p v-if="nearestObstacle !== null" class="text-xs flex items-center gap-1 text-muted-foreground">
                 <Radar class="w-3 h-3 text-primary shrink-0" />
                 Obstáculo más próximo (LIDAR): <span class="font-medium text-foreground">{{ nearestObstacle.toFixed(2) }} m</span>
             </p>
 
-            <!-- Canvas -->
+            <!-- Lienzo -->
             <div class="relative border border-border rounded-md overflow-hidden bg-muted/30"
                 :class="mapMode === 'nav-goal' ? 'cursor-crosshair ring-2 ring-green-500' : 'cursor-default'">
 
@@ -472,11 +472,11 @@ const nearestObstacle = computed(() => {
                     <span>{{ robot.connected ? 'Cargando mapa…' : 'Conecta el robot para ver el mapa' }}</span>
                 </div>
 
-                <!-- block + w-full + h-auto keeps the rendered image exactly
-                     proportional to the canvas pixels, so click→world mapping in
-                     canvasToWorld() is accurate. (object-contain/max-h letterboxed
-                     it and broke the goal placement.) pixelated keeps the grid crisp
-                     when scaled up. -->
+                <!-- block + w-full + h-auto mantiene la imagen renderizada exactamente
+                     proporcional a los píxeles del canvas, así el mapeo clic→mundo de
+                     canvasToWorld() es preciso. (object-contain/max-h la dejaba con bandas
+                     y rompía la colocación del objetivo.) pixelated mantiene la rejilla
+                     nítida al ampliarla. -->
                 <canvas
                     v-show="mapData"
                     ref="mapCanvas"
@@ -487,14 +487,14 @@ const nearestObstacle = computed(() => {
             </div>
         </div>
 
-        <!-- ── Teleoperation ───────────────────────────────────────────────── -->
+        <!-- ── Teleoperación ───────────────────────────────────────────────── -->
         <div class="lg:col-span-1 space-y-2">
             <span class="text-sm font-semibold text-foreground">Teleoperación</span>
             <p class="text-xs text-muted-foreground">Usa las teclas WASD / ↑↓←→ o el D-pad.</p>
 
             <div class="flex justify-center">
                 <div class="grid grid-cols-3 gap-1.5 w-36">
-                    <!-- Row 1 -->
+                    <!-- Fila 1 -->
                     <div></div>
                     <Button size="icon"
                         class="w-10 h-10 select-none"
@@ -509,7 +509,7 @@ const nearestObstacle = computed(() => {
                     </Button>
                     <div></div>
 
-                    <!-- Row 2 -->
+                    <!-- Fila 2 -->
                     <Button size="icon"
                         class="w-10 h-10 select-none"
                         :variant="dpadDown?.az > 0 ? 'default' : 'outline'"
@@ -540,7 +540,7 @@ const nearestObstacle = computed(() => {
                         <RotateCw class="w-4 h-4" />
                     </Button>
 
-                    <!-- Row 3 -->
+                    <!-- Fila 3 -->
                     <div></div>
                     <Button size="icon"
                         class="w-10 h-10 select-none"

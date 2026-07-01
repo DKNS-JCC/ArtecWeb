@@ -61,7 +61,7 @@ const handleChange = async () => {
     <div class="min-h-screen flex items-center justify-center bg-background px-6 py-12">
         <div class="w-full max-w-[26rem]">
 
-            <!-- Masthead, like the head of a catalogue entry -->
+            <!-- Cabecera, como el encabezado de una entrada de catálogo -->
             <header class="reveal" style="animation-delay: 40ms">
                 <h1 class="font-display text-5xl font-medium tracking-tight leading-[0.95] mb-3">
                     {{ isForced ? 'Cambia tu contraseña' : 'Cambiar contraseña' }}

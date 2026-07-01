@@ -4,10 +4,10 @@
  * errores (un 401 cierra la sesión y redirige al login).
  * @module services/api
  */
-// Default to a SAME-ORIGIN relative path ('/api'), which Vite proxies to the
-// backend. This means the app works on any network with no IP to configure:
-// whatever host the phone used to load the page is the host the API calls go to.
-// Set VITE_API_URL only to override (e.g. point at a remote backend).
+// Por defecto usa una ruta relativa del MISMO ORIGEN ('/api'), que Vite redirige
+// (proxy) al backend. Así la app funciona en cualquier red sin configurar ninguna IP:
+// el host desde el que el móvil cargó la página es el host al que van las llamadas a la API.
+// Define VITE_API_URL solo para sobreescribirlo (p. ej. apuntar a un backend remoto).
 const API_BASE = import.meta.env.VITE_API_URL || '/api'
 
 /**

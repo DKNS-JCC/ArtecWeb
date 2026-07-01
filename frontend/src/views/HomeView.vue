@@ -39,7 +39,7 @@ onUnmounted(() => window.removeEventListener('scroll', handleScroll));
 
 <template>
     <div>
-        <!-- HERO - Scroll-driven video -->
+        <!-- HERO - Vídeo controlado por scroll -->
         <div ref="containerRef" class="scroll-container">
             <div class="sticky-wrapper">
                 <video ref="videoRef" src="/output.mp4" preload="auto" muted playsinline class="video-bg" />
@@ -128,8 +128,8 @@ onUnmounted(() => window.removeEventListener('scroll', handleScroll));
 </template>
 
 <style scoped>
-/* Scroll-driven hero video - kept as scoped CSS for the sticky/overlay
-   mechanics that Tailwind utilities can't express cleanly. */
+/* Vídeo del hero controlado por scroll - se mantiene como CSS scoped por la mecánica
+   de sticky/overlay que las utilidades de Tailwind no expresan de forma limpia. */
 .scroll-container {
     height: 350vh;
     background: var(--color-background);

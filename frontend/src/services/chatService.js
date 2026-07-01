@@ -22,8 +22,8 @@ export const chatService = /** @lends module:services/chatService.chatService */
     },
 
     /**
-     * Transcribe a recorded voice clip using the backend's local Whisper model.
-     * @param {Blob} wavBlob  16 kHz mono PCM-16 WAV produced by useSpeechToText.
+     * Transcribe un clip de voz grabado usando el modelo local de Whisper del backend.
+     * @param {Blob} wavBlob  WAV PCM-16 mono de 16 kHz producido por useSpeechToText.
      * @returns {Promise<{ text: string }>}
      */
     transcribe(wavBlob) {
@@ -33,8 +33,8 @@ export const chatService = /** @lends module:services/chatService.chatService */
     },
 
     /**
-     * Confirm a pending navigate_to intent and fire the actual ROS goal.
-     * @param {string} placeId  Zone ID returned by the chat API as resolved_place.id
+     * Confirma un intent navigate_to pendiente y lanza el goal real de ROS.
+     * @param {string} placeId  ID de la zona devuelto por la API del chat como resolved_place.id
      */
     confirmNav(placeId) {
         return api.post('/chat/confirm-nav', { place_id: placeId })

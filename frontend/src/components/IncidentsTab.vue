@@ -61,7 +61,7 @@ const typeLabel = (t) => TYPE_LABELS[t] || t
 
 function formatWhen(ts) {
     if (!ts) return '-'
-    // SQLite stores UTC without a zone marker; normalise so it renders in local time.
+    // SQLite guarda UTC sin marca de zona; se normaliza para que se muestre en hora local.
     const d = new Date(ts.includes('T') ? ts : ts.replace(' ', 'T') + 'Z')
     return d.toLocaleString('es-ES', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })
 }
@@ -72,7 +72,7 @@ defineExpose({ refresh: fetchIncidents })
 
 <template>
     <div>
-        <!-- Header -->
+        <!-- Cabecera -->
         <div class="flex flex-wrap justify-between items-center gap-3 mb-6">
             <div>
                 <h2 class="font-display text-xl font-medium tracking-tight text-foreground flex items-center gap-2">
@@ -93,12 +93,12 @@ defineExpose({ refresh: fetchIncidents })
             </div>
         </div>
 
-        <!-- Loading -->
+        <!-- Cargando -->
         <div v-if="loading" class="flex justify-center items-center h-40">
             <div class="animate-spin rounded-full h-10 w-10 border-b-2 border-primary"></div>
         </div>
 
-        <!-- Empty -->
+        <!-- Vacío -->
         <div v-else-if="visibleIncidents.length === 0"
             class="flex flex-col items-center justify-center p-12 text-muted-foreground border border-dashed border-border rounded-md">
             <CheckCircle2 class="w-10 h-10 mb-3 opacity-40 text-green-500" />
@@ -106,7 +106,7 @@ defineExpose({ refresh: fetchIncidents })
             <p class="text-sm">Todo funciona correctamente.</p>
         </div>
 
-        <!-- List -->
+        <!-- Lista -->
         <div v-else class="space-y-3">
             <div v-for="inc in visibleIncidents" :key="inc.id"
                 class="flex items-start gap-4 p-4 rounded-lg border bg-card transition-colors"

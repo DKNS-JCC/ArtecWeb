@@ -82,14 +82,14 @@ let isPanning = false
 let panStart = { x: 0, y: 0 }
 
 const isPlacingMode = ref(false)
-const placingBase = ref(false)        // placing/moving the internal base point
+const placingBase = ref(false)        // colocando/moviendo el punto base interno
 const pendingZone = ref(null)
 const showZoneForm = ref(false)
 const zoneForm = ref({ name: '', description: '', category: 'exhibit' })
 
-// The single base point of the current map (or null if not defined yet).
+// El único punto base del mapa actual (o null si aún no está definido).
 const baseZone = computed(() => zones.value.find(z => z.category === BASE_CATEGORY) || null)
-// Visitor-facing zones shown in the regular list (base is managed separately).
+// Zonas visibles para el visitante que se muestran en la lista normal (la base se gestiona aparte).
 const regularZones = computed(() => zones.value.filter(z => z.category !== BASE_CATEGORY))
 
 const editingZone = ref(null)
@@ -367,7 +367,7 @@ function screenToImage(clientX, clientY) {
     }
 }
 
-// Convert image-pixel coords → ROS world coords (meters), matching RViz frame
+// Convierte coords de píxel de imagen → coords del mundo de ROS (metros), acordes al marco de RViz
 function pixelToWorld(px, py) {
     const { resolution, origin_x, origin_y, height } = mapData.value
     return {
@@ -376,7 +376,7 @@ function pixelToWorld(px, py) {
     }
 }
 
-// Convert ROS world coords (meters) → image-pixel coords for canvas rendering
+// Convierte coords del mundo de ROS (metros) → coords de píxel de imagen para dibujar en el lienzo
 function worldToPixel(wx, wy) {
     const { resolution, origin_x, origin_y, height } = mapData.value
     return {
@@ -421,7 +421,7 @@ function handleCanvasClick(e) {
 
     const clicked = findZoneAtPosition(x, y)
     if (clicked) {
-        // The base point is edited via its dedicated controls, not the zone form.
+        // El punto base se edita con sus controles dedicados, no con el formulario de zona.
         if (clicked.category === BASE_CATEGORY) return
         editingZone.value = clicked
         editForm.value = {
@@ -433,7 +433,7 @@ function handleCanvasClick(e) {
     }
 }
 
-// ── Base point management ──────────────────────────────────────────────────────
+// ── Gestión del punto base ──────────────────────────────────────────────────────
 
 function startPlacingBase() {
     isPlacingMode.value = false
@@ -761,9 +761,9 @@ onMounted(async () => {
         selectedMuseumId.value = museumOptions.value[0].id
     }
 
-    // watch(selectedMuseumId) misses the initial value set by watch(museumOptions, { immediate: true })
-    // because that watch fires during setup before watch(selectedMuseumId) is registered.
-    // Explicitly load maps here if they haven't been fetched yet.
+    // watch(selectedMuseumId) se pierde el valor inicial que fija watch(museumOptions, { immediate: true })
+    // porque ese watch se dispara durante el setup, antes de registrar watch(selectedMuseumId).
+    // Por eso cargamos aquí los mapas explícitamente si aún no se han obtenido.
     if (selectedMuseumId.value && maps.value.length === 0) {
         await fetchMaps(selectedMuseumId.value)
     }
@@ -785,15 +785,15 @@ onUnmounted(() => {
 
 <template>
     <div class="flex flex-col gap-4">
-        <!-- Alerts -->
+        <!-- Alertas -->
         <Alert v-if="error" variant="destructive">{{ error }}</Alert>
         <Alert v-if="success" variant="success">{{ success }}</Alert>
 
-        <!-- Top Bar -->
+        <!-- Barra superior -->
         <Card>
             <CardContent class="p-3">
                 <div class="flex flex-wrap items-center gap-3">
-                    <!-- Museum selector -->
+                    <!-- Selector de museo -->
                     <div class="flex items-center gap-2">
                         <Label class="text-xs text-muted-foreground whitespace-nowrap shrink-0">Museo</Label>
                         <select
@@ -807,10 +807,10 @@ onUnmounted(() => {
                         </select>
                     </div>
 
-                    <!-- Divider -->
+                    <!-- Separador -->
                     <div class="h-5 w-px bg-border hidden sm:block"></div>
 
-                    <!-- Map selector -->
+                    <!-- Selector de mapa -->
                     <div class="flex items-center gap-2">
                         <Label class="text-xs text-muted-foreground whitespace-nowrap shrink-0">Mapa</Label>
                         <select
@@ -823,16 +823,16 @@ onUnmounted(() => {
                         </select>
                     </div>
 
-                    <!-- Spacer -->
+                    <!-- Espaciador -->
                     <div class="flex-1"></div>
 
-                    <!-- Robot count badge -->
+                    <!-- Contador de robots -->
                     <div v-if="selectedMapId" class="flex items-center gap-1.5 text-xs text-muted-foreground bg-muted px-3 py-1.5 rounded-full">
                         <Bot class="w-3.5 h-3.5" />
                         {{ robotsAssignedToMap.length }} robot{{ robotsAssignedToMap.length !== 1 ? 's' : '' }}
                     </div>
 
-                    <!-- Actions -->
+                    <!-- Acciones -->
                     <Button
                         @click="showCapturePanel = !showCapturePanel; showUploadPanel = false"
                         :variant="showCapturePanel ? 'default' : 'outline'"
@@ -868,7 +868,7 @@ onUnmounted(() => {
             </CardContent>
         </Card>
 
-        <!-- Capture from Robot Panel -->
+        <!-- Panel de captura desde el robot -->
         <Card v-if="showCapturePanel">
             <CardContent class="p-4">
                 <p class="text-xs text-muted-foreground mb-4">
@@ -901,7 +901,7 @@ onUnmounted(() => {
             </CardContent>
         </Card>
 
-        <!-- Upload Panel (collapsible) -->
+        <!-- Panel de subida (plegable) -->
         <Card v-if="showUploadPanel">
             <CardContent class="p-4">
                 <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -937,12 +937,12 @@ onUnmounted(() => {
             </CardContent>
         </Card>
 
-        <!-- Loading -->
+        <!-- Cargando -->
         <div v-if="loading" class="flex items-center justify-center py-20">
             <div class="w-8 h-8 border-4 border-primary/30 border-t-primary rounded-full animate-spin"></div>
         </div>
 
-        <!-- Empty state -->
+        <!-- Estado vacío -->
         <div v-else-if="!selectedMapId" class="flex flex-col items-center justify-center py-20 text-center">
             <MapPin class="w-12 h-12 text-muted-foreground opacity-30 mb-4" />
             <p class="text-base font-medium text-muted-foreground">
@@ -953,9 +953,9 @@ onUnmounted(() => {
             </p>
         </div>
 
-        <!-- Map selected: optional base warning + workspace -->
+        <!-- Mapa seleccionado: aviso de base opcional + área de trabajo -->
         <div v-else class="flex flex-col gap-4">
-        <!-- Mandatory base warning -->
+        <!-- Aviso de base obligatoria -->
         <div v-if="!baseZone"
             class="flex items-start gap-3 rounded-sm border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/30 px-4 py-3">
             <AlertTriangle class="w-5 h-5 text-amber-700 dark:text-amber-400 shrink-0 mt-0.5" />
@@ -970,11 +970,11 @@ onUnmounted(() => {
             </Button>
         </div>
 
-        <!-- Main map workspace -->
+        <!-- Área de trabajo principal del mapa -->
         <div class="flex gap-4 flex-col xl:flex-row">
-            <!-- Canvas card with floating controls -->
+            <!-- Tarjeta del lienzo con controles flotantes -->
             <Card class="flex-1 overflow-hidden relative">
-                <!-- Top-left: map name + zone count + add-zone button -->
+                <!-- Arriba a la izquierda: nombre del mapa + nº de zonas + botón de añadir zona -->
                 <div class="absolute top-3 left-3 z-10 flex items-center gap-2 flex-wrap">
                     <span class="text-sm font-semibold bg-background/90 backdrop-blur-sm px-3 py-1.5 rounded-sm border border-border shadow-sm">
                         {{ mapData?.name }}
@@ -993,7 +993,7 @@ onUnmounted(() => {
                     </Button>
                 </div>
 
-                <!-- Top-right: zoom controls -->
+                <!-- Arriba a la derecha: controles de zoom -->
                 <div class="absolute top-3 right-3 z-10 flex flex-col gap-1">
                     <Button @click="zoomIn" variant="secondary" size="icon" class="h-8 w-8 shadow-sm bg-background/90 backdrop-blur-sm">
                         <ZoomIn class="w-3.5 h-3.5" />
@@ -1006,7 +1006,7 @@ onUnmounted(() => {
                     </Button>
                 </div>
 
-                <!-- Placing mode banner (centered top overlay) -->
+                <!-- Banner del modo de colocación (superpuesto arriba y centrado) -->
                 <div
                     v-if="isPlacingMode || placingBase"
                     class="absolute top-3 left-1/2 -translate-x-1/2 z-10 flex items-center gap-2 px-4 py-2 rounded-sm shadow-sm text-sm font-medium whitespace-nowrap"
@@ -1019,7 +1019,7 @@ onUnmounted(() => {
                     </button>
                 </div>
 
-                <!-- Canvas -->
+                <!-- Lienzo -->
                 <div ref="containerRef" class="relative w-full" style="height: 560px;">
                     <canvas
                         ref="canvasRef"
@@ -1034,9 +1034,9 @@ onUnmounted(() => {
                 </div>
             </Card>
 
-            <!-- Right sidebar -->
+            <!-- Barra lateral derecha -->
             <div class="xl:w-72 shrink-0 flex flex-col gap-4">
-                <!-- Zones list -->
+                <!-- Lista de zonas -->
                 <Card class="flex-1">
                     <CardHeader class="pb-2 pt-4 px-4">
                         <h4 class="text-sm font-semibold text-foreground">Zonas</h4>
@@ -1069,7 +1069,7 @@ onUnmounted(() => {
                     </CardContent>
                 </Card>
 
-                <!-- Base point (internal) -->
+                <!-- Punto base (interno) -->
                 <Card>
                     <CardHeader class="pb-2 pt-4 px-4">
                         <h4 class="text-sm font-semibold text-foreground flex items-center gap-1.5">
@@ -1100,13 +1100,13 @@ onUnmounted(() => {
                     </CardContent>
                 </Card>
 
-                <!-- Robot assignment -->
+                <!-- Asignación de robots -->
                 <Card>
                     <CardHeader class="pb-2 pt-4 px-4">
                         <h4 class="text-sm font-semibold text-foreground">Robots asignados</h4>
                     </CardHeader>
                     <CardContent class="px-4 pb-4 space-y-3">
-                        <!-- Assign -->
+                        <!-- Asignar -->
                         <div class="flex gap-2">
                             <select
                                 v-model="selectedRobotToAssign"
@@ -1127,7 +1127,7 @@ onUnmounted(() => {
                             Define el punto base para poder asignar robots.
                         </p>
 
-                        <!-- Assigned robots list -->
+                        <!-- Lista de robots asignados -->
                         <div v-if="robotsAssignedToMap.length === 0" class="text-sm text-muted-foreground text-center py-2">
                             Ningún robot asignado.
                         </div>
@@ -1158,7 +1158,7 @@ onUnmounted(() => {
         </div>
         </div>
 
-        <!-- New zone modal -->
+        <!-- Modal de nueva zona -->
         <Teleport to="body">
             <div
                 v-if="showZoneForm"
@@ -1207,7 +1207,7 @@ onUnmounted(() => {
             </div>
         </Teleport>
 
-        <!-- Edit zone modal -->
+        <!-- Modal de editar zona -->
         <Teleport to="body">
             <div
                 v-if="showEditForm"

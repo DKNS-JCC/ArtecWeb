@@ -62,8 +62,8 @@ const router = createRouter({
             path: '/dashboard',
             name: 'dashboard',
             component: () => import('../views/DashboardView.vue'),
-            // Staff = technicians + admins. The view itself limits which tabs a
-            // technician sees (Robots only).
+            // Personal = técnicos + administradores. La propia vista limita qué pestañas ve
+            // un técnico (solo Robots).
             meta: { requiresAuth: true, requiresStaff: true }
         },
         {
@@ -97,7 +97,7 @@ const router = createRouter({
             name: 'not-found',
             component: () => import('../views/NotFoundView.vue')
         },
-        // Catch-all - must be last
+        // Catch-all - debe ir el último
         {
             path: '/:pathMatch(.*)*',
             redirect: '/404'
@@ -105,31 +105,31 @@ const router = createRouter({
     ]
 })
 
-// Navigation Guard - uses Pinia auth store (single source of truth)
+// Guard de navegación - usa el store de auth de Pinia (fuente única de verdad)
 router.beforeEach((to, from, next) => {
     const authStore = useAuthStore()
 
-    // 1. Force active visitors to stay in the chat until they end the session
+    // 1. Obliga a los visitantes activos a permanecer en el chat hasta que terminen la sesión
     if (authStore.isAuthenticated && authStore.isVisitor && to.name !== 'chat') {
         return next({ name: 'chat' })
     }
 
-    // 2. Protect any route requiring auth
+    // 2. Protege cualquier ruta que requiera autenticación
     if (to.meta.requiresAuth && !authStore.isAuthenticated) {
         return next({ name: 'login' })
     }
 
-    // 3. Protect staff routes (like profile) from visitors
+    // 3. Protege las rutas de personal (como el perfil) frente a los visitantes
     if (to.meta.requiresStaff && authStore.user?.role === 'visitor') {
         return next({ name: 'home' })
     }
 
-    // 4. If authenticated admin with must_change_password, force them to change it
+    // 4. Si un admin autenticado tiene must_change_password, le obliga a cambiarla
     if (authStore.isAuthenticated && authStore.mustChangePassword && to.name !== 'change-password') {
         return next({ name: 'change-password' })
     }
 
-    // 5. Already logged in → skip login pages
+    // 5. Ya con sesión iniciada → salta las páginas de login
     if (to.name === 'login' && authStore.isAuthenticated && !authStore.mustChangePassword) {
         return next(authStore.isStaff ? { name: 'dashboard' } : { name: 'home' })
     }

@@ -26,7 +26,7 @@ const authStore = useAuthStore()
 
 const error          = ref('')
 const loading        = ref(false)
-const checking       = ref(true)   // verifying robot availability on entry
+const checking       = ref(true)   // verifica la disponibilidad del robot al entrar
 const robotId        = ref('')
 const visitorName    = ref('')
 const expertiseLevel = ref('general')
@@ -157,7 +157,7 @@ const LEVELS = computed(() => [
     { id: 'experto', ...t.value.levels.experto }
 ])
 
-// Description of the currently selected level, shown under the combo box.
+// Descripción del nivel seleccionado, mostrada bajo el combo box.
 const selectedLevel = computed(() => LEVELS.value.find(l => l.id === expertiseLevel.value))
 
 onMounted(async () => {
@@ -208,7 +208,7 @@ const startChat = async () => {
   <div class="min-h-screen flex items-center justify-center bg-background px-6 py-12">
     <div class="w-full max-w-[26rem]">
 
-      <!-- Language selector (always visible) -->
+      <!-- Selector de idioma (siempre visible) -->
       <div class="flex justify-center gap-2 mb-8">
         <button v-for="lang in LANGUAGES" :key="lang.id" @click="authStore.setLanguage(lang.id)"
           type="button" class="flex items-center gap-1 px-3 py-2 text-sm rounded-sm transition-all border"
@@ -221,7 +221,7 @@ const startChat = async () => {
         </button>
       </div>
 
-      <!-- Checking robot availability -->
+      <!-- Comprobando la disponibilidad del robot -->
       <div v-if="checking" class="flex flex-col items-center gap-4 text-center reveal">
         <div class="h-9 w-9 rounded-full border-4 border-primary/30 border-t-primary animate-spin"></div>
         <p class="text-muted-foreground text-[0.95rem]">{{ t.checking_robot }}</p>
@@ -239,7 +239,7 @@ const startChat = async () => {
         </p>
       </div>
 
-      <!-- Form -->
+      <!-- Formulario -->
       <div v-else-if="showNamePrompt">
         <header class="reveal" style="animation-delay: 40ms">
           <h1 class="font-display text-5xl font-medium tracking-tight leading-[0.95] mb-3">{{ t.greeting }}</h1>
@@ -274,7 +274,7 @@ const startChat = async () => {
         </div>
       </div>
 
-      <!-- Loading -->
+      <!-- Cargando -->
       <div v-else-if="loading" class="flex flex-col items-center gap-4 text-center reveal">
         <div class="h-9 w-9 rounded-full border-4 border-primary/30 border-t-primary animate-spin"></div>
         <p class="text-muted-foreground text-[0.95rem]">{{ t.establishing_connection }}</p>

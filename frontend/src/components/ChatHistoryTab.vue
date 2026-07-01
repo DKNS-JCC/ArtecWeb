@@ -34,11 +34,11 @@ const loadingMsgs  = ref(false)
 const selectedSession = ref(null)
 const messages        = ref([])
 
-// session_id awaiting delete confirmation (null = none)
+// session_id a la espera de confirmar el borrado (null = ninguno)
 const pendingDelete   = ref(null)
 const deleting        = ref(false)
 
-// ─── Expertise label map ───────────────────────────────────────────────────────
+// ─── Mapa de etiquetas de nivel ───────────────────────────────────────────────────────
 
 const EXPERTISE = {
     nino:       { label: 'Niño',       color: 'bg-yellow-50 dark:bg-yellow-950/30 text-yellow-700 dark:text-yellow-400 border-yellow-200 dark:border-yellow-800' },
@@ -55,7 +55,7 @@ const INTENT_LABEL = {
     none:        '',
 }
 
-// ─── Computed ──────────────────────────────────────────────────────────────────
+// ─── Computadas ──────────────────────────────────────────────────────────────────
 
 const hasMore        = computed(() => offset.value + LIMIT < total.value)
 const hasDateFilter  = computed(() => dateFrom.value || dateTo.value)
@@ -122,7 +122,7 @@ async function loadMore() {
 }
 
 async function selectSession(s) {
-    if (pendingDelete.value) return   // block selection while confirming delete
+    if (pendingDelete.value) return   // bloquea la selección mientras se confirma el borrado
     selectedSession.value = s
     messages.value        = []
     loadingMsgs.value     = true
@@ -186,9 +186,9 @@ onMounted(async () => {
       </Button>
     </div>
 
-    <!-- Filter bar -->
+    <!-- Barra de filtros -->
     <div class="flex flex-wrap items-center gap-3 mb-6">
-      <!-- Robot filter -->
+      <!-- Filtro de robot -->
       <div class="relative">
         <Bot class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
         <select
@@ -200,7 +200,7 @@ onMounted(async () => {
         </select>
       </div>
 
-      <!-- Date from -->
+      <!-- Fecha desde -->
       <div class="relative">
         <Calendar class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
         <input
@@ -224,22 +224,22 @@ onMounted(async () => {
         />
       </div>
 
-      <!-- Clear dates -->
+      <!-- Limpiar fechas -->
       <Button v-if="hasDateFilter" @click="clearDates" variant="ghost" size="sm" class="gap-1.5 text-muted-foreground hover:text-foreground">
         <X class="w-3.5 h-3.5" /> Limpiar fechas
       </Button>
 
-      <!-- Session count -->
+      <!-- Contador de sesiones -->
       <span class="text-sm text-muted-foreground ml-auto bg-muted/50 px-3 py-1.5 rounded-full border border-border">
         <History class="w-4 h-4 inline-block mr-1 align-text-bottom" />
         {{ total }} sesión{{ total !== 1 ? 'es' : '' }}
       </span>
     </div>
 
-    <!-- Two-panel layout -->
+    <!-- Disposición de dos paneles -->
     <div class="flex gap-4" style="min-height: 520px;">
 
-      <!-- ── Session list (left) ─────────────────────────────────── -->
+      <!-- ── Lista de sesiones (izquierda) ─────────────────────────────────── -->
       <div class="w-full md:w-2/5 flex flex-col gap-2 overflow-y-auto pr-1" style="max-height:620px;">
 
         <p v-if="loading && sessions.length === 0" class="text-sm text-muted-foreground text-center py-10 animate-pulse">
@@ -268,7 +268,7 @@ onMounted(async () => {
             class="p-4"
             @click="selectSession(s)"
           >
-            <!-- Row 1: name + badge + delete button -->
+            <!-- Fila 1: nombre + insignia + botón de borrar -->
             <div class="flex items-start justify-between gap-2 mb-2">
               <span class="font-semibold text-sm text-foreground truncate flex items-center gap-1.5">
                 <span class="w-6 h-6 flex items-center justify-center bg-primary/10 text-primary rounded-full text-xs shrink-0 uppercase">
@@ -289,13 +289,13 @@ onMounted(async () => {
                 </button>
               </div>
             </div>
-            <!-- Row 2: robot + date -->
+            <!-- Fila 2: robot + fecha -->
             <div class="text-xs text-muted-foreground mb-2 flex items-center gap-1">
                <Bot class="w-3 h-3" /> {{ s.robot_name }}
                <span class="mx-1 opacity-50">•</span>
                <Calendar class="w-3 h-3" /> {{ formatDate(s.started_at) }}
             </div>
-            <!-- Row 3: stats -->
+            <!-- Fila 3: estadísticas -->
             <div class="flex items-center gap-3 text-xs font-medium text-muted-foreground bg-muted/30 p-1.5 rounded-md">
               <span class="flex items-center gap-1"><Clock class="w-3 h-3" /> {{ formatDuration(s.duration_minutes) }}</span>
               <span class="flex items-center gap-1"><MessageSquare class="w-3 h-3" /> {{ s.message_count }} msgs</span>
@@ -304,7 +304,7 @@ onMounted(async () => {
             </div>
           </div>
 
-          <!-- Delete confirmation view -->
+          <!-- Vista de confirmación de borrado -->
           <div v-else class="p-4 flex flex-col gap-3">
             <div class="flex items-center gap-2 text-sm font-medium text-destructive">
               <AlertTriangle class="w-4 h-4 shrink-0" />
@@ -337,7 +337,7 @@ onMounted(async () => {
           </div>
         </div>
 
-        <!-- Load more -->
+        <!-- Cargar más -->
         <Button
           v-if="hasMore"
           variant="secondary"
@@ -350,10 +350,10 @@ onMounted(async () => {
         </Button>
       </div>
 
-      <!-- ── Conversation panel (right) ─────────────────────────── -->
+      <!-- ── Panel de conversación (derecha) ─────────────────────────── -->
       <div class="hidden md:flex flex-1 flex-col border border-border shadow-sm rounded-md bg-card overflow-hidden">
 
-        <!-- Empty state -->
+        <!-- Estado vacío -->
         <div v-if="!selectedSession" class="flex-1 flex flex-col items-center justify-center text-muted-foreground gap-3 p-8 text-center bg-muted/10">
           <MessagesSquare class="w-12 h-12 text-muted-foreground/30" />
           <div class="space-y-1">
@@ -363,7 +363,7 @@ onMounted(async () => {
         </div>
 
         <template v-else>
-          <!-- Header -->
+          <!-- Cabecera -->
           <div class="border-b border-border px-5 py-4 bg-muted/30 flex items-center justify-between shadow-sm z-10">
             <div class="flex items-center gap-3">
               <div class="w-10 h-10 flex items-center justify-center bg-primary/10 text-primary rounded-full font-bold text-lg uppercase shadow-inner">

@@ -52,13 +52,13 @@ const loadingRobots = ref(true)
 const errorRobots = ref(null)
 let robotEventSource = null
 
-/** Apply a single robot update pushed by the server. */
+/** Aplica una actualización de un robot enviada por el servidor. */
 const applyRobotUpdate = (updated) => {
     const idx = robots.value.findIndex(r => r.id === updated.id)
     if (idx === -1) {
         robots.value.push(updated)
     } else {
-        // A newer nav-failure timestamp means a fresh incident the admin hasn't seen.
+        // Una marca de tiempo de fallo de navegación más reciente significa una incidencia nueva que el admin no ha visto.
         const prev = robots.value[idx]
         if (updated.last_nav_error_at && updated.last_nav_error_at !== prev.last_nav_error_at
             && activeTab.value !== 'incidents') {
@@ -68,7 +68,7 @@ const applyRobotUpdate = (updated) => {
     }
 }
 
-/** Open the SSE stream. Reconnects automatically on error (browser built-in). */
+/** Abre el stream SSE. Se reconecta automáticamente ante errores (nativo del navegador). */
 const startRobotStream = () => {
     if (robotEventSource) robotEventSource.close()
 
@@ -84,7 +84,7 @@ const startRobotStream = () => {
         try {
             const data = JSON.parse(e.data)
             applyRobotUpdate(data)
-        } catch { /* ignore malformed event */ }
+        } catch { /* ignora eventos malformados */ }
     })
 
     robotEventSource.addEventListener('ready', () => {
@@ -93,7 +93,7 @@ const startRobotStream = () => {
     })
 
     robotEventSource.onerror = () => {
-        // EventSource retries automatically - only show error if we never got data
+        // EventSource reintenta automáticamente - solo muestra error si nunca llegaron datos
         if (robots.value.length === 0) {
             loadingRobots.value = false
             errorRobots.value = 'No se pudo conectar con el servidor en tiempo real.'
@@ -101,39 +101,39 @@ const startRobotStream = () => {
     }
 }
 
-// QR codes are generated LOCALLY (no internet) so the demo works on any network.
-// Keyed by robot id → PNG data URL. Regenerated whenever the robot list changes.
+// Los códigos QR se generan LOCALMENTE (sin internet) para que la demo funcione en cualquier red.
+// Indexados por id de robot → data URL PNG. Se regeneran cuando cambia la lista de robots.
 const qrCodes = ref({})
 
 const buildVisitUrl = (robotId) => `${originUrl}/r/${robotId}`
 
-// Idempotent: the QR URL depends only on the stable robot id, so each one is
-// generated once and reused (skipped if already present).
+// Idempotente: la URL del QR depende solo del id estable del robot, así que cada uno se
+// genera una vez y se reutiliza (se omite si ya existe).
 const generateQrCodes = async () => {
     for (const robot of robots.value) {
         if (qrCodes.value[robot.id]) continue
         try {
             qrCodes.value[robot.id] = await QRCode.toDataURL(buildVisitUrl(robot.id), { width: 300, margin: 1 })
-        } catch { /* skip individual failures */ }
+        } catch { /* omite fallos individuales */ }
     }
 }
 
-// Robots arrive asynchronously over SSE (not just via fetchRobots), so generate
-// QRs whenever the set of robot ids changes - otherwise the first paint after an
-// SSE load is stuck on "Generando QR…" until a manual refresh.
+// Los robots llegan de forma asíncrona por SSE (no solo vía fetchRobots), así que se
+// generan los QR cuando cambia el conjunto de ids de robot - de lo contrario el primer
+// render tras una carga por SSE se queda en "Generando QR…" hasta un refresco manual.
 watch(
     () => robots.value.map(r => r.id).join('|'),
     generateQrCodes,
     { immediate: true }
 )
 
-/** Manual refresh - still useful after mutations (connect/disconnect/update). */
+/** Refresco manual - sigue siendo útil tras mutaciones (conectar/desconectar/actualizar). */
 const fetchRobots = async () => {
     try {
         const fresh = await robotService.fetchAll()
         robots.value = fresh
         errorRobots.value = null
-        generateQrCodes()  // covers the case where fetch replaces the list with the same ids (watch wouldn't re-fire)
+        generateQrCodes()  // cubre el caso en que fetch reemplaza la lista con los mismos ids (el watch no se re-dispararía)
     } catch (err) {
         errorRobots.value = 'No se pudo obtener la lista de robots.'
     } finally {
@@ -214,7 +214,7 @@ const handleDeleteRobot = async () => {
 }
 
 const pendingCommandId = ref(null)
-const commandError = ref(null)   // { id, message } | null - scoped to the failing robot
+const commandError = ref(null)   // { id, message } | null - acotado al robot que falla
 
 const sendCommand = async (id, command) => {
     pendingCommandId.value = id
@@ -239,7 +239,7 @@ const handleEndVisit = async (id) => {
     }
 }
 
-// ---------------- STAFF ----------------
+// ---------------- PERSONAL ----------------
 const staff = ref([])
 const loadingStaff = ref(false)
 const showStaffModal = ref(false)
@@ -350,7 +350,7 @@ const handleDeleteStaff = async () => {
     }
 }
 
-// ---------------- MUSEUMS ----------------
+// ---------------- MUSEOS ----------------
 const museums = ref([])
 const loadingMuseums = ref(false)
 const museumName = (id) => museums.value.find(m => m.id === id)?.name || 'Sin asignar'
@@ -439,12 +439,12 @@ const handleDeleteMuseum = async () => {
     }
 }
 
-// ---------------- STATS ----------------
+// ---------------- ESTADÍSTICAS ----------------
 const statsTabRef = ref(null)
 
-// ---------------- INCIDENTS ----------------
+// ---------------- INCIDENCIAS ----------------
 const incidentsTabRef = ref(null)
-const hasNewIncident  = ref(false)   // unseen nav-failure notification dot
+const hasNewIncident  = ref(false)   // punto de notificación de fallo de navegación sin ver
 
 const openIncidentsTab = () => {
     activeTab.value = 'incidents'
@@ -452,7 +452,7 @@ const openIncidentsTab = () => {
     incidentsTabRef.value?.refresh()
 }
 
-// ---------------- GLOBAL TAB REFRESH ----------------
+// ---------------- REFRESCO GLOBAL DE PESTAÑAS ----------------
 const refreshCurrentTab = () => {
     if (activeTab.value === 'robots')    fetchRobots()
     if (activeTab.value === 'staff')     fetchStaff()
@@ -485,7 +485,7 @@ onUnmounted(() => {
             </Button>
         </div>
 
-        <!-- Custom Tabs Navigation -->
+        <!-- Navegación de pestañas personalizada -->
         <div class="flex gap-2 border-b border-border mb-8 overflow-x-auto">
             <button @click="activeTab = 'robots'" class="px-4 py-2 text-sm font-medium transition-colors border-b-2 flex items-center gap-2"
                 :class="activeTab === 'robots' ? 'border-primary text-foreground' : 'border-transparent text-muted-foreground hover:text-foreground'">
@@ -528,7 +528,7 @@ onUnmounted(() => {
             </button>
         </div>
 
-        <!-- TAB: ROBOTS -->
+        <!-- PESTAÑA: ROBOTS -->
         <div v-show="activeTab === 'robots'">
             <div class="flex justify-between items-center mb-6">
                 <h2 class="font-display text-xl font-medium tracking-tight">Gestión de Robots</h2>
@@ -548,11 +548,11 @@ onUnmounted(() => {
                 <p>No se encontraron robots asignados a tu perfil.</p>
             </div>
             <div v-else class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                <!-- Robots Card Loop -->
+                <!-- Bucle de tarjetas de robots -->
                 <Card v-for="robot in robots" :key="robot.id"
                     class="p-6 hover:border-primary/40 transition-colors relative overflow-hidden group">
 
-                    <!-- SUPERADMIN (provider): assignment-only view -->
+                    <!-- SUPERADMIN (proveedor): vista solo de asignación -->
                     <template v-if="isPlatformAdmin">
                         <div class="flex items-center gap-4 mb-6">
                             <div class="w-12 h-12 bg-primary/10 rounded-sm flex items-center justify-center text-primary flex-shrink-0">
@@ -578,7 +578,7 @@ onUnmounted(() => {
                         </div>
                     </template>
 
-                    <!-- OPERATORS (museum_admin / technician): full operational panel -->
+                    <!-- OPERADORES (museum_admin / technician): panel operativo completo -->
                     <template v-else>
                     <div class="flex justify-between items-start mb-4">
                         <div>
@@ -627,7 +627,7 @@ onUnmounted(() => {
                                 {{ robot.current_location.name }}
                             </span>
                         </div>
-                        <!-- Last navigation failure (cleared when a new goal is dispatched) -->
+                        <!-- Último fallo de navegación (se limpia al despachar un nuevo goal) -->
                         <div v-if="robot.last_nav_error_at" class="flex items-start gap-2 text-sm rounded-sm bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-700/40 px-2.5 py-2">
                             <AlertTriangle class="w-4 h-4 text-red-600 dark:text-red-400 flex-shrink-0 mt-0.5" />
                             <span class="text-xs text-red-700 dark:text-red-300 leading-snug">
@@ -699,9 +699,9 @@ onUnmounted(() => {
             </div>
         </div>
 
-        <!-- TAB: STAFF -->
+        <!-- PESTAÑA: PERSONAL -->
         <div v-if="isMuseumAdmin" v-show="activeTab === 'staff'">
-            <!-- Header -->
+            <!-- Cabecera -->
             <div class="flex justify-between items-center mb-6">
                 <div>
                     <h2 class="font-display text-xl font-medium tracking-tight text-foreground">Gestión de Personal</h2>
@@ -714,7 +714,7 @@ onUnmounted(() => {
                 </Button>
             </div>
 
-            <!-- Toolbar -->
+            <!-- Barra de herramientas -->
             <div class="flex flex-col sm:flex-row gap-3 mb-4">
                 <div class="relative flex-1">
                     <Search class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
@@ -740,7 +740,7 @@ onUnmounted(() => {
                 </select>
             </div>
 
-            <!-- Table -->
+            <!-- Tabla -->
             <div class="border border-border rounded-md overflow-hidden bg-card">
                 <div v-if="loadingStaff" class="flex justify-center items-center h-32">
                     <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
@@ -767,7 +767,7 @@ onUnmounted(() => {
                             class="hover:bg-muted/30 transition-colors"
                             :class="{ 'opacity-50': getStaffStatus(member) === 'inactive' }">
 
-                            <!-- Avatar + name + email -->
+                            <!-- Avatar + nombre + email -->
                             <td class="px-6 py-4">
                                 <div class="flex items-center gap-3">
                                     <div class="w-8 h-8 rounded-full bg-primary/10 text-primary flex items-center justify-center text-xs font-bold flex-shrink-0 uppercase">
@@ -780,7 +780,7 @@ onUnmounted(() => {
                                 </div>
                             </td>
 
-                            <!-- Role badge -->
+                            <!-- Insignia de rol -->
                             <td class="px-6 py-4">
                                 <span class="px-2.5 py-1 rounded-full text-xs font-semibold"
                                     :class="{
@@ -792,7 +792,7 @@ onUnmounted(() => {
                                 </span>
                             </td>
 
-                            <!-- Status badge -->
+                            <!-- Insignia de estado -->
                             <td class="px-6 py-4">
                                 <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold"
                                     :class="{
@@ -810,17 +810,17 @@ onUnmounted(() => {
                                 </span>
                             </td>
 
-                            <!-- Museum -->
+                            <!-- Museo -->
                             <td v-if="isPlatformAdmin" class="px-6 py-4 text-xs text-muted-foreground">
                                 {{ member.museum_name || '-' }}
                             </td>
 
-                            <!-- Date -->
+                            <!-- Fecha -->
                             <td class="px-6 py-4 text-xs text-muted-foreground whitespace-nowrap">
                                 {{ new Date(member.created_at).toLocaleDateString('es-ES', { day: '2-digit', month: 'short', year: 'numeric' }) }}
                             </td>
 
-                            <!-- Actions -->
+                            <!-- Acciones -->
                             <td class="px-6 py-4">
                                 <div class="flex items-center justify-end gap-1">
                                     <Button @click="openEditStaffModal(member)" variant="ghost" size="icon" class="h-8 w-8" title="Editar">
@@ -847,7 +847,7 @@ onUnmounted(() => {
             </div>
         </div>
 
-        <!-- TAB: MUSEUMS -->
+        <!-- PESTAÑA: MUSEOS -->
         <div v-if="isMuseumAdmin" v-show="activeTab === 'museums'">
             <div class="flex justify-between items-center mb-6">
                 <h2 class="font-display text-xl font-medium tracking-tight text-foreground">Museos Integrados</h2>
@@ -883,28 +883,28 @@ onUnmounted(() => {
             </div>
         </div>
 
-        <!-- TAB: HISTORY -->
+        <!-- PESTAÑA: HISTORIAL -->
         <div v-if="isMuseumAdmin" v-show="activeTab === 'history'">
             <ChatHistoryTab />
         </div>
 
-        <!-- TAB: MAP -->
+        <!-- PESTAÑA: MAPA -->
         <div v-if="isMuseumAdmin" v-show="activeTab === 'map'">
             <MapTab :robots="robots" />
         </div>
 
-        <!-- TAB: STATS -->
+        <!-- PESTAÑA: ESTADÍSTICAS -->
         <div v-if="isMuseumAdmin" v-show="activeTab === 'stats'">
             <StatsTab ref="statsTabRef" />
         </div>
 
-        <!-- TAB: INCIDENTS -->
+        <!-- PESTAÑA: INCIDENCIAS -->
         <div v-if="isMuseumAdmin" v-show="activeTab === 'incidents'">
             <IncidentsTab ref="incidentsTabRef" />
         </div>
 
 
-        <!-- EDIT ROBOT MODAL -->
+        <!-- MODAL DE EDITAR ROBOT -->
         <div v-if="showEditRobotModal"
             class="fixed inset-0 bg-background/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
             <Card class="w-full max-w-md relative">
@@ -946,7 +946,7 @@ onUnmounted(() => {
             </Card>
         </div>
 
-        <!-- STAFF CREATE MODAL -->
+        <!-- MODAL DE CREAR PERSONAL -->
         <div v-if="showStaffModal"
             class="fixed inset-0 bg-background/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
             <Card class="w-full max-w-md relative">
@@ -1000,7 +1000,7 @@ onUnmounted(() => {
             </Card>
         </div>
 
-        <!-- STAFF EDIT MODAL -->
+        <!-- MODAL DE EDITAR PERSONAL -->
         <div v-if="showEditStaffModal"
             class="fixed inset-0 bg-background/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
             <Card class="w-full max-w-md relative">
@@ -1037,7 +1037,7 @@ onUnmounted(() => {
             </Card>
         </div>
 
-        <!-- STAFF DELETE CONFIRM MODAL -->
+        <!-- MODAL DE CONFIRMAR ELIMINACIÓN DE PERSONAL -->
         <div v-if="showDeleteStaffModal"
             class="fixed inset-0 bg-background/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
             <Card class="w-full max-w-sm">
@@ -1063,7 +1063,7 @@ onUnmounted(() => {
             </Card>
         </div>
 
-        <!-- ROBOT MODAL -->
+        <!-- MODAL DE ROBOT -->
         <div v-if="showRobotModal"
             class="fixed inset-0 bg-background/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
             <Card class="w-full max-w-md relative">
@@ -1103,7 +1103,7 @@ onUnmounted(() => {
             </Card>
         </div>
 
-        <!-- MUSEUM MODAL -->
+        <!-- MODAL DE MUSEO -->
         <div v-if="showMuseumModal"
             class="fixed inset-0 bg-background/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
             <Card class="w-full max-w-md relative">
@@ -1140,7 +1140,7 @@ onUnmounted(() => {
             </Card>
         </div>
 
-        <!-- EDIT MUSEUM MODAL -->
+        <!-- MODAL DE EDITAR MUSEO -->
         <div v-if="showEditMuseumModal"
             class="fixed inset-0 bg-background/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
             <Card class="w-full max-w-md relative">
@@ -1177,7 +1177,7 @@ onUnmounted(() => {
             </Card>
         </div>
 
-        <!-- MUSEUM DELETE CONFIRM MODAL -->
+        <!-- MODAL DE CONFIRMAR ELIMINACIÓN DE MUSEO -->
         <div v-if="showDeleteMuseumModal"
             class="fixed inset-0 bg-background/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
             <Card class="w-full max-w-sm">
@@ -1206,7 +1206,7 @@ onUnmounted(() => {
             </Card>
         </div>
 
-        <!-- ROBOT DELETE CONFIRM MODAL -->
+        <!-- MODAL DE CONFIRMAR ELIMINACIÓN DE ROBOT -->
         <div v-if="showDeleteRobotModal"
             class="fixed inset-0 bg-background/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
             <Card class="w-full max-w-sm">

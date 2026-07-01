@@ -58,7 +58,7 @@ export const useAuthStore = defineStore('auth', () => {
     const isMuseumAdmin = computed(() => user.value?.role === 'museum_admin' || user.value?.role === 'platform_admin')
     const isPlatformAdmin = computed(() => user.value?.role === 'platform_admin')
     const isTechnician = computed(() => user.value?.role === 'technician')
-    // Staff = anyone who can operate robots (technicians + admins).
+    // Personal = cualquiera que pueda operar robots (técnicos + administradores).
     const isStaff = computed(() => isTechnician.value || isMuseumAdmin.value)
     const isVisitor = computed(() => user.value?.role === 'visitor')
     const mustChangePassword = computed(() => {

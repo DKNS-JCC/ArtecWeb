@@ -71,12 +71,12 @@ export const robotService = /** @lends module:services/robotService.robotService
 
 
     /**
-     * Send a Nav2 goal pose.
-     * @param {string} id  Robot ID
+     * Envía una pose objetivo de Nav2.
+     * @param {string} id  ID del robot
      * @param {number} x
      * @param {number} y
-     * @param {number} qz  Quaternion z (default 0 = facing +X)
-     * @param {number} qw  Quaternion w (default 1)
+     * @param {number} qz  Cuaternión z (por defecto 0 = mirando a +X)
+     * @param {number} qw  Cuaternión w (por defecto 1)
      */
     sendNavGoal(id, x, y, qz = 0, qw = 1) {
         return api.post(`/robots/${id}/nav-goal`, { x, y, qz, qw })

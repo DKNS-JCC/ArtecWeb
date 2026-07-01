@@ -21,7 +21,7 @@ const pinia = createPinia()
 
 app.use(pinia)
 
-// Hydrate auth state from localStorage before configuring the router
+// Rehidrata el estado de auth desde localStorage antes de configurar el router
 const authStore = useAuthStore()
 authStore.initFromStorage()
 

@@ -27,7 +27,7 @@ const isUploading = ref(false)
 const avatarUrl = computed(() => {
     const avatar = authStore.user?.avatar
     if (!avatar) return null
-    // Same-origin relative path by default (Vite proxies /uploads to the backend).
+    // Ruta relativa del mismo origen por defecto (Vite hace proxy de /uploads al backend).
     const baseUrl = import.meta.env.VITE_API_URL ? import.meta.env.VITE_API_URL.replace('/api', '') : ''
     return `${baseUrl}${avatar}`
 })
@@ -58,13 +58,13 @@ const handleFileChange = async (event) => {
         alert(err.message || 'Error al subir la imagen')
     } finally {
         isUploading.value = false
-        // Reset input so the same file could be selected again if needed
+        // Resetea el input para poder volver a seleccionar el mismo archivo si hace falta
         event.target.value = ''
     }
 }
 
 const handleDeleteAvatar = async (event) => {
-    // Prevent triggering the file input click
+    // Evita disparar el clic del input de archivo
     event.stopPropagation()
 
     if (confirm('¿Estás seguro de que quieres eliminar tu foto de perfil?')) {
@@ -85,7 +85,7 @@ const handleDeleteAvatar = async (event) => {
     <div class="min-h-screen flex items-center justify-center bg-background px-6 py-12">
         <div class="w-full max-w-[26rem]">
 
-            <!-- Masthead, framed portrait like a gallery wall card -->
+            <!-- Cabecera, retrato enmarcado como una cartela de museo -->
             <header class="text-center reveal" style="animation-delay: 40ms">
                 <div class="relative w-28 h-28 mx-auto mb-6 group cursor-pointer" @click="triggerFileInput">
                     <div class="w-full h-full bg-muted border border-border rounded-sm flex items-center justify-center overflow-hidden relative">
@@ -97,20 +97,20 @@ const handleDeleteAvatar = async (event) => {
                         </div>
                     </div>
 
-                    <!-- Hover edit overlay -->
+                    <!-- Overlay de edición al pasar el ratón -->
                     <div v-if="!isUploading"
                         class="absolute inset-0 bg-foreground/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-background">
                         <Camera class="w-6 h-6" />
                     </div>
 
-                    <!-- Delete button (only show if has avatar) -->
+                    <!-- Botón de borrar (solo si hay avatar) -->
                     <button v-if="avatarUrl && !isUploading" @click="handleDeleteAvatar"
                         class="absolute -right-2 -bottom-2 w-9 h-9 rounded-sm bg-destructive text-destructive-foreground flex items-center justify-center transition-colors hover:bg-destructive/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
                         title="Eliminar foto" type="button">
                         <Trash2 class="w-4 h-4" />
                     </button>
 
-                    <!-- Hidden file input -->
+                    <!-- Input de archivo oculto -->
                     <input type="file" ref="fileInput" class="hidden" accept="image/*" @change="handleFileChange" />
                 </div>
                 <h1 class="font-display text-5xl font-medium tracking-tight leading-[0.95] mb-3">
@@ -123,7 +123,7 @@ const handleDeleteAvatar = async (event) => {
 
             <hr class="hairline my-8 reveal" style="animation-delay: 120ms" />
 
-            <!-- Account details -->
+            <!-- Datos de la cuenta -->
             <div class="reveal" style="animation-delay: 200ms">
                 <div class="flex items-center justify-between py-4 border-b border-border">
                     <div class="flex items-center gap-2.5 text-muted-foreground">

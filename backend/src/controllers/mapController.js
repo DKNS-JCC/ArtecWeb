@@ -7,7 +7,7 @@ const rosService = require('../services/rosService');
 const zoneCache = require('../utils/zoneCache');
 const { BASE_CATEGORY } = require('../utils/geo');
 
-// Promisified DB helpers
+// Helpers de BD basados en promesas
 function dbGet(sql, params) {
     return new Promise((resolve, reject) => {
         db.get(sql, params, (err, row) => {
@@ -34,7 +34,7 @@ function dbRun(sql, params) {
 }
 
 /**
- * Parses a ROS map_saver YAML file to extract resolution and origin.
+ * Parsea un archivo YAML de map_saver de ROS para extraer la resolución y el origen.
  */
 function parseMapYaml(yamlContent) {
     const meta = { resolution: 0.05, origin_x: 0, origin_y: 0, origin_theta: 0 };
@@ -53,7 +53,7 @@ function parseMapYaml(yamlContent) {
 }
 
 /**
- * Parses a binary (P5) PGM file buffer into width, height, and raw pixel data.
+ * Parsea el buffer de un archivo PGM binario (P5) en anchura, altura y datos de píxel en bruto.
  */
 function parsePgm(buffer) {
     let offset = 0;
@@ -85,7 +85,7 @@ function parsePgm(buffer) {
     }
 
     const magic = readToken();
-    if (magic !== 'P5') throw new Error('Only binary PGM (P5) is supported');
+    if (magic !== 'P5') throw new Error('Solo se admite PGM binario (P5)');
 
     const width = parseInt(readToken(), 10);
     const height = parseInt(readToken(), 10);
@@ -111,8 +111,8 @@ const UPLOAD_DIR = path.join(__dirname, '../../uploads/maps');
 
 /**
  * POST /api/robots/:id/capture-map
- * Subscribes to /map once via rosbridge, converts the OccupancyGrid to PNG,
- * and persists it as a new map record for the robot's museum.
+ * Se suscribe a /map una vez vía rosbridge, convierte el OccupancyGrid a PNG,
+ * y lo persiste como un nuevo registro de mapa para el museo del robot.
  */
 exports.captureMapFromRobot = async (req, res) => {
     const robotId = req.params.id;
@@ -136,17 +136,17 @@ exports.captureMapFromRobot = async (req, res) => {
         const origin_x = origin.position?.x ?? 0;
         const origin_y = origin.position?.y ?? 0;
 
-        // OccupancyGrid rows start at the bottom of the world frame; PNG rows start
-        // at the top, so we flip vertically - same as what map_saver_cli does.
+        // Las filas del OccupancyGrid empiezan en la parte inferior del marco del mundo; las
+        // del PNG empiezan arriba, así que volteamos verticalmente - igual que hace map_saver_cli.
         const buf = Buffer.alloc(width * height);
         for (let row = 0; row < height; row++) {
             const srcRow = height - 1 - row;
             for (let col = 0; col < width; col++) {
                 const v = rosMap.data[srcRow * width + col];
                 let pixel;
-                if (v === -1)      pixel = 205;                              // unknown → gray
-                else if (v === 0)  pixel = 254;                              // free → near-white
-                else               pixel = Math.round(255 * (1 - v / 100)); // occupied → dark
+                if (v === -1)      pixel = 205;                              // desconocido → gris
+                else if (v === 0)  pixel = 254;                              // libre → casi blanco
+                else               pixel = Math.round(255 * (1 - v / 100)); // ocupado → oscuro
                 buf[row * width + col] = pixel;
             }
         }
@@ -179,7 +179,7 @@ exports.captureMapFromRobot = async (req, res) => {
 
 /**
  * POST /api/museums/:museum_id/maps
- * Upload a new map for a museum. Requires 'name' in body.
+ * Sube un mapa nuevo para un museo. Requiere 'name' en el cuerpo de la petición.
  */
 exports.uploadMap = async (req, res) => {
     const { museum_id } = req.params;
@@ -200,7 +200,7 @@ exports.uploadMap = async (req, res) => {
     }
 
     try {
-        // Parse YAML metadata if provided
+        // Parsea los metadatos YAML si se proporcionan
         let meta = { resolution: 0.05, origin_x: 0, origin_y: 0, origin_theta: 0 };
         const yamlFile = req.files?.yaml?.[0];
         if (yamlFile) {
@@ -213,7 +213,7 @@ exports.uploadMap = async (req, res) => {
         if (req.body.origin_x) meta.origin_x = parseFloat(req.body.origin_x);
         if (req.body.origin_y) meta.origin_y = parseFloat(req.body.origin_y);
 
-        // Convert PGM to PNG if needed
+        // Convierte PGM a PNG si hace falta
         let finalFilename = imageFile.filename;
         const ext = path.extname(imageFile.filename).toLowerCase();
         if (ext === '.pgm') {
@@ -250,7 +250,7 @@ exports.uploadMap = async (req, res) => {
 
 /**
  * GET /api/museums/:museum_id/maps
- * List all maps for a museum.
+ * Lista todos los mapas de un museo.
  */
 exports.listMaps = async (req, res) => {
     const { museum_id } = req.params;
@@ -273,7 +273,7 @@ exports.listMaps = async (req, res) => {
 
 /**
  * GET /api/maps/:map_id
- * Get a specific map by ID.
+ * Obtiene un mapa concreto por su ID.
  */
 exports.getMap = async (req, res) => {
     const { map_id } = req.params;
@@ -293,7 +293,7 @@ exports.getMap = async (req, res) => {
 
 /**
  * DELETE /api/maps/:map_id
- * Delete a map, unassign it from robots, and remove its zones.
+ * Elimina un mapa, lo desasigna de los robots y borra sus zonas.
  */
 exports.deleteMap = async (req, res) => {
     const { map_id } = req.params;
@@ -306,12 +306,12 @@ exports.deleteMap = async (req, res) => {
             return res.status(403).json({ error: 'No tienes acceso a este mapa' });
         }
 
-        // Delete image file from disk (the DB cascade can't touch the filesystem)
+        // Borra el archivo de imagen del disco (el cascade de la BD no puede tocar el sistema de archivos)
         const filePath = path.join(__dirname, '../../', map.image_path);
         if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
 
-        // Deleting the map cascades to its zones and sets robots.map_id = NULL
-        // automatically (see FK definitions in database.js).
+        // Borrar el mapa hace cascade a sus zonas y pone robots.map_id = NULL
+        // automáticamente (ver las definiciones de FK en database.js).
         await dbRun('DELETE FROM maps WHERE id = ?', [map_id]);
         zoneCache.invalidate(map_id);
 
@@ -359,7 +359,7 @@ exports.createZone = async (req, res) => {
 
         if (!name) return res.status(400).json({ error: 'El nombre es obligatorio' });
 
-        // A base point requires coordinates (it's a navigation target).
+        // Un punto base requiere coordenadas (es un objetivo de navegación).
         if (category === BASE_CATEGORY && (map_x == null || map_y == null)) {
             return res.status(400).json({ error: 'El punto base necesita una posición en el mapa.' });
         }
@@ -371,7 +371,7 @@ exports.createZone = async (req, res) => {
                 [id, map_id, name, description || null, category || 'exhibit', map_x ?? null, map_y ?? null]
             );
         } catch (e) {
-            // Partial unique index → only one base per map.
+            // Índice único parcial → solo una base por mapa.
             if (category === BASE_CATEGORY && /UNIQUE/i.test(e.message)) {
                 return res.status(409).json({ error: 'Este mapa ya tiene un punto base. Edítalo para moverlo.' });
             }

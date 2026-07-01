@@ -1,15 +1,15 @@
 /**
- * Lightweight in-memory cache of zones per map.
+ * Caché ligera en memoria de las zonas por mapa.
  *
- * The SSE hub broadcasts robot updates on every odometry tick (several Hz), and
- * each broadcast wants the robot's "current location" (nearest zone). Querying
- * the zones table on every tick would be wasteful, so we cache them per map and
- * only reload when zones are mutated (create/update/delete) or a map is removed.
+ * El hub SSE difunde actualizaciones del robot en cada tick de odometría (varios Hz), y
+ * cada difusión necesita la "ubicación actual" del robot (la zona más cercana). Consultar
+ * la tabla de zonas en cada tick sería un derroche, así que las cacheamos por mapa y solo
+ * recargamos cuando las zonas cambian (crear/actualizar/borrar) o se elimina un mapa.
  *
- * `get()` is synchronous and returns the cached array (possibly an empty array
- * on the very first call while the async load is in flight - acceptable, the
- * next tick will have the data). HTTP endpoints that need strong freshness
- * should query the DB directly instead of using this cache.
+ * `get()` es síncrona y devuelve el array cacheado (posiblemente un array vacío en la
+ * primerísima llamada mientras la carga asíncrona está en curso - es aceptable, el
+ * siguiente tick ya tendrá los datos). Los endpoints HTTP que necesiten frescura fuerte
+ * deben consultar la BD directamente en vez de usar esta caché.
  */
 const db = require('../database');
 
@@ -23,17 +23,17 @@ function load(mapId) {
     );
 }
 
-/** Returns cached zones for a map (triggers a background load on first miss). */
+/** Devuelve las zonas cacheadas de un mapa (dispara una carga en segundo plano en el primer fallo). */
 function get(mapId) {
     if (!mapId) return [];
     if (!cache.has(mapId)) {
-        cache.set(mapId, []);   // placeholder to avoid repeated loads
+        cache.set(mapId, []);   // marcador para evitar cargas repetidas
         load(mapId);
     }
     return cache.get(mapId);
 }
 
-/** Reload a map's zones after a mutation (or after the map's zones change). */
+/** Recarga las zonas de un mapa tras una mutación (o cuando cambian sus zonas). */
 function invalidate(mapId) {
     if (mapId) load(mapId);
 }

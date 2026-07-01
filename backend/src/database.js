@@ -20,7 +20,7 @@ const db = new sqlite3.Database(dbPath, (err) => {
 
 function initializeDatabase() {
     db.serialize(() => {
-        // 1. Museums
+        // 1. Museos
         db.run(`
             CREATE TABLE IF NOT EXISTS museums (
                 id TEXT PRIMARY KEY,
@@ -30,7 +30,7 @@ function initializeDatabase() {
             )
         `);
 
-        // 2. Users
+        // 2. Usuarios
         db.run(`
             CREATE TABLE IF NOT EXISTS users (
                 id TEXT PRIMARY KEY,
@@ -49,7 +49,7 @@ function initializeDatabase() {
             )
         `);
 
-        // 3. Maps - belong to a museum
+        // 3. Mapas - pertenecen a un museo
         db.run(`
             CREATE TABLE IF NOT EXISTS maps (
                 id TEXT PRIMARY KEY,
@@ -67,7 +67,7 @@ function initializeDatabase() {
             )
         `);
 
-        // 4. Robots - belong to a museum, assigned one map
+        // 4. Robots - pertenecen a un museo, con un mapa asignado
         db.run(`
             CREATE TABLE IF NOT EXISTS robots (
                 id TEXT PRIMARY KEY,
@@ -90,7 +90,7 @@ function initializeDatabase() {
             )
         `);
 
-        // 5. Visitors
+        // 5. Visitantes
         db.run(`
             CREATE TABLE IF NOT EXISTS visitors (
                 id TEXT PRIMARY KEY,
@@ -106,7 +106,7 @@ function initializeDatabase() {
             )
         `);
 
-        // 6. Zones - belong to a map
+        // 6. Zonas - pertenecen a un mapa
         db.run(`
             CREATE TABLE IF NOT EXISTS zones (
                 id TEXT PRIMARY KEY,
@@ -121,7 +121,7 @@ function initializeDatabase() {
             )
         `);
 
-        // 7. Chat messages
+        // 7. Mensajes de chat
         db.run(`
             CREATE TABLE IF NOT EXISTS chat_messages (
                 id TEXT PRIMARY KEY,
@@ -137,7 +137,7 @@ function initializeDatabase() {
             )
         `);
 
-        // 8. Incidents
+        // 8. Incidencias
         db.run(`
             CREATE TABLE IF NOT EXISTS incidents (
                 id TEXT PRIMARY KEY,
@@ -155,7 +155,7 @@ function initializeDatabase() {
             )
         `);
 
-        // 9. Password reset tokens
+        // 9. Tokens de recuperación de contraseña
         db.run(`
             CREATE TABLE IF NOT EXISTS password_reset_tokens (
                 id TEXT PRIMARY KEY,
@@ -168,7 +168,7 @@ function initializeDatabase() {
             )
         `);
 
-        // 10.Indexes
+        // 10. Índices
         db.run(`CREATE INDEX IF NOT EXISTS idx_users_museum_id ON users(museum_id)`);
         db.run(`CREATE INDEX IF NOT EXISTS idx_maps_museum_id ON maps(museum_id)`);
         db.run(`CREATE INDEX IF NOT EXISTS idx_robots_museum_id ON robots(museum_id)`);

@@ -4,7 +4,7 @@ const db     = require('../database');
 const { sendPasswordResetEmail } = require('../utils/emailService');
 
 const SALT_ROUNDS   = 10;
-const TOKEN_TTL_MS  = 60 * 60 * 1000; // 1 hour
+const TOKEN_TTL_MS  = 60 * 60 * 1000; // 1 hora
 
 
 function dbGet(sql, params) {
@@ -25,13 +25,13 @@ function dbRun(sql, params) {
     });
 }
 
-// Accepts an email address and - if it matches a staff account - sends a
-// password-reset link. Always returns 200 to prevent email enumeration.
+// Acepta una dirección de correo y - si coincide con una cuenta de personal - envía
+// un enlace de recuperación de contraseña. Siempre devuelve 200 para evitar la enumeración de correos.
 
 exports.forgotPassword = async (req, res) => {
     const { email } = req.body;
 
-    // Always respond success regardless of whether email exists
+    // Responde siempre con éxito independientemente de si el correo existe
     const successResponse = () =>
         res.json({ message: 'Si ese correo está registrado, recibirás un enlace en breve.' });
 
@@ -45,13 +45,13 @@ exports.forgotPassword = async (req, res) => {
 
         if (!user) return successResponse();
 
-        // Invalidate any existing unused tokens for this user
+        // Invalida cualquier token existente sin usar de este usuario
         await dbRun(
             `UPDATE password_reset_tokens SET used = 1 WHERE user_id = ? AND used = 0`,
             [user.id]
         );
 
-        // Generate a cryptographically secure token
+        // Genera un token criptográficamente seguro
         const rawToken   = crypto.randomBytes(32).toString('hex');
         const tokenHash  = crypto.createHash('sha256').update(rawToken).digest('hex');
         const expiresAt  = new Date(Date.now() + TOKEN_TTL_MS).toISOString();
@@ -68,11 +68,11 @@ exports.forgotPassword = async (req, res) => {
         return successResponse();
     } catch (err) {
         console.error('[PasswordReset] forgotPassword error:', err);
-        return successResponse(); // Never expose errors to prevent leaking info
+        return successResponse(); // Nunca expone errores para evitar filtrar información
     }
 };
 
-// Validates the token and updates the user's password.
+// Valida el token y actualiza la contraseña del usuario.
 
 exports.resetPassword = async (req, res) => {
     const { token, new_password } = req.body;
@@ -102,7 +102,7 @@ exports.resetPassword = async (req, res) => {
 
         const newHash = await bcrypt.hash(new_password, SALT_ROUNDS);
 
-        // Update password and mark token as used - both in the same callback chain
+        // Actualiza la contraseña y marca el token como usado - ambos en la misma cadena de callbacks
         await dbRun(
             `UPDATE users SET password_hash = ?, must_change_password = 0, active = 1 WHERE id = ?`,
             [newHash, record.user_id]

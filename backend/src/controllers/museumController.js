@@ -31,7 +31,7 @@ exports.listMuseums = (req, res) => {
     });
 };
 
-// POST /api/museums - Create a new museum
+// POST /api/museums - Crea un museo nuevo
 exports.createMuseum = (req, res) => {
     const { name, company } = req.body;
 
@@ -55,7 +55,7 @@ exports.createMuseum = (req, res) => {
     );
 };
 
-// PUT /api/museums/:id - Update a museum's name/company
+// PUT /api/museums/:id - Actualiza el nombre/empresa de un museo
 exports.updateMuseum = (req, res) => {
     const { id } = req.params;
     const { name, company } = req.body;
@@ -79,10 +79,10 @@ exports.updateMuseum = (req, res) => {
     );
 };
 
-// DELETE /api/museums/:id - Delete a museum and everything under it. The FK
-// cascade removes its maps, robots, users, visitors, chat and incidents in one
-// shot; we still clean up the side effects the DB can't reach: live ROS
-// connections and the map image files on disk.
+// DELETE /api/museums/:id - Elimina un museo y todo lo que cuelga de él. El
+// cascade de claves foráneas borra de golpe sus mapas, robots, usuarios, visitantes,
+// chat e incidencias; aún así limpiamos los efectos colaterales que la BD no alcanza:
+// las conexiones ROS en vivo y los archivos de imagen del mapa en disco.
 exports.deleteMuseum = async (req, res) => {
     const { id } = req.params;
 
@@ -95,7 +95,7 @@ exports.deleteMuseum = async (req, res) => {
 
         await dbRun('DELETE FROM museums WHERE id = ?', [id]);
 
-        // Side effects outside the database:
+        // Efectos colaterales fuera de la base de datos:
         for (const r of robots) rosService.disconnect(r.id);
         for (const m of maps) {
             zoneCache.invalidate(m.id);

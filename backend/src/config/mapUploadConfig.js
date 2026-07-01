@@ -32,7 +32,7 @@ const fileFilter = (req, file, cb) => {
 
 const mapUpload = multer({
     storage,
-    limits: { fileSize: 20 * 1024 * 1024 }, // 20 MB (maps can be large)
+    limits: { fileSize: 20 * 1024 * 1024 }, // 20 MB (los mapas pueden ser grandes)
     fileFilter
 });
 

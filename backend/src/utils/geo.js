@@ -1,21 +1,21 @@
 /**
- * Geometry helpers for robot localization on a map.
+ * Helpers de geometría para la localización del robot en un mapa.
  *
- * Zones store their position in ROS world coordinates (meters). The robot's
- * pose (position_x/position_y) is in the same frame, so we can find the closest
- * waypoint with a plain Euclidean nearest-neighbour search.
+ * Las zonas guardan su posición en coordenadas del mundo de ROS (metros). La pose
+ * del robot (position_x/position_y) está en el mismo marco, así que podemos encontrar
+ * el waypoint más cercano con una simple búsqueda del vecino más próximo (euclídea).
  */
 
 const BASE_CATEGORY = 'base';
 
 /**
- * Finds the zone closest to a given world position.
- * @param {number} x  robot world X (meters)
- * @param {number} y  robot world Y (meters)
+ * Encuentra la zona más cercana a una posición del mundo dada.
+ * @param {number} x  X del robot en el mundo (metros)
+ * @param {number} y  Y del robot en el mundo (metros)
  * @param {Array}  zones  [{ id, name, category, map_x, map_y }]
  * @param {object} [opts]
- * @param {string} [opts.excludeCategory]  skip zones of this category (e.g. 'base')
- * @param {number} [opts.maxDistance]      ignore matches farther than this (meters)
+ * @param {string} [opts.excludeCategory]  omite las zonas de esta categoría (p. ej. 'base')
+ * @param {number} [opts.maxDistance]      ignora coincidencias más lejanas que esto (metros)
  * @returns {{ id, name, category, distance }|null}
  */
 function findNearestZone(x, y, zones, opts = {}) {

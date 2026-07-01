@@ -5,18 +5,18 @@ const zoneCache = require('../utils/zoneCache');
 const { findNearestZone } = require('../utils/geo');
 
 /**
- * Server-Sent Events broadcast hub for the robot fleet.
+ * Hub de difusión por Server-Sent Events para la flota de robots.
  *
- * Architecture:
- *  • Each admin tab opens one long-lived GET /api/robots/stream connection.
- *  • The hub holds all active SSE response objects, grouped by museum.
- *  • rosService emits robot:update / robot:connect / robot:disconnect events
- *    → the hub fetches the freshest robot row from the DB and pushes it to
- *    every client that has visibility over that robot.
- *  • A heartbeat is sent every 25 s to prevent proxy/load-balancer timeouts.
+ * Arquitectura:
+ *  • Cada pestaña de administración abre una conexión persistente GET /api/robots/stream.
+ *  • El hub guarda todos los objetos de respuesta SSE activos, agrupados por museo.
+ *  • rosService emite eventos robot:update / robot:connect / robot:disconnect
+ *    → el hub obtiene de la BD la fila más reciente del robot y la envía a
+ *    cada cliente que tenga visibilidad sobre ese robot.
+ *  • Se envía un heartbeat cada 25 s para evitar timeouts de proxy/balanceador de carga.
  *
- * This replaces N×HTTP-poll requests with a single persistent connection per
- * browser tab, completely bypassing the rate limiter.
+ * Esto sustituye N peticiones de sondeo HTTP por una única conexión persistente por
+ * pestaña del navegador, saltándose por completo el limitador de tasa.
  */
 
 // clients: Map<res, { museumId: string|null, isSuperAdmin: boolean }>
@@ -30,14 +30,14 @@ const HEARTBEAT_MS = 25_000;
 function send(res, event, data) {
     try {
         res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
-    } catch (_) { /* client already gone */ }
+    } catch (_) { /* el cliente ya se ha ido */ }
 }
 
 function writeSseHeaders(res) {
     res.setHeader('Content-Type',  'text/event-stream');
     res.setHeader('Cache-Control', 'no-cache');
     res.setHeader('Connection',    'keep-alive');
-    res.setHeader('X-Accel-Buffering', 'no'); // disable nginx buffering
+    res.setHeader('X-Accel-Buffering', 'no'); // desactiva el buffering de nginx
     res.flushHeaders();
 }
 
@@ -58,8 +58,8 @@ function formatRobot(row) {
     if (!row) return null;
     const now      = new Date();
     const isLocked = row.locked_until && new Date(row.locked_until) > now;
-    // Nearest waypoint to the live pose (zones cached so this stays cheap on
-    // the high-frequency odometry broadcast path).
+    // Waypoint más cercano a la pose en vivo (las zonas se cachean para que esto
+    // siga siendo barato en la ruta de difusión de odometría de alta frecuencia).
     const nearest = findNearestZone(row.position_x, row.position_y, zoneCache.get(row.map_id));
     return {
         id:           row.id,
@@ -81,7 +81,7 @@ function formatRobot(row) {
     };
 }
 
-/** Push a single robot update to all clients that can see it. */
+/** Envía la actualización de un robot a todos los clientes que pueden verlo. */
 async function broadcastRobot(robotId) {
     if (clients.size === 0) return;
     const row = await dbGetRobot(robotId);
@@ -116,7 +116,7 @@ function formatPosition(row) {
     };
 }
 
-/** Push the live pose to every visitor watching this specific robot. */
+/** Envía la pose en vivo a cada visitante que está observando este robot concreto. */
 async function broadcastPosition(robotId) {
     if (positionClients.size === 0) return;
     const payload = formatPosition(await dbGetPosition(robotId));
@@ -126,7 +126,7 @@ async function broadcastPosition(robotId) {
     }
 }
 
-/** Push a navigation outcome (arrived / failed) to the visitor watching this robot. */
+/** Envía el resultado de navegación (llegó / falló) al visitante que observa este robot. */
 function broadcastNav(robotId, payload) {
     if (positionClients.size === 0) return;
     for (const [res, meta] of positionClients) {
@@ -148,9 +148,9 @@ rosService.on('robot:disconnect', ({ robotId }) => {
     broadcastRobot(robotId);
 });
 
-// A navigation goal reached a terminal state. On failure: log an incident and
-// refresh the admin dashboard (red state). For visitor-initiated goals, tell the
-// visitor's chat the outcome so it can confirm arrival or offer a retry.
+// Un goal de navegación alcanzó un estado terminal. Si falla: registra una incidencia y
+// refresca el panel de administración (estado en rojo). Para goals iniciados por un visitante,
+// informa al chat del visitante del resultado para confirmar la llegada u ofrecer un reintento.
 rosService.on('robot:nav_result', async ({ robotId, outcome, goal }) => {
     if (outcome === 'aborted') {
         await incidentService.recordNavFailure(robotId, goal);
@@ -167,13 +167,13 @@ rosService.on('robot:nav_result', async ({ robotId, outcome, goal }) => {
 
 
 /**
- * Register a new SSE client.
- * Sends an initial snapshot of all robots visible to this client,
- * then registers heartbeat and cleanup handlers.
+ * Registra un nuevo cliente SSE.
+ * Envía una instantánea inicial de todos los robots visibles para este cliente
+ * y luego registra los manejadores de heartbeat y de limpieza.
  *
  * @param {express.Request}  req
  * @param {express.Response} res
- * @param {{ id: string, role: string, museum_id: string|null }} user  JWT payload
+ * @param {{ id: string, role: string, museum_id: string|null }} user  payload del JWT
  */
 function addClient(req, res, user) {
     writeSseHeaders(res);
@@ -183,7 +183,7 @@ function addClient(req, res, user) {
 
     clients.set(res, { museumId, isSuperAdmin });
 
-    // Send initial snapshot
+    // Envía la instantánea inicial
     let query  = `SELECT r.*, v.name AS visitor_name FROM robots r LEFT JOIN visitors v ON r.current_visitor_id = v.id`;
     let params = [];
     if (!isSuperAdmin) { query += ` WHERE r.museum_id = ?`; params = [museumId]; }
@@ -194,7 +194,7 @@ function addClient(req, res, user) {
         send(res, 'ready', { ts: Date.now() });
     });
 
-    // Heartbeat to keep the connection alive through proxies
+    // Heartbeat para mantener viva la conexión a través de proxies
     const heartbeat = setInterval(() => {
         try { res.write(': heartbeat\n\n'); } catch (_) { cleanup(); }
     }, HEARTBEAT_MS);
@@ -209,20 +209,20 @@ function addClient(req, res, user) {
 }
 
 /**
- * Register a visitor position-stream client.
- * Sends the robot's current pose immediately, then pushes every subsequent
- * pose update broadcast by rosService. One connection per visitor map view.
+ * Registra un cliente del stream de posición de un visitante.
+ * Envía la pose actual del robot de inmediato y después envía cada actualización
+ * de pose que difunde rosService. Una conexión por cada vista de mapa del visitante.
  *
  * @param {express.Request}  req
  * @param {express.Response} res
- * @param {string} robotId  the robot assigned to the visitor's session
+ * @param {string} robotId  el robot asignado a la sesión del visitante
  */
 function addPositionClient(req, res, robotId) {
     writeSseHeaders(res);
 
     positionClients.set(res, { robotId });
 
-    // Send initial snapshot so the overlay appears without waiting for an update
+    // Envía la instantánea inicial para que el overlay aparezca sin esperar a una actualización
     dbGetPosition(robotId).then((row) => {
         const payload = formatPosition(row);
         if (payload) send(res, 'position', payload);

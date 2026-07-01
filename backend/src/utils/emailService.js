@@ -9,12 +9,12 @@ const transporter = nodemailer.createTransport({
 });
 
 /**
- * Sends a welcome email with temporary credentials to newly created staff.
- * @param {string} toEmail Recipient email address
- * @param {string} name User's name
- * @param {string} tempPassword Temporary password
- * @param {string} role User role (museum_admin, technician)
- * @param {string} museumName Museum the user belongs to
+ * Envía un correo de bienvenida con credenciales temporales al personal recién creado.
+ * @param {string} toEmail Dirección de correo del destinatario
+ * @param {string} name Nombre del usuario
+ * @param {string} tempPassword Contraseña temporal
+ * @param {string} role Rol del usuario (museum_admin, technician)
+ * @param {string} museumName Museo al que pertenece el usuario
  */
 const sendWelcomeEmail = async (toEmail, name, tempPassword, role, museumName) => {
     const loginUrl = process.env.APP_URL || 'http://localhost:5173/login';
@@ -59,10 +59,10 @@ const sendWelcomeEmail = async (toEmail, name, tempPassword, role, museumName) =
 };
 
 /**
- * Sends a password-reset link to a staff member.
- * @param {string} toEmail Recipient email address
- * @param {string} name    User's name
- * @param {string} rawToken Plain-text reset token (not hashed)
+ * Envía un enlace de recuperación de contraseña a un miembro del personal.
+ * @param {string} toEmail Dirección de correo del destinatario
+ * @param {string} name    Nombre del usuario
+ * @param {string} rawToken Token de recuperación en texto plano (sin hashear)
  */
 const sendPasswordResetEmail = async (toEmail, name, rawToken) => {
     const appUrl   = process.env.APP_URL || 'http://localhost:5173';

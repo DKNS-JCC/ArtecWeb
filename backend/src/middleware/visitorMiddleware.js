@@ -1,8 +1,8 @@
 const db = require('../database');
 
 /**
- * Middleware that validates the visitor has an active session
- * and is assigned to a robot. Used for chat endpoints.
+ * Middleware que valida que el visitante tiene una sesión activa
+ * y está asignado a un robot. Se usa en los endpoints del chat.
  */
 module.exports.visitorMiddleware = (req, res, next) => {
     if (!req.user || req.user.role !== 'visitor') {

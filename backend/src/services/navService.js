@@ -7,11 +7,12 @@ function dbGet(sql, params) {
 }
 
 /**
- * Sends a robot to its map's base point (its home / return location).
+ * Envía un robot al punto base de su mapa (su ubicación de origen / de retorno).
  *
- * Best-effort by design: callers on the session-end path ignore the result so a
- * disconnected robot or a map without a base never blocks ending a visit. The
- * manual admin endpoint inspects the returned `reason` to give feedback.
+ * Es "best-effort" por diseño: quien lo invoca al finalizar la sesión ignora el
+ * resultado, de modo que un robot desconectado o un mapa sin base nunca bloqueen
+ * el fin de una visita. El endpoint manual de administración inspecciona el `reason`
+ * devuelto para dar feedback.
  *
  * @returns {Promise<Object>} Resultado con la forma: { ok: boolean, reason?: string, base?: object, error?: string }
  */
@@ -28,7 +29,7 @@ async function sendRobotToBase(robotId) {
     if (!rosService.getConnectionState(robotId)) return { ok: false, reason: 'not_connected' };
 
     try {
-        // qz=0, qw=1 → identity orientation (face map +X). Base only needs position.
+        // qz=0, qw=1 → orientación identidad (mira hacia +X del mapa). La base solo necesita la posición.
         rosService.sendNavGoal(robotId, base.map_x, base.map_y, 0, 1, {
             kind:      'base',
             placeName: base.name,

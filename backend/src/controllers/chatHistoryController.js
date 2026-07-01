@@ -28,7 +28,7 @@ function dbRun(sql, params) {
     });
 }
 
-// Lists sessions (soft-deleted excluded). Supports robot_id, date_from, date_to filters.
+// Lista las sesiones (excluye las borradas con soft-delete). Admite filtros robot_id, date_from, date_to.
 
 exports.listSessions = async (req, res) => {
     const isSuperAdmin = req.user.role === 'platform_admin';
@@ -48,7 +48,7 @@ exports.listSessions = async (req, res) => {
             params.push(museumId);
         }
 
-        // Soft-delete: hide deleted sessions from history
+        // Soft-delete: oculta del historial las sesiones borradas
         conditions.push('v.deleted_at IS NULL');
 
         if (robotFilter) {
@@ -114,7 +114,7 @@ exports.listSessions = async (req, res) => {
     }
 };
 
-// Returns the ordered conversation for one session (paginated, max 500).
+// Devuelve la conversación ordenada de una sesión (paginada, máx. 500).
 
 exports.getSessionMessages = async (req, res) => {
     const isSuperAdmin = req.user.role === 'platform_admin';
@@ -160,7 +160,7 @@ exports.getSessionMessages = async (req, res) => {
     }
 };
 
-// Soft-deletes a session: hidden in history, still counted in stats.
+// Soft-delete de una sesión: se oculta del historial, pero sigue contando en las estadísticas.
 
 exports.deleteSession = async (req, res) => {
     const isSuperAdmin = req.user.role === 'platform_admin';
@@ -168,7 +168,7 @@ exports.deleteSession = async (req, res) => {
     const { session_id } = req.params;
 
     try {
-        // Verify the session belongs to an authorised robot
+        // Verifica que la sesión pertenece a un robot autorizado
         const session = await dbGet(`
             SELECT v.session_id FROM visitors v
             JOIN   robots r ON r.id = v.robot_id
@@ -193,7 +193,7 @@ exports.deleteSession = async (req, res) => {
     }
 };
 
-// Convenience: list robots the admin can see (for the filter dropdown).
+// Utilidad: lista los robots que el administrador puede ver (para el desplegable de filtro).
 
 exports.listRobotsForFilter = async (req, res) => {
     const isSuperAdmin = req.user.role === 'platform_admin';

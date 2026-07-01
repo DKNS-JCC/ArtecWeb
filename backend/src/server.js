@@ -28,12 +28,12 @@ app.use(limiter);
 // Servir la carpeta uploads estáticamente
 app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
 
-// Main welcome route for backend root
+// Ruta principal de bienvenida en la raíz del backend
 app.get('/', (req, res) => {
   res.json({ message: 'API activa' });
 });
 
-// API Routes
+// Rutas de la API
 app.use('/api', apiRoutes);
 
 // -- Documentación interactiva de la API (Swagger UI) --
@@ -84,7 +84,7 @@ app.use((req, res) => {
   res.status(404).json({ error: 'Not found' });
 });
 
-// Start Server (skip in test mode - supertest handles binding)
+// Arranca el servidor (se omite en modo test - supertest gestiona el binding)
 if (process.env.NODE_ENV !== 'test') {
   app.listen(PORT, "0.0.0.0", () => {
     console.log(`Servidor en el puerto ${PORT}`);

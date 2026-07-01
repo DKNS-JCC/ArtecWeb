@@ -5,7 +5,7 @@ const sttService = require('../services/sttService');
 const { findNearestZone, BASE_CATEGORY } = require('../utils/geo');
 
 const MAX_MESSAGE_LENGTH = 500;
-const HISTORY_LIMIT = 8;  // Slightly more context for better AI coherence
+const HISTORY_LIMIT = 8;  // Un poco más de contexto para mejorar la coherencia de la IA
 
 
 function dbGet(sql, params) {
@@ -37,25 +37,25 @@ function dbRun(sql, params) {
 
 
 /**
- * Resolves an AI-returned place_name to a known zone using:
- * 1. Exact match (case-insensitive)
- * 2. Place name contains the query (or vice-versa)
- * Returns the matching zone object or null.
+ * Resuelve el place_name devuelto por la IA a una zona conocida usando:
+ * 1. Coincidencia exacta (sin distinguir mayúsculas/minúsculas)
+ * 2. El nombre del lugar contiene la consulta (o viceversa)
+ * Devuelve el objeto de zona coincidente o null.
  */
 function resolvePlace(placeName, places) {
     if (!placeName || !places || places.length === 0) return null;
 
     const query = placeName.toLowerCase().trim();
 
-    // 1. Exact match
+    // 1. Coincidencia exacta
     let match = places.find(p => p.name.toLowerCase() === query);
     if (match) return match;
 
-    // 2. Starts-with
+    // 2. Empieza por
     match = places.find(p => p.name.toLowerCase().startsWith(query) || query.startsWith(p.name.toLowerCase()));
     if (match) return match;
 
-    // 3. Contains
+    // 3. Contiene
     match = places.find(p => p.name.toLowerCase().includes(query) || query.includes(p.name.toLowerCase()));
     return match || null;
 }
@@ -63,8 +63,8 @@ function resolvePlace(placeName, places) {
 
 /**
  * POST /api/chat/message
- * Validates the visitor message, calls the AI, persists history, and responds.
- * For navigate_to intents, resolves the place name to a known zone.
+ * Valida el mensaje del visitante, llama a la IA, persiste el historial y responde.
+ * Para intents navigate_to, resuelve el nombre del lugar a una zona conocida.
  */
 exports.handleMessage = async (req, res) => {
     const message = req.body.message?.trim();
@@ -80,18 +80,18 @@ exports.handleMessage = async (req, res) => {
     try {
         const museum = await dbGet('SELECT name FROM museums WHERE id = ?', [museum_id]);
 
-        // Load zones from the map assigned to the robot (if any).
-        // The base point is internal - exclude it from anything the AI sees.
+        // Carga las zonas del mapa asignado al robot (si lo hay).
+        // El punto base es interno: se excluye de todo lo que ve la IA.
         const robot = await dbGet('SELECT map_id, position_x, position_y FROM robots WHERE id = ?', [robot_id]);
         const places = robot?.map_id
             ? await dbAll('SELECT id, name, description, category, map_x, map_y FROM zones WHERE map_id = ? AND category != ?', [robot.map_id, BASE_CATEGORY])
             : [];
 
-        // Where is the robot right now? Nearest named waypoint to its live pose,
-        // so it can answer "¿dónde estás?" naturally.
+        // ¿Dónde está el robot ahora mismo? El waypoint con nombre más cercano a su pose
+        // en vivo, para que pueda responder "¿dónde estás?" con naturalidad.
         const nearest = findNearestZone(robot?.position_x, robot?.position_y, places);
 
-        // Load conversation history from DB (server-side, prevents forgery)
+        // Carga el historial de conversación de la BD (en el servidor, evita falsificaciones)
         const recentMessages = await dbAll(
             `SELECT role, content FROM chat_messages
              WHERE session_id = ? ORDER BY created_at DESC LIMIT ?`,
@@ -110,7 +110,7 @@ exports.handleMessage = async (req, res) => {
             currentLocation: nearest?.name || null
         };
 
-        // Call AI service
+        // Llama al servicio de IA
         const aiResult = await aiService.interpret(message, history, context);
 
         let resolvedPlace = null;
@@ -119,17 +119,17 @@ exports.handleMessage = async (req, res) => {
             resolvedPlace = resolvePlace(requestedName, places);
 
             if (resolvedPlace) {
-                // Normalise the place_name to the canonical stored name
+                // Normaliza el place_name al nombre canónico almacenado
                 aiResult.params.place_name = resolvedPlace.name;
                 aiResult.params.place_id   = resolvedPlace.id;
                 if (resolvedPlace.map_x != null) aiResult.params.map_x = resolvedPlace.map_x;
                 if (resolvedPlace.map_y != null) aiResult.params.map_y = resolvedPlace.map_y;
 
-                // NOTE: Confirmation is handled by the frontend modal dialog.
-                // The AI response should acknowledge the destination but not ask
-                // for text-based confirmation - the modal takes care of that.
+                // NOTA: la confirmación la gestiona el modal del frontend.
+                // La respuesta de la IA debe reconocer el destino pero no pedir
+                // confirmación por texto: de eso se encarga el modal.
             } else if (requestedName) {
-                // AI suggested a place that doesn't exist - downgrade intent
+                // La IA sugirió un lugar que no existe - se degrada el intent
                 aiResult.intent = 'none';
                 aiResult.confidence = 0.3;
                 const availableNames = places.map(p => `"${p.name}"`).join(', ');
@@ -172,10 +172,10 @@ exports.handleMessage = async (req, res) => {
 
 /**
  * POST /api/chat/stt
- * Transcribes a visitor voice clip to text using the local Whisper model.
- * The audio (16 kHz mono WAV) arrives in memory via multer; nothing is stored.
- * Returns only the recognised text - the client then sends it like a typed
- * message, so the existing /chat/message pipeline (AI, history, intents) is reused.
+ * Transcribe un clip de voz del visitante a texto usando el modelo local de Whisper.
+ * El audio (WAV mono 16 kHz) llega en memoria vía multer; no se almacena nada.
+ * Devuelve solo el texto reconocido: el cliente lo envía después como un mensaje
+ * escrito, reutilizando la tubería existente de /chat/message (IA, historial, intents).
  */
 exports.handleTranscribe = async (req, res) => {
     if (!req.file || !req.file.buffer?.length) {
@@ -187,8 +187,8 @@ exports.handleTranscribe = async (req, res) => {
         return res.json({ text });
     } catch (err) {
         console.error('[STT] Transcription failed:', err.message);
-        // Validation errors carry a user-friendly Spanish message; surface them
-        // as 400, anything unexpected as 503 (model load / inference failure).
+        // Los errores de validación llevan un mensaje amigable en español; se devuelven
+        // como 400, y cualquier cosa inesperada como 503 (fallo de carga del modelo / inferencia).
         const isUserError = /audio|grabación|formato|corto|PCM|WAV/i.test(err.message || '');
         return res.status(isUserError ? 400 : 503).json({
             error: isUserError

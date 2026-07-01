@@ -31,9 +31,9 @@ module.exports.superAdminMiddleware = (req, res, next) => {
     next();
 };
 
-// Allows technicians in addition to admins. Used for robot operation and
-// monitoring endpoints (control, teleop, map/scan), which technicians need but
-// which are scoped to their own museum via req.user.museum_id in each query.
+// Permite técnicos además de administradores. Se usa en los endpoints de operación y
+// monitorización del robot (control, teleop, mapa/scan), que los técnicos necesitan pero
+// que quedan acotados a su propio museo mediante req.user.museum_id en cada consulta.
 module.exports.staffMiddleware = (req, res, next) => {
     const allowed = ['technician', 'museum_admin', 'platform_admin'];
     if (!req.user || !allowed.includes(req.user.role)) {

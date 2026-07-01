@@ -2,9 +2,9 @@ const crypto = require('crypto');
 const db = require('../database');
 
 /**
- * Operational incident log. Right now it records navigation failures (a Nav2
- * goal that ended ABORTED) so technicians can review them after the fact, even
- * if no admin was watching the live dashboard when it happened.
+ * Registro de incidencias operativas. Ahora mismo registra fallos de navegación (un
+ * goal de Nav2 que terminó ABORTED) para que los técnicos puedan revisarlos a posteriori,
+ * aunque ningún administrador estuviera mirando el panel en vivo cuando ocurrió.
  */
 
 function dbGet(sql, params) {
@@ -34,10 +34,10 @@ function dbRun(sql, params) {
 }
 
 /**
- * Record a navigation failure and flag the robot so the dashboard can show it
- * inline. Best-effort: never throws into the ROS event path.
+ * Registra un fallo de navegación y marca el robot para que el panel pueda mostrarlo
+ * en línea. Best-effort: nunca lanza excepciones dentro del flujo de eventos de ROS.
  * @param {string} robotId
- * @param {object} goal  the activeGoal carried by rosService { placeName, visitorId, museumId, kind }
+ * @param {object} goal  el activeGoal que transporta rosService { placeName, visitorId, museumId, kind }
  */
 async function recordNavFailure(robotId, goal = {}) {
     try {
@@ -58,7 +58,7 @@ async function recordNavFailure(robotId, goal = {}) {
             [crypto.randomUUID(), museumId, robotId, goal.visitorId || null, place, detail]
         );
 
-        // Mark the robot so the live dashboard shows a red state next to it.
+        // Marca el robot para que el panel en vivo muestre un estado en rojo junto a él.
         await dbRun(
             `UPDATE robots SET last_nav_error_at = CURRENT_TIMESTAMP, last_nav_error_place = ? WHERE id = ?`,
             [place, robotId]
@@ -69,8 +69,8 @@ async function recordNavFailure(robotId, goal = {}) {
 }
 
 /**
- * List incidents visible to the requester. Platform admins see everything;
- * museum admins/technicians are scoped to their museum.
+ * Lista las incidencias visibles para quien las solicita. Los administradores de la
+ * plataforma lo ven todo; los administradores/técnicos de museo se limitan a su museo.
  */
 function list({ isSuperAdmin, museumId, limit = 100 }) {
     const base = `
@@ -87,7 +87,7 @@ function list({ isSuperAdmin, museumId, limit = 100 }) {
     return dbAll(`${base} WHERE i.museum_id = ? ORDER BY i.created_at DESC LIMIT ?`, [museumId, limit]);
 }
 
-/** Mark an incident resolved, scoped to the requester's museum unless superadmin. */
+/** Marca una incidencia como resuelta, limitada al museo del solicitante salvo que sea superadmin. */
 function resolve({ id, isSuperAdmin, museumId }) {
     if (isSuperAdmin) {
         return dbRun(`UPDATE incidents SET resolved = 1 WHERE id = ?`, [id]);

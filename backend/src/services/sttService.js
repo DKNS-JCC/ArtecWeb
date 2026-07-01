@@ -1,33 +1,33 @@
 /**
- * Speech-to-Text service - 100% local, free, no external API.
+ * Servicio de reconocimiento de voz (Speech-to-Text) - 100% local, gratuito y sin API externa.
  *
- * Runs OpenAI Whisper on-device (on this server) through Transformers.js
- * (`@xenova/transformers`). Inference uses onnxruntime-node, which ships
- * prebuilt binaries for Windows/macOS/Linux, so there is NO native build step.
+ * Ejecuta OpenAI Whisper en el propio dispositivo (este servidor) mediante Transformers.js
+ * (`@xenova/transformers`). La inferencia usa onnxruntime-node, que incluye binarios
+ * precompilados para Windows/macOS/Linux, así que NO hay paso de compilación nativa.
  *
- * The model is downloaded from the HuggingFace hub on first use (~75 MB for
- * `whisper-tiny`, ~145 MB for `whisper-base`) and cached on disk afterwards,
- * so subsequent runs work fully offline.
+ * El modelo se descarga del hub de HuggingFace en el primer uso (~75 MB para
+ * `whisper-tiny`, ~145 MB para `whisper-base`) y luego se cachea en disco, de modo
+ * que las siguientes ejecuciones funcionan totalmente offline.
  *
- * Audio contract: the frontend records the visitor's voice, resamples it to
- * 16 kHz mono and uploads it as a PCM-16 WAV. This keeps the backend free of
- * ffmpeg/native audio dependencies - we only parse a well-formed WAV buffer.
+ * Contrato de audio: el frontend graba la voz del visitante, la remuestrea a
+ * 16 kHz mono y la sube como WAV PCM-16. Esto mantiene el backend libre de
+ * dependencias de ffmpeg/audio nativo: solo parseamos un buffer WAV bien formado.
  */
 
-// Multilingual model. `whisper-tiny` is the fastest; `whisper-base` is more
-// accurate for Spanish at a small latency cost. Override with WHISPER_MODEL.
+// Modelo multilingüe. `whisper-tiny` es el más rápido; `whisper-base` es más
+// preciso en español a costa de algo de latencia. Se sobreescribe con WHISPER_MODEL.
 const WHISPER_MODEL = process.env.WHISPER_MODEL || 'Xenova/whisper-tiny';
 const WHISPER_LANGUAGE = process.env.WHISPER_LANGUAGE || 'spanish';
 
-const TARGET_SAMPLE_RATE = 16000;          // Whisper expects 16 kHz mono
-const MIN_DURATION_SEC   = 0.25;            // reject accidental taps / silence
-const MAX_DURATION_SEC   = 30;              // Whisper processes 30 s windows
+const TARGET_SAMPLE_RATE = 16000;          // Whisper espera 16 kHz mono
+const MIN_DURATION_SEC   = 0.25;            // descarta toques accidentales / silencio
+const MAX_DURATION_SEC   = 30;              // Whisper procesa ventanas de 30 s
 
-let transcriberPromise = null;             // lazy singleton (model load is heavy)
+let transcriberPromise = null;             // singleton perezoso (cargar el modelo es costoso)
 
 /**
- * Lazily loads the ASR pipeline once and reuses it for every request.
- * `@xenova/transformers` is ESM-only, so we import it dynamically from CommonJS.
+ * Carga la pipeline de ASR una sola vez (de forma perezosa) y la reutiliza en cada petición.
+ * `@xenova/transformers` es solo ESM, así que la importamos dinámicamente desde CommonJS.
  */
 async function getTranscriber() {
     if (!transcriberPromise) {
@@ -41,7 +41,7 @@ async function getTranscriber() {
             console.log('[STT] Whisper model ready.');
             return asr;
         })().catch((err) => {
-            // Reset so a later request can retry the load instead of failing forever.
+            // Se resetea para que una petición posterior pueda reintentar la carga en vez de fallar para siempre.
             transcriberPromise = null;
             throw err;
         });
@@ -50,9 +50,9 @@ async function getTranscriber() {
 }
 
 /**
- * Parses a PCM-16 WAV buffer into a normalised Float32Array (mono).
- * Scans RIFF sub-chunks rather than assuming a fixed 44-byte header so it
- * tolerates extra metadata chunks some encoders insert.
+ * Parsea un buffer WAV PCM-16 a un Float32Array normalizado (mono).
+ * Recorre los sub-chunks RIFF en lugar de asumir una cabecera fija de 44 bytes, de
+ * forma que tolera chunks de metadatos extra que algunos codificadores insertan.
  *
  * @returns {{ samples: Float32Array, sampleRate: number }}
  */
@@ -70,7 +70,7 @@ function parseWav(buffer) {
     let dataOffset    = -1;
     let dataLength    = 0;
 
-    // Walk the chunk list: [4-byte id][4-byte little-endian size][payload]
+    // Recorre la lista de chunks: [id de 4 bytes][tamaño little-endian de 4 bytes][payload]
     let offset = 12;
     while (offset + 8 <= buffer.length) {
         const chunkId   = buffer.toString('ascii', offset, offset + 4);
@@ -85,7 +85,7 @@ function parseWav(buffer) {
             dataLength = Math.min(chunkSize, buffer.length - dataOffset);
             break;
         }
-        // Chunks are word-aligned (padded to even sizes).
+        // Los chunks están alineados a palabra (con relleno a tamaños pares).
         offset += 8 + chunkSize + (chunkSize % 2);
     }
 
@@ -96,7 +96,7 @@ function parseWav(buffer) {
         throw new Error('Solo se admite audio PCM de 16 bits.');
     }
 
-    // Decode interleaved PCM-16 → mono Float32 in [-1, 1].
+    // Decodifica PCM-16 intercalado → Float32 mono en [-1, 1].
     const totalSamples = Math.floor(dataLength / 2);
     const frames       = Math.floor(totalSamples / numChannels);
     const mono         = new Float32Array(frames);
@@ -112,7 +112,7 @@ function parseWav(buffer) {
     return { samples: mono, sampleRate };
 }
 
-/** Linear-resamples mono audio to 16 kHz if the source rate differs. */
+/** Remuestrea linealmente el audio mono a 16 kHz si la frecuencia de origen difiere. */
 function resampleTo16k(samples, sampleRate) {
     if (sampleRate === TARGET_SAMPLE_RATE) return samples;
 
@@ -126,20 +126,20 @@ function resampleTo16k(samples, sampleRate) {
         const frac   = srcPos - idx;
         const a      = samples[idx] || 0;
         const b      = samples[idx + 1] !== undefined ? samples[idx + 1] : a;
-        out[i] = a + (b - a) * frac;   // linear interpolation
+        out[i] = a + (b - a) * frac;   // interpolación lineal
     }
     return out;
 }
 
-// Serialise transcriptions: Whisper inference is CPU/RAM heavy, so running many
-// at once on a shared museum server would spike memory. A tiny promise chain
-// keeps requests in order without an external queue dependency.
+// Serializa las transcripciones: la inferencia de Whisper consume mucha CPU/RAM, así que
+// ejecutar muchas a la vez en un servidor de museo compartido dispararía la memoria. Una
+// pequeña cadena de promesas mantiene el orden de las peticiones sin depender de una cola externa.
 let queue = Promise.resolve();
 
 /**
- * Transcribes a visitor audio clip to Spanish text using the local model.
- * @param {Buffer} wavBuffer  16 kHz-ish mono PCM-16 WAV uploaded by the client.
- * @returns {Promise<string>} the recognised text (may be empty for silence).
+ * Transcribe un clip de audio del visitante a texto en español usando el modelo local.
+ * @param {Buffer} wavBuffer  WAV PCM-16 mono (~16 kHz) subido por el cliente.
+ * @returns {Promise<string>} el texto reconocido (puede estar vacío si hay silencio).
  */
 async function transcribe(wavBuffer) {
     const { samples, sampleRate } = parseWav(wavBuffer);
@@ -164,14 +164,14 @@ async function transcribe(wavBuffer) {
         return (result?.text || '').trim();
     });
 
-    // Keep the chain alive even if this run rejects, so later requests proceed.
+    // Mantiene viva la cadena aunque esta ejecución se rechace, para que las siguientes peticiones continúen.
     queue = run.catch(() => {});
     return run;
 }
 
 module.exports = {
     transcribe,
-    // Exported for unit testing
+    // Exportado para pruebas unitarias
     parseWav,
     resampleTo16k,
 };

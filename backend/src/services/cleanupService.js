@@ -28,7 +28,7 @@ async function runCleanup() {
 }
 
 function start() {
-    // Delay first run so DB is fully initialized before we touch it
+    // Retrasa la primera ejecución para que la BD esté totalmente inicializada antes de tocarla
     setTimeout(runCleanup, 10_000);
     setInterval(runCleanup, CLEANUP_INTERVAL_MS);
 }

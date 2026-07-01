@@ -10,7 +10,7 @@ const SALT_ROUNDS = 10;
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-// Promise Helpers for Database
+// Helpers de base de datos basados en promesas
 const dbGet = (sql, params = []) => new Promise((resolve, reject) => {
     db.get(sql, params, (err, row) => {
         if (err) reject(err);
@@ -63,7 +63,7 @@ exports.createVisitor = async (req, res) => {
         return res.status(500).json({ error: 'Error verificando el robot' });
     }
 
-    // Use IMMEDIATE transaction to prevent race conditions on robot locking
+    // Usa una transacción IMMEDIATE para evitar condiciones de carrera al bloquear el robot
     async function reserveRobot() {
         try {
             await dbRun('BEGIN IMMEDIATE');
@@ -110,7 +110,7 @@ exports.createVisitor = async (req, res) => {
                 visitor: { id: visitorId, session_id: sessionId, role: 'visitor', robot_id: robot.id, robot_name: robot.name, name: visitorName, expertise_level: visitorExpertise, language: visitorLanguage }
             });
 
-            // Wake the robot LEDs - a visitor is now active
+            // Despierta los LEDs del robot - ahora hay un visitante activo
             rosService.publishSessionActive(robot.id, true);
         } catch (err) {
             console.error('VISITOR ERROR:', err);
@@ -163,10 +163,10 @@ exports.endVisitor = (req, res) => {
         db.run('UPDATE visitors SET ended_at = CURRENT_TIMESTAMP WHERE id = ?', [visitorId], (err2) => {
             if (err2) console.error('Error updating visitor ended_at', err2);
 
-            // Put LEDs into standby - no active session
+            // Pone los LEDs en standby - no hay sesión activa
             rosService.publishSessionActive(robotId, false);
 
-            // Send the robot home to its base point (best-effort - never blocks end).
+            // Envía el robot a su punto base (best-effort - nunca bloquea el cierre de la sesión).
             navService.sendRobotToBase(robotId).catch(() => {});
 
             res.json({ message: 'Session ended' });
@@ -193,7 +193,7 @@ exports.login = (req, res) => {
             const match = await bcrypt.compare(password, user.password_hash);
             if (!match) return res.status(401).json({ error: 'Credenciales incorrectas' });
 
-            // Block manually deactivated accounts (active=0 but already activated once)
+            // Bloquea cuentas desactivadas manualmente (active=0 pero ya activadas alguna vez)
             if (user.active === 0 && user.must_change_password === 0) {
                 return res.status(403).json({ error: 'Esta cuenta ha sido desactivada. Contacta con tu administrador.' });
             }
@@ -272,7 +272,7 @@ exports.changePassword = async (req, res) => {
 const { sendWelcomeEmail } = require('../utils/emailService');
 
 exports.createStaff = async (req, res) => {
-    // Note: password is no longer received from the client
+    // Nota: la contraseña ya no se recibe del cliente
     const { name, email, role, museum_id } = req.body;
     const created_by = req.user.id;
     const reqUserRole = req.user.role;
@@ -284,7 +284,7 @@ exports.createStaff = async (req, res) => {
         return res.status(400).json({ error: 'Invalid email format' });
     }
 
-    // Role validation based on who is creating the user
+    // Validación de rol según quién esté creando el usuario
     if (reqUserRole === 'platform_admin') {
         if (!['museum_admin', 'technician'].includes(role)) {
             return res.status(400).json({ error: 'Platform admin can only create museum admin or technician' });
@@ -296,7 +296,7 @@ exports.createStaff = async (req, res) => {
         if (role !== 'technician') {
             return res.status(403).json({ error: 'Museum admins can only create technicians' });
         }
-        // Force the museum_id to be the admin's museum_id
+        // Fuerza el museum_id al del propio administrador
         if (req.user.museum_id && museum_id !== req.user.museum_id) {
             return res.status(403).json({ error: 'You can only create staff for your own museum' });
         }
@@ -304,7 +304,7 @@ exports.createStaff = async (req, res) => {
 
     const assignedMuseumId = reqUserRole === 'museum_admin' ? req.user.museum_id : museum_id;
 
-    // Generate a secure temporary password (e.g. 8 chars, alphanumeric)
+    // Genera una contraseña temporal segura (alfanumérica con símbolos)
     const tempPassword = crypto.randomBytes(4).toString('hex') + 'Aa1!';
 
     try {
@@ -330,7 +330,7 @@ exports.createStaff = async (req, res) => {
                         return res.status(500).json({ error: 'Error creating staff account' });
                     }
 
-                    // Send the automated welcome email
+                    // Envía el correo de bienvenida automático
                     await sendWelcomeEmail(email.trim(), name.trim(), tempPassword, role, museumName);
 
                     res.status(201).json({
@@ -418,7 +418,7 @@ exports.deleteStaff = (req, res) => {
         if (reqUserRole === 'museum_admin' && targetUser.museum_id !== reqMuseumId) {
             return res.status(403).json({ error: 'No autorizado' });
         }
-        // Only allow deleting accounts that have never been activated
+        // Solo permite eliminar cuentas que nunca se han activado
         if (!(targetUser.active === 0 && targetUser.must_change_password === 1)) {
             return res.status(403).json({ error: 'Solo se pueden eliminar cuentas pendientes de activación' });
         }
@@ -487,7 +487,7 @@ exports.uploadAvatar = (req, res) => {
             if (oldAvatar) {
                 const oldFileName = oldAvatar.split('/').pop();
                 const oldFilePath = path.join(__dirname, '../../uploads/avatars', oldFileName);
-                // Sanitize to only delete from the exact directory
+                // Sanea para borrar solo del directorio exacto
                 const resolvedDir = path.resolve(path.join(__dirname, '../../uploads/avatars'));
                 const resolvedFile = path.resolve(oldFilePath);
                 if (resolvedFile.startsWith(resolvedDir)) {

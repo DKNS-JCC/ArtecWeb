@@ -13,9 +13,10 @@ const VALID_INTENTS = ['navigate_to', 'explain', 'greet', 'farewell', 'none'];
 const VALID_LANGUAGES = ['es', 'en', 'fr', 'de', 'it'];
 
 /**
- * Expertise directives - written once, in English. They instruct the model HOW
- * to adapt tone and depth; the visitor never reads them, so they don't need
- * translating. The reply language is enforced separately (see buildSystemPrompt).
+ * Directivas de nivel de conocimiento - escritas una sola vez y en inglés a propósito:
+ * van al modelo, no a la interfaz. Le indican CÓMO adaptar el tono y la profundidad;
+ * el visitante nunca las lee, así que no necesitan traducirse. El idioma de la respuesta
+ * se fuerza aparte (ver buildSystemPrompt).
  */
 const EXPERTISE_DIRECTIVES = {
     nino: `The visitor IS A CHILD.
@@ -43,8 +44,8 @@ const EXPERTISE_DIRECTIVES = {
 };
 
 /**
- * Reply-language names - the only per-language data the prompt needs.
- * Injected into the system prompt so the model knows which language to answer in.
+ * Nombres de los idiomas de respuesta - el único dato por idioma que necesita el prompt.
+ * Se inyecta en el prompt del sistema para que el modelo sepa en qué idioma contestar.
  */
 const LANGUAGE_NAMES = {
     es: 'Spanish (español)',
@@ -56,23 +57,23 @@ const LANGUAGE_NAMES = {
 
 
 /**
- * Strips control characters, JSON-breaking chars, and trims to maxLength.
- * Used for all DB/user values injected into the system prompt.
+ * Elimina caracteres de control y caracteres que rompen el JSON, y recorta a maxLength.
+ * Se usa para todos los valores de BD/usuario que se inyectan en el prompt del sistema.
  */
 function sanitizeForPrompt(value, maxLength = 100) {
     if (typeof value !== 'string') return '';
     return value
-        .replace(/[\x00-\x1F\x7F]/g, ' ')  // strip control characters (newlines, tabs…)
-        .replace(/[{}]/g, '')                // strip JSON braces that could confuse the model
-        .replace(/[<>]/g, '')                // strip HTML-like angle brackets
+        .replace(/[\x00-\x1F\x7F]/g, ' ')  // elimina caracteres de control (saltos de línea, tabs…)
+        .replace(/[{}]/g, '')                // elimina llaves JSON que podrían confundir al modelo
+        .replace(/[<>]/g, '')                // elimina símbolos de ángulo tipo HTML
         .trim()
         .slice(0, maxLength);
 }
 
 /**
- * Returns true if the string contains common prompt-injection patterns.
- * We reject injected names that carry instructions, not the user message itself
- * (the message goes in the conversation history, not the system prompt).
+ * Devuelve true si la cadena contiene patrones habituales de inyección de prompts.
+ * Rechazamos nombres inyectados que llevan instrucciones, no el mensaje del usuario en sí
+ * (el mensaje va en el historial de conversación, no en el prompt del sistema).
  */
 function hasInjectionAttempt(value) {
     if (typeof value !== 'string') return false;
@@ -93,8 +94,8 @@ function hasInjectionAttempt(value) {
 }
 
 /**
- * Sanitizes a name-like field for injection into the system prompt.
- * Falls back to the provided default if injection is detected.
+ * Sanea un campo tipo nombre para inyectarlo en el prompt del sistema.
+ * Recurre al valor por defecto indicado si se detecta un intento de inyección.
  */
 function safeName(value, fallback, maxLength = 60) {
     const cleaned = sanitizeForPrompt(value, maxLength);
@@ -104,9 +105,10 @@ function safeName(value, fallback, maxLength = 60) {
 
 
 /**
- * Builds the system prompt in English and tells the model which language to
- * reply in. One template for every language: the model handles the output
- * language, so there's no need to maintain a translated copy per locale.
+ * Construye el prompt del sistema en inglés e indica al modelo en qué idioma debe
+ * responder. Una única plantilla para todos los idiomas: el modelo se encarga del
+ * idioma de salida, así que no hace falta mantener una copia traducida por locale.
+ * (El contenido del prompt va en inglés porque es entrada para el modelo, no interfaz.)
  */
 function buildSystemPrompt(context) {
     const robotName    = safeName(context.robotName,   'Robot Guía', 40);
@@ -264,7 +266,7 @@ function validateResponse(parsed) {
     if (typeof parsed.response !== 'string' || !parsed.response.trim()) {
         parsed.response = 'Lo siento, no pude procesar tu mensaje. ¿Puedes intentarlo de nuevo?';
     } else {
-        // Trim excessively long responses
+        // Recorta las respuestas excesivamente largas
         parsed.response = parsed.response.slice(0, 1000);
     }
 
@@ -393,7 +395,7 @@ module.exports = {
     interpret,
     VALID_INTENTS,
     VALID_LANGUAGES,
-    // Exported for unit testing
+    // Exportado para pruebas unitarias
     sanitizeForPrompt,
     hasInjectionAttempt,
     safeName,

@@ -18,15 +18,15 @@ const rateLimit = require('express-rate-limit');
 const navService = require('../services/navService');
 const { findNearestZone, BASE_CATEGORY } = require('../utils/geo');
 
-// Chat-specific rate limiter (stricter: 15 msgs/min)
+// Limitador de tasa específico del chat (más estricto: 15 msgs/min)
 const chatLimiter = rateLimit({
     windowMs: 60 * 1000,
     max: 15,
     message: { error: 'Demasiados mensajes. Espera un momento antes de enviar otro.' }
 });
 
-// Speech-to-text limiter - local Whisper inference is CPU-heavy, so cap it
-// tighter than text chat (20 clips/min per IP).
+// Limitador de speech-to-text - la inferencia local de Whisper consume mucha CPU, así que
+// se limita más que el chat de texto (20 clips/min por IP).
 const sttLimiter = rateLimit({
     windowMs: 60 * 1000,
     max: 20,
@@ -35,9 +35,9 @@ const sttLimiter = rateLimit({
 
 const audioUpload = require('../config/audioUploadConfig');
 
-// Long-lived text/event-stream connection. One connection per admin browser tab.
-// EventSource cannot send custom headers, so the JWT is passed as ?token=...
-// We validate it inline rather than using authMiddleware (which reads the header).
+// Conexión persistente text/event-stream. Una conexión por pestaña de administración.
+// EventSource no puede enviar cabeceras personalizadas, así que el JWT se pasa como ?token=...
+// Lo validamos aquí en línea en vez de usar authMiddleware (que lee la cabecera).
 router.get('/robots/stream', (req, res) => {
     const jwt = require('jsonwebtoken');
     const JWT_SECRET = process.env.JWT_SECRET || 'super-secret-artec-key';
@@ -77,7 +77,7 @@ router.get('/robots/position-stream', (req, res) => {
         return res.status(403).json({ error: 'Visitor access required' });
     }
 
-    // Confirm the visitor still owns this robot session before streaming.
+    // Confirma que el visitante aún es dueño de esta sesión del robot antes de emitir el stream.
     db.get(
         'SELECT id FROM robots WHERE id = ? AND current_visitor_id = ?',
         [user.robot_id, user.id],
@@ -91,9 +91,9 @@ router.get('/robots/position-stream', (req, res) => {
 
 /**
  * GET /api/robots/:id/availability
- * Checked by the scan screen BEFORE prompting the visitor, so an offline or
- * occupied robot is reported up-front instead of failing later on navigation.
- * Path is under /robots → skipped by the global rate limiter.
+ * La comprueba la pantalla de escaneo ANTES de preguntar al visitante, de modo que un
+ * robot offline u ocupado se informa por adelantado en vez de fallar luego en la navegación.
+ * La ruta está bajo /robots → el limitador de tasa global la omite.
  */
 router.get('/robots/:id/availability', (req, res) => {
     db.get('SELECT id, name, ip, locked_until FROM robots WHERE id = ?', [req.params.id], async (err, robot) => {
@@ -131,14 +131,14 @@ router.delete('/auth/avatar', authMiddleware, authController.deleteAvatar);
 
 router.post('/chat/message', chatLimiter, authMiddleware, visitorMiddleware, chatController.handleMessage);
 
-// Accepts a 16 kHz mono WAV clip, returns the recognised text.
+// Acepta un clip WAV mono de 16 kHz y devuelve el texto reconocido.
 router.post('/chat/stt', sttLimiter, authMiddleware, visitorMiddleware, audioUpload.single('audio'), chatController.handleTranscribe);
 
 
 /**
  * POST /api/chat/confirm-nav
- * Visitor explicitly confirms a navigate_to intent.
- * Fires the actual Nav2 goal via rosService and persists the confirmation in chat history.
+ * El visitante confirma explícitamente un intent navigate_to.
+ * Lanza el goal real de Nav2 vía rosService y persiste la confirmación en el historial de chat.
  */
 router.post('/chat/confirm-nav', chatLimiter, authMiddleware, async (req, res) => {
     const { visitorMiddleware } = require('../middleware/visitorMiddleware');
@@ -151,7 +151,7 @@ router.post('/chat/confirm-nav', chatLimiter, authMiddleware, async (req, res) =
             return res.status(400).json({ error: 'place_id is required' });
         }
 
-        // Load zone - coordinates are already stored as ROS world coords (meters)
+        // Carga la zona - las coordenadas ya están almacenadas como coords del mundo de ROS (metros)
         db.get(
             `SELECT z.id, z.name, z.map_x, z.map_y
              FROM zones z
@@ -193,7 +193,7 @@ router.post('/chat/confirm-nav', chatLimiter, authMiddleware, async (req, res) =
                     [robot_id]
                 );
 
-                // Persist robot confirmation message in chat history
+                // Persiste el mensaje de confirmación del robot en el historial de chat
                 db.run(
                     `INSERT INTO chat_messages (id, visitor_id, session_id, robot_id, role, content, intent)
                      VALUES (?, ?, ?, ?, 'assistant', ?, 'navigate_to')`,
@@ -215,7 +215,7 @@ router.post('/chat/confirm-nav', chatLimiter, authMiddleware, async (req, res) =
 
 /**
  * PATCH /api/visitor/expertise
- * Update the expertise level of the current visitor (AI reads it from DB on each message).
+ * Actualiza el nivel de conocimiento del visitante actual (la IA lo lee de la BD en cada mensaje).
  */
 router.patch('/visitor/expertise', authMiddleware, (req, res) => {
     const { visitorMiddleware } = require('../middleware/visitorMiddleware');
@@ -239,7 +239,7 @@ router.patch('/visitor/expertise', authMiddleware, (req, res) => {
 
 /**
  * GET /api/visitor/map
- * Returns the map metadata and zones for the robot assigned to the current visitor.
+ * Devuelve los metadatos del mapa y las zonas del robot asignado al visitante actual.
  */
 router.get('/visitor/map', authMiddleware, (req, res) => {
     const { visitorMiddleware } = require('../middleware/visitorMiddleware');
@@ -252,7 +252,7 @@ router.get('/visitor/map', authMiddleware, (req, res) => {
             db.get('SELECT * FROM maps WHERE id = ?', [robot.map_id], (err, map) => {
                 if (err || !map) return res.status(500).json({ error: 'Error al obtener el mapa' });
 
-                // Exclude the internal base point - it's opaque to visitors.
+                // Excluye el punto base interno - es opaco para los visitantes.
                 db.all('SELECT * FROM zones WHERE map_id = ? AND category != ?', [robot.map_id, BASE_CATEGORY], (err, zones) => {
                     if (err) return res.status(500).json({ error: 'Error al obtener las zonas' });
                     res.json({ map, zones: zones || [] });
@@ -341,8 +341,8 @@ router.get('/robots', authMiddleware, staffMiddleware, (req, res) => {
 
         const now = new Date();
 
-        // Batch-load zones for every map involved, then derive each robot's
-        // current location as the nearest waypoint to its live position.
+        // Carga en lote las zonas de cada mapa implicado y luego deriva la ubicación
+        // actual de cada robot como el waypoint más cercano a su posición en vivo.
         const mapIds = [...new Set(rows.map(r => r.map_id).filter(Boolean))];
 
         const buildResponse = (zonesByMap) => rows.map(r => {
@@ -438,7 +438,7 @@ router.put('/robots/:id', authMiddleware, staffMiddleware, (req, res) => {
         if (err) return res.status(500).json({ error: 'Database error' });
         if (!robot) return res.status(404).json({ error: 'Robot not found or unauthorized' });
 
-        // Reassigning a robot to another museum (or unassigning it) is provider-only.
+        // Reasignar un robot a otro museo (o desasignarlo) es exclusivo del proveedor.
         const reassign = isSuperAdmin && museum_id !== undefined;
         const newMuseumId = reassign ? (museum_id || null) : robot.museum_id;
         const museumChanged = newMuseumId !== robot.museum_id;
@@ -450,8 +450,8 @@ router.put('/robots/:id', authMiddleware, staffMiddleware, (req, res) => {
             if (!museum) return res.status(404).json({ error: 'Museo no encontrado' });
         }
 
-        // If assigning a map, verify it belongs to the same museum AND has a base point.
-        // (Skipped on a museum change: the old map belongs to the previous museum.)
+        // Si se asigna un mapa, verifica que pertenece al mismo museo Y tiene un punto base.
+        // (Se omite en un cambio de museo: el mapa antiguo pertenece al museo anterior.)
         if (isAdmin && !museumChanged && map_id !== undefined && map_id !== null) {
             const mapRow = await new Promise(resolve => {
                 db.get('SELECT museum_id FROM maps WHERE id = ?', [map_id], (e, row) => resolve(row || null));
@@ -460,7 +460,7 @@ router.put('/robots/:id', authMiddleware, staffMiddleware, (req, res) => {
             if (!isSuperAdmin && mapRow.museum_id !== museumId) {
                 return res.status(403).json({ error: 'El mapa no pertenece a tu museo' });
             }
-            // Mandatory base: a map without a base point cannot drive a robot.
+            // Base obligatoria: un mapa sin punto base no puede guiar a un robot.
             const base = await new Promise(resolve => {
                 db.get('SELECT id FROM zones WHERE map_id = ? AND category = ? LIMIT 1', [map_id, BASE_CATEGORY], (e, row) => resolve(row || null));
             });
@@ -471,10 +471,10 @@ router.put('/robots/:id', authMiddleware, staffMiddleware, (req, res) => {
 
         const updatedIp = ip !== undefined ? ip : robot.ip;
         const updatedName = name !== undefined ? name : robot.name;
-        // Maps are museum-scoped, so moving the robot to another museum drops its map.
+        // Los mapas están acotados a un museo, así que mover el robot a otro museo descarta su mapa.
         const updatedMapId = museumChanged ? null : (isAdmin && map_id !== undefined ? map_id : robot.map_id);
 
-        // On a museum change, also clear any stale visitor session from the old museum.
+        // En un cambio de museo, limpia también cualquier sesión de visitante obsoleta del museo anterior.
         const updateSql = museumChanged
             ? `UPDATE robots SET ip = ?, name = ?, map_id = ?, museum_id = ?, current_visitor_id = NULL, locked_until = NULL WHERE id = ?`
             : `UPDATE robots SET ip = ?, name = ?, map_id = ?, museum_id = ? WHERE id = ?`;
@@ -501,7 +501,7 @@ router.delete('/robots/:id', authMiddleware, superAdminMiddleware, (req, res) =>
 
         db.run('DELETE FROM robots WHERE id = ?', [robotId], (delErr) => {
             if (delErr) return res.status(500).json({ error: 'Error deleting robot' });
-            rosService.disconnect(robotId); // tear down any live ROS connection
+            rosService.disconnect(robotId); // cierra cualquier conexión ROS activa
             res.json({ message: 'Robot deleted' });
         });
     });
@@ -536,7 +536,7 @@ router.post('/robots/:id/command', authMiddleware, staffMiddleware, (req, res) =
             } catch (e) {
                 return res.status(503).json({ error: `Error iniciando la conexión: ${e.message}` });
             }
-            // Wait for the actual WebSocket to come up so we report a real result.
+            // Espera a que el WebSocket real se levante para reportar un resultado real.
             const ok = await rosService.waitForConnection(robotId, 6000);
             if (ok) {
                 sseService.broadcastRobot(robotId);
@@ -812,7 +812,7 @@ router.get('/admin/stats', authMiddleware, adminMiddleware, async (req, res) => 
             activeRobots:   activeRobots.count || 0,
             totalVisitors:  totVisitors.count  || 0,
             avgSessionTime: Math.round((avgSession.avg || 0) * 10) / 10,
-            // Museum count is only meaningful platform-wide, so expose it to superadmins only.
+            // El recuento de museos solo tiene sentido a nivel de plataforma, así que se expone solo a los superadmins.
             ...(isSuperAdmin && { totalMuseums: totMuseums.count || 0 }),
             visitorsByDay,
             expertiseDist,
@@ -827,7 +827,7 @@ router.get('/admin/stats', authMiddleware, adminMiddleware, async (req, res) => 
 
 const incidentService = require('../services/incidentService');
 
-// GET /api/admin/incidents - list nav failures etc., scoped to the museum.
+// GET /api/admin/incidents - lista fallos de navegación, etc., acotado al museo.
 router.get('/admin/incidents', authMiddleware, adminMiddleware, async (req, res) => {
     try {
         const incidents = await incidentService.list({
@@ -841,7 +841,7 @@ router.get('/admin/incidents', authMiddleware, adminMiddleware, async (req, res)
     }
 });
 
-// PATCH /api/admin/incidents/:id/resolve - mark an incident as handled.
+// PATCH /api/admin/incidents/:id/resolve - marca una incidencia como atendida.
 router.patch('/admin/incidents/:id/resolve', authMiddleware, adminMiddleware, async (req, res) => {
     try {
         const result = await incidentService.resolve({

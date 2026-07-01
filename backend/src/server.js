@@ -81,7 +81,7 @@ try {
 
 // Manejo de errores 404
 app.use((req, res) => {
-  res.status(404).json({ error: 'Not found' });
+  res.status(404).json({ error: 'No encontrado' });
 });
 
 // Arranca el servidor (se omite en modo test - supertest gestiona el binding)

@@ -71,10 +71,10 @@ exports.handleMessage = async (req, res) => {
     const { id: visitorId, session_id, robot_id, robot_name, museum_id, name: visitorName, expertise_level, language } = req.user;
 
     if (!message) {
-        return res.status(400).json({ error: 'Message is required' });
+        return res.status(400).json({ error: 'El mensaje es obligatorio' });
     }
     if (message.length > MAX_MESSAGE_LENGTH) {
-        return res.status(400).json({ error: `Message too long (max ${MAX_MESSAGE_LENGTH} characters)` });
+        return res.status(400).json({ error: `Mensaje demasiado largo (máximo ${MAX_MESSAGE_LENGTH} caracteres)` });
     }
 
     try {

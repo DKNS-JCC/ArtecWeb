@@ -157,7 +157,7 @@ describe('PUT /api/robots/:id', () => {
             .set('Authorization', `Bearer ${adminToken}`)
             .send({ name: 'Bot Alpha Updated' });
         expect(res.status).toBe(200);
-        expect(res.body.message).toMatch(/updated/i);
+        expect(res.body.message).toMatch(/actualizado/i);
     });
 
     test('admin can update robot IP', async () => {
@@ -253,7 +253,7 @@ describe('POST /api/robots/:id/force-end', () => {
             .post(`/api/robots/${freeRobot.id}/force-end`)
             .set('Authorization', `Bearer ${adminToken}`);
         expect(res.status).toBe(200);
-        expect(res.body.message).toMatch(/No active session/i);
+        expect(res.body.message).toMatch(/sesión activa/i);
     });
 });
 

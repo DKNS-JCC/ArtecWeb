@@ -105,7 +105,7 @@ exports.createVisitor = async (req, res) => {
             );
 
             res.status(201).json({
-                message: 'Visitor session created',
+                message: 'Sesión de visitante creada',
                 token,
                 visitor: { id: visitorId, session_id: sessionId, role: 'visitor', robot_id: robot.id, robot_name: robot.name, name: visitorName, expertise_level: visitorExpertise, language: visitorLanguage }
             });
@@ -126,13 +126,13 @@ exports.createVisitor = async (req, res) => {
 
 exports.pingVisitor = (req, res) => {
     const robotId = req.user.robot_id;
-    if (!robotId) return res.status(400).json({ error: 'No robot assigned' });
+    if (!robotId) return res.status(400).json({ error: 'No hay ningún robot asignado' });
     
     // Extiende el bloqueo por otros 10 minutos
     const newLockTime = new Date(new Date().getTime() + 10 * 60000).toISOString();
     db.run('UPDATE robots SET locked_until = ? WHERE id = ?', [newLockTime, robotId], (err) => {
-        if (err) return res.status(500).json({ error: 'Database error' });
-        res.json({ message: 'Session extended' });
+        if (err) return res.status(500).json({ error: 'Error de base de datos' });
+        res.json({ message: 'Sesión ampliada' });
     });
 };
 
@@ -153,11 +153,11 @@ exports.checkVisitorStatus = (req, res) => {
 exports.endVisitor = (req, res) => {
     const robotId = req.user.robot_id;
     const visitorId = req.user.id;
-    if (!robotId) return res.status(400).json({ error: 'No robot assigned' });
+    if (!robotId) return res.status(400).json({ error: 'No hay ningún robot asignado' });
 
     // Libera el robot para otros
     db.run('UPDATE robots SET locked_until = NULL, current_visitor_id = NULL WHERE id = ?', [robotId], (err) => {
-        if (err) return res.status(500).json({ error: 'Database error' });
+        if (err) return res.status(500).json({ error: 'Error de base de datos' });
 
         // Registrar fin de la sesión del visitante
         db.run('UPDATE visitors SET ended_at = CURRENT_TIMESTAMP WHERE id = ?', [visitorId], (err2) => {
@@ -169,7 +169,7 @@ exports.endVisitor = (req, res) => {
             // Envía el robot a su punto base (best-effort - nunca bloquea el cierre de la sesión).
             navService.sendRobotToBase(robotId).catch(() => {});
 
-            res.json({ message: 'Session ended' });
+            res.json({ message: 'Sesión finalizada' });
         });
     });
 };
@@ -178,15 +178,15 @@ exports.login = (req, res) => {
     const { identifier, password } = req.body;
 
     if (!identifier || !password) {
-        return res.status(400).json({ error: 'Name/email and password are required' });
+        return res.status(400).json({ error: 'El nombre/correo y la contraseña son obligatorios' });
     }
     const query = `SELECT * FROM users WHERE name = ? OR email = ? LIMIT 1`;
     db.get(query, [identifier.trim(), identifier.trim().toLowerCase()], async (err, user) => {
-        if (err) return res.status(500).json({ error: 'Database error' });
+        if (err) return res.status(500).json({ error: 'Error de base de datos' });
         if (!user) return res.status(401).json({ error: 'Credenciales incorrectas' });
 
         if (!['platform_admin', 'museum_admin', 'technician'].includes(user.role)) {
-            return res.status(403).json({ error: 'Access denied: Valid administrative role required' });
+            return res.status(403).json({ error: 'Acceso denegado: se requiere un rol administrativo válido' });
         }
 
         try {
@@ -213,7 +213,7 @@ exports.login = (req, res) => {
             );
 
             res.json({
-                message: 'Login successful',
+                message: 'Inicio de sesión correcto',
                 token,
                 must_change_password: mustChange,
                 user: {
@@ -227,7 +227,7 @@ exports.login = (req, res) => {
             });
         } catch (err) {
             console.error('LOGIN ERROR:', err);
-            res.status(500).json({ error: 'Server error during login' });
+            res.status(500).json({ error: 'Error del servidor durante el inicio de sesión' });
         }
     });
 };
@@ -237,17 +237,17 @@ exports.changePassword = async (req, res) => {
     const userId = req.user.id;
 
     if (!current_password || !new_password) {
-        return res.status(400).json({ error: 'Both current and new password are required' });
+        return res.status(400).json({ error: 'La contraseña actual y la nueva son obligatorias' });
     }
     if (new_password.length < 6) {
-        return res.status(400).json({ error: 'New password must be at least 6 characters' });
+        return res.status(400).json({ error: 'La nueva contraseña debe tener al menos 6 caracteres' });
     }
 
     db.get(`SELECT * FROM users WHERE id = ?`, [userId], async (err, user) => {
-        if (err || !user) return res.status(404).json({ error: 'User not found' });
+        if (err || !user) return res.status(404).json({ error: 'Usuario no encontrado' });
 
         const match = await bcrypt.compare(current_password, user.password_hash);
-        if (!match) return res.status(401).json({ error: 'Current password is incorrect' });
+        if (!match) return res.status(401).json({ error: 'La contraseña actual es incorrecta' });
 
         const newHash = await bcrypt.hash(new_password, SALT_ROUNDS);
 
@@ -255,7 +255,7 @@ exports.changePassword = async (req, res) => {
             `UPDATE users SET password_hash = ?, must_change_password = 0, active = 1 WHERE id = ?`,
             [newHash, userId],
             (err) => {
-                if (err) return res.status(500).json({ error: 'Error updating password' });
+                if (err) return res.status(500).json({ error: 'Error al actualizar la contraseña' });
 
                 const token = jwt.sign(
                     { id: user.id, name: user.name, role: user.role, must_change_password: false, museum_id: user.museum_id },
@@ -263,7 +263,7 @@ exports.changePassword = async (req, res) => {
                     { expiresIn: '24h' }
                 );
 
-                res.json({ message: 'Password changed successfully', token });
+                res.json({ message: 'Contraseña cambiada correctamente', token });
             }
         );
     });
@@ -278,27 +278,27 @@ exports.createStaff = async (req, res) => {
     const reqUserRole = req.user.role;
 
     if (!name || !email || !role) {
-        return res.status(400).json({ error: 'Name, email and role are required' });
+        return res.status(400).json({ error: 'El nombre, el correo y el rol son obligatorios' });
     }
     if (!EMAIL_RE.test(email.trim())) {
-        return res.status(400).json({ error: 'Invalid email format' });
+        return res.status(400).json({ error: 'Formato de correo no válido' });
     }
 
     // Validación de rol según quién esté creando el usuario
     if (reqUserRole === 'platform_admin') {
         if (!['museum_admin', 'technician'].includes(role)) {
-            return res.status(400).json({ error: 'Platform admin can only create museum admin or technician' });
+            return res.status(400).json({ error: 'El administrador de plataforma solo puede crear administradores de museo o técnicos' });
         }
         if (!museum_id) {
-            return res.status(400).json({ error: 'museum_id is required to assign staff to a museum' });
+            return res.status(400).json({ error: 'Se requiere museum_id para asignar personal a un museo' });
         }
     } else if (reqUserRole === 'museum_admin') {
         if (role !== 'technician') {
-            return res.status(403).json({ error: 'Museum admins can only create technicians' });
+            return res.status(403).json({ error: 'Los administradores de museo solo pueden crear técnicos' });
         }
         // Fuerza el museum_id al del propio administrador
         if (req.user.museum_id && museum_id !== req.user.museum_id) {
-            return res.status(403).json({ error: 'You can only create staff for your own museum' });
+            return res.status(403).json({ error: 'Solo puedes crear personal para tu propio museo' });
         }
     }
 
@@ -311,8 +311,8 @@ exports.createStaff = async (req, res) => {
         const passwordHash = await bcrypt.hash(tempPassword, SALT_ROUNDS);
 
         db.get('SELECT name FROM museums WHERE id = ?', [assignedMuseumId], (err, museumRow) => {
-            if (err) return res.status(500).json({ error: 'Error checking museum' });
-            if (!museumRow) return res.status(404).json({ error: 'Museum not found' });
+            if (err) return res.status(500).json({ error: 'Error al comprobar el museo' });
+            if (!museumRow) return res.status(404).json({ error: 'Museo no encontrado' });
 
             const museumName = museumRow.name;
 
@@ -325,23 +325,23 @@ exports.createStaff = async (req, res) => {
                     if (err) {
                         if (err.message.includes('UNIQUE constraint failed')) {
                             const field = err.message.includes('name') ? 'name' : 'email';
-                            return res.status(409).json({ error: `That ${field} is already taken` });
+                            return res.status(409).json({ error: `Ese ${field} ya está en uso` });
                         }
-                        return res.status(500).json({ error: 'Error creating staff account' });
+                        return res.status(500).json({ error: 'Error al crear la cuenta de personal' });
                     }
 
                     // Envía el correo de bienvenida automático
                     await sendWelcomeEmail(email.trim(), name.trim(), tempPassword, role, museumName);
 
                     res.status(201).json({
-                        message: `${role} account created and welcome email sent.`,
+                        message: `Cuenta de ${role} creada y correo de bienvenida enviado.`,
                         user: { id: userId, name: name.trim(), email: email.trim().toLowerCase(), role, museum_id: assignedMuseumId }
                     });
                 }
             );
         });
     } catch {
-        res.status(500).json({ error: 'Server error' });
+        res.status(500).json({ error: 'Error del servidor' });
     }
 };
 
@@ -366,7 +366,7 @@ exports.updateStaff = async (req, res) => {
         if (name)  { updates.push('name = ?');  params.push(name.trim()); }
         if (email) {
             if (!EMAIL_RE.test(email.trim())) {
-                return res.status(400).json({ error: 'Invalid email format' });
+                return res.status(400).json({ error: 'Formato de correo no válido' });
             }
             updates.push('email = ?'); params.push(email.trim().toLowerCase());
         }
@@ -449,7 +449,7 @@ exports.listUsers = (req, res) => {
     query += ` ORDER BY u.created_at DESC`;
 
     db.all(query, params, (err, rows) => {
-        if (err) return res.status(500).json({ error: 'Database error' });
+        if (err) return res.status(500).json({ error: 'Error de base de datos' });
         res.json(rows);
     });
 };

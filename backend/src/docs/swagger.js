@@ -70,8 +70,8 @@ const ENRICH = {
       { identifier: 'admin', password: 'password_ejemplo' }
     ),
     responses: {
-      200: r('Inicio de sesión correcto', { message: 'Login successful', token: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...', must_change_password: false, user: { id: 'a1b2c3', name: 'admin', email: 'admin@museo.es', role: 'museum_admin', avatar: null, museum_id: 'm-001' } }),
-      400: r('Faltan credenciales', { error: 'Name/email and password are required' }),
+      200: r('Inicio de sesión correcto', { message: 'Inicio de sesión correcto', token: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...', must_change_password: false, user: { id: 'a1b2c3', name: 'admin', email: 'admin@museo.es', role: 'museum_admin', avatar: null, museum_id: 'm-001' } }),
+      400: r('Faltan credenciales', { error: 'El nombre/correo y la contraseña son obligatorios' }),
       401: r('Credenciales incorrectas', { error: 'Credenciales incorrectas' }),
       403: r('Rol no válido o cuenta desactivada', { error: 'Esta cuenta ha sido desactivada. Contacta con tu administrador.' }),
     },
@@ -90,7 +90,7 @@ const ENRICH = {
       { robotId: 'r-7f3a', name: 'María', expertiseLevel: 'general', language: 'es' }
     ),
     responses: {
-      201: r('Sesión de visitante creada', { message: 'Visitor session created', token: 'eyJ...', visitor: { id: 'v-001', session_id: 's-001', role: 'visitor', robot_id: 'r-7f3a', robot_name: 'Rob-1', name: 'María', expertise_level: 'general', language: 'es' } }),
+      201: r('Sesión de visitante creada', { message: 'Sesión de visitante creada', token: 'eyJ...', visitor: { id: 'v-001', session_id: 's-001', role: 'visitor', robot_id: 'r-7f3a', robot_name: 'Rob-1', name: 'María', expertise_level: 'general', language: 'es' } }),
       400: r('Falta el ID del robot', { error: 'Se requiere el ID del robot leído del QR' }),
       403: r('Robot ocupado por otro visitante', { error: 'Este robot ya está siendo utilizado por otro visitante. Por favor, espera a que termine su visita.' }),
       404: r('Robot no encontrado', { error: 'Robot no válido o no encontrado' }),
@@ -112,7 +112,7 @@ const ENRICH = {
       { token: 'a1b2c3d4...', new_password: 'nueva_contrasena_ejemplo' }
     ),
     responses: {
-      200: r('Contraseña actualizada', { message: 'Password reset successfully' }),
+      200: r('Contraseña actualizada', { message: 'Contraseña actualizada correctamente. Ya puedes iniciar sesión.' }),
       400: r('Token inválido o expirado', { error: 'Token inválido o expirado' }),
     },
   },
@@ -125,9 +125,9 @@ const ENRICH = {
       { current_password: 'contrasena_actual_ejemplo', new_password: 'nueva_contrasena_ejemplo' }
     ),
     responses: {
-      200: r('Contraseña cambiada', { message: 'Password changed successfully', token: 'eyJ...' }),
-      400: r('Datos inválidos', { error: 'New password must be at least 6 characters' }),
-      401: r('Contraseña actual incorrecta', { error: 'Current password is incorrect' }),
+      200: r('Contraseña cambiada', { message: 'Contraseña cambiada correctamente', token: 'eyJ...' }),
+      400: r('Datos inválidos', { error: 'La nueva contraseña debe tener al menos 6 caracteres' }),
+      401: r('Contraseña actual incorrecta', { error: 'La contraseña actual es incorrecta' }),
     },
   },
   'POST /admin/create-staff': {
@@ -143,9 +143,9 @@ const ENRICH = {
       { name: 'Lucía Pérez', email: 'lucia@museo.es', role: 'technician', museum_id: 'm-001' }
     ),
     responses: {
-      201: r('Cuenta creada y correo enviado', { message: 'technician account created and welcome email sent.', user: { id: 'u-010', name: 'Lucía Pérez', email: 'lucia@museo.es', role: 'technician', museum_id: 'm-001' } }),
-      400: r('Datos inválidos', { error: 'Name, email and role are required' }),
-      409: r('Nombre o correo en uso', { error: 'That email is already taken' }),
+      201: r('Cuenta creada y correo enviado', { message: 'Cuenta de technician creada y correo de bienvenida enviado.', user: { id: 'u-010', name: 'Lucía Pérez', email: 'lucia@museo.es', role: 'technician', museum_id: 'm-001' } }),
+      400: r('Datos inválidos', { error: 'El nombre, el correo y el rol son obligatorios' }),
+      409: r('Nombre o correo en uso', { error: 'Ese email ya está en uso' }),
     },
   },
   'POST /chat/message': {
@@ -160,7 +160,7 @@ const ENRICH = {
     requestBody: jsonBody({ place_id: { type: 'string', description: 'ID de la zona destino' } }, ['place_id'], { place_id: 'z-12' }),
     responses: {
       200: r('Navegación iniciada', { message: 'Navegación iniciada', place: 'Sala del Renacimiento' }),
-      400: r('Falta el destino', { error: 'place_id is required' }),
+      400: r('Falta el destino', { error: 'Se requiere place_id' }),
     },
   },
   'POST /robots': {
@@ -172,8 +172,8 @@ const ENRICH = {
       { name: 'Robot Recepción', museum_id: 'm-001' }
     ),
     responses: {
-      201: r('Robot creado', { message: 'Robot created', id: 'r-7f3a', name: 'Robot Recepción', museum_id: 'm-001', status: 'idle', battery: 100, position: { x: 0, y: 0, theta: 0 } }),
-      400: r('Datos inválidos', { error: 'Name and museum_id are required' }),
+      201: r('Robot creado', { message: 'Robot creado', id: 'r-7f3a', name: 'Robot Recepción', museum_id: 'm-001', status: 'idle', battery: 100, position: { x: 0, y: 0, theta: 0 } }),
+      400: r('Datos inválidos', { error: 'El nombre y museum_id son obligatorios' }),
     },
   },
   'POST /robots/{id}/command': {
@@ -189,7 +189,7 @@ const ENRICH = {
     ),
     responses: {
       200: r('Comando ejecutado', { message: 'Conectado a Robot Recepción', connected: true }),
-      404: r('Robot no encontrado o sin permiso', { error: 'Robot not found or unauthorized' }),
+      404: r('Robot no encontrado o sin permiso', { error: 'Robot no encontrado o no autorizado' }),
       503: r('Error iniciando la conexión', { error: 'Error iniciando la conexión: timeout' }),
       504: r('No se pudo conectar con el robot', { error: 'No se pudo conectar con "Robot Recepción" en 192.168.1.50:9090. Comprueba que el robot está encendido, en la misma red y con rosbridge_server activo.' }),
     },
@@ -203,8 +203,8 @@ const ENRICH = {
       { name: 'Museo de Salamanca', company: 'Junta de Castilla y León' }
     ),
     responses: {
-      201: r('Museo creado', { message: 'Museum created successfully', museum: { id: 'm-001', name: 'Museo de Salamanca', company: 'Junta de Castilla y León' } }),
-      400: r('Datos inválidos', { error: 'Name and company are required' }),
+      201: r('Museo creado', { message: 'Museo creado correctamente', museum: { id: 'm-001', name: 'Museo de Salamanca', company: 'Junta de Castilla y León' } }),
+      400: r('Datos inválidos', { error: 'El nombre y la empresa son obligatorios' }),
     },
   },
   'POST /museums/{museum_id}/maps': {
@@ -222,7 +222,7 @@ const ENRICH = {
       ['name', 'image']
     ),
     responses: {
-      201: r('Mapa creado', { message: 'Map uploaded', map: { id: 'map-1', museum_id: 'm-001', name: 'Planta baja', image_path: '/uploads/maps/abc.png', resolution: 0.05, origin_x: -10, origin_y: -10, width: 800, height: 600 } }),
+      201: r('Mapa creado', { message: 'Mapa subido correctamente', map: { id: 'map-1', museum_id: 'm-001', name: 'Planta baja', image_path: '/uploads/maps/abc.png', resolution: 0.05, origin_x: -10, origin_y: -10, width: 800, height: 600 } }),
       400: r('Faltan datos o imagen', { error: 'Se requiere una imagen del mapa' }),
       403: r('Sin acceso al museo', { error: 'No tienes acceso a este museo' }),
     },

@@ -26,7 +26,7 @@ const dbRun = (sql, params = []) => new Promise((resolve, reject) => {
 
 exports.listMuseums = (req, res) => {
     db.all(`SELECT * FROM museums ORDER BY name ASC`, [], (err, rows) => {
-        if (err) return res.status(500).json({ error: 'Error fetching museums' });
+        if (err) return res.status(500).json({ error: 'Error al obtener los museos' });
         res.json(rows);
     });
 };
@@ -36,7 +36,7 @@ exports.createMuseum = (req, res) => {
     const { name, company } = req.body;
 
     if (!name || !company) {
-        return res.status(400).json({ error: 'Name and company are required' });
+        return res.status(400).json({ error: 'El nombre y la empresa son obligatorios' });
     }
 
     const museumId = crypto.randomUUID();
@@ -45,10 +45,10 @@ exports.createMuseum = (req, res) => {
         `INSERT INTO museums (id, name, company) VALUES (?, ?, ?)`,
         [museumId, name.trim(), company.trim()],
         function (err) {
-            if (err) return res.status(500).json({ error: 'Error creating museum' });
+            if (err) return res.status(500).json({ error: 'Error al crear el museo' });
 
             res.status(201).json({
-                message: 'Museum created successfully',
+                message: 'Museo creado correctamente',
                 museum: { id: museumId, name: name.trim(), company: company.trim() }
             });
         }
@@ -61,18 +61,18 @@ exports.updateMuseum = (req, res) => {
     const { name, company } = req.body;
 
     if (!name || !company) {
-        return res.status(400).json({ error: 'Name and company are required' });
+        return res.status(400).json({ error: 'El nombre y la empresa son obligatorios' });
     }
 
     db.run(
         `UPDATE museums SET name = ?, company = ? WHERE id = ?`,
         [name.trim(), company.trim(), id],
         function (err) {
-            if (err) return res.status(500).json({ error: 'Error updating museum' });
-            if (this.changes === 0) return res.status(404).json({ error: 'Museum not found' });
+            if (err) return res.status(500).json({ error: 'Error al actualizar el museo' });
+            if (this.changes === 0) return res.status(404).json({ error: 'Museo no encontrado' });
 
             res.json({
-                message: 'Museum updated successfully',
+                message: 'Museo actualizado correctamente',
                 museum: { id, name: name.trim(), company: company.trim() }
             });
         }
@@ -88,7 +88,7 @@ exports.deleteMuseum = async (req, res) => {
 
     try {
         const museum = await dbGet('SELECT id FROM museums WHERE id = ?', [id]);
-        if (!museum) return res.status(404).json({ error: 'Museum not found' });
+        if (!museum) return res.status(404).json({ error: 'Museo no encontrado' });
 
         const robots = await dbAll('SELECT id FROM robots WHERE museum_id = ?', [id]);
         const maps   = await dbAll('SELECT id, image_path FROM maps WHERE museum_id = ?', [id]);
@@ -103,9 +103,9 @@ exports.deleteMuseum = async (req, res) => {
             if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
         }
 
-        res.json({ message: 'Museum deleted' });
+        res.json({ message: 'Museo eliminado' });
     } catch (err) {
         console.error('[Museum] Delete error:', err.message);
-        res.status(500).json({ error: 'Error deleting museum' });
+        res.status(500).json({ error: 'Error al eliminar el museo' });
     }
 };

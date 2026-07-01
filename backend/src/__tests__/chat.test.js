@@ -137,7 +137,7 @@ describe('POST /api/chat/message', () => {
             .set('Authorization', `Bearer ${visitorToken}`)
             .send({ message: 'x'.repeat(501) });
         expect(res.status).toBe(400);
-        expect(res.body.error).toMatch(/too long/i);
+        expect(res.body.error).toMatch(/demasiado largo/i);
     });
 
     test('returns 401 without auth token', async () => {

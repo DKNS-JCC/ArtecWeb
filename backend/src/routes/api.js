@@ -43,17 +43,17 @@ router.get('/robots/stream', (req, res) => {
     const JWT_SECRET = process.env.JWT_SECRET || 'super-secret-artec-key';
     const token = req.query.token;
 
-    if (!token) return res.status(401).json({ error: 'Token required' });
+    if (!token) return res.status(401).json({ error: 'Se requiere token' });
 
     let user;
     try {
         user = jwt.verify(token, JWT_SECRET);
     } catch {
-        return res.status(401).json({ error: 'Invalid token' });
+        return res.status(401).json({ error: 'Token no válido' });
     }
 
     if (!['technician', 'museum_admin', 'platform_admin'].includes(user.role)) {
-        return res.status(403).json({ error: 'Staff access required' });
+        return res.status(403).json({ error: 'Se requiere acceso de personal' });
     }
 
     sseService.addClient(req, res, user);
@@ -64,17 +64,17 @@ router.get('/robots/position-stream', (req, res) => {
     const JWT_SECRET = process.env.JWT_SECRET || 'super-secret-artec-key';
     const token = req.query.token;
 
-    if (!token) return res.status(401).json({ error: 'Token required' });
+    if (!token) return res.status(401).json({ error: 'Se requiere token' });
 
     let user;
     try {
         user = jwt.verify(token, JWT_SECRET);
     } catch {
-        return res.status(401).json({ error: 'Invalid token' });
+        return res.status(401).json({ error: 'Token no válido' });
     }
 
     if (user.role !== 'visitor' || !user.robot_id) {
-        return res.status(403).json({ error: 'Visitor access required' });
+        return res.status(403).json({ error: 'Se requiere acceso de visitante' });
     }
 
     // Confirma que el visitante aún es dueño de esta sesión del robot antes de emitir el stream.
@@ -82,8 +82,8 @@ router.get('/robots/position-stream', (req, res) => {
         'SELECT id FROM robots WHERE id = ? AND current_visitor_id = ?',
         [user.robot_id, user.id],
         (err, robot) => {
-            if (err)    return res.status(500).json({ error: 'Database error' });
-            if (!robot) return res.status(403).json({ error: 'Session expired or robot reassigned' });
+            if (err)    return res.status(500).json({ error: 'Error de base de datos' });
+            if (!robot) return res.status(403).json({ error: 'Sesión expirada o robot reasignado' });
             sseService.addPositionClient(req, res, user.robot_id);
         }
     );
@@ -148,7 +148,7 @@ router.post('/chat/confirm-nav', chatLimiter, authMiddleware, async (req, res) =
         const { id: visitorId, session_id, robot_id } = req.user;
 
         if (!place_id) {
-            return res.status(400).json({ error: 'place_id is required' });
+            return res.status(400).json({ error: 'Se requiere place_id' });
         }
 
         // Carga la zona - las coordenadas ya están almacenadas como coords del mundo de ROS (metros)
@@ -160,8 +160,8 @@ router.post('/chat/confirm-nav', chatLimiter, authMiddleware, async (req, res) =
              WHERE z.id = ? AND r.id = ?`,
             [place_id, robot_id],
             (err, zone) => {
-                if (err)   return res.status(500).json({ error: 'Database error' });
-                if (!zone) return res.status(404).json({ error: 'Place not found or not accessible from this robot' });
+                if (err)   return res.status(500).json({ error: 'Error de base de datos' });
+                if (!zone) return res.status(404).json({ error: 'Lugar no encontrado o no accesible desde este robot' });
 
                 if (zone.map_x == null || zone.map_y == null) {
                     return res.status(422).json({
@@ -204,7 +204,7 @@ router.post('/chat/confirm-nav', chatLimiter, authMiddleware, async (req, res) =
                 );
 
                 res.json({
-                    message:    `Navigating to ${zone.name}`,
+                    message:    `Navegando a ${zone.name}`,
                     nav_message: `¡En camino hacia ${zone.name}! Sígueme, por favor.`,
                     place: { id: zone.id, name: zone.name, map_x: zone.map_x, map_y: zone.map_y }
                 });
@@ -230,7 +230,7 @@ router.patch('/visitor/expertise', authMiddleware, (req, res) => {
             'UPDATE visitors SET expertise_level = ? WHERE id = ?',
             [expertise_level, visitorId],
             (err) => {
-                if (err) return res.status(500).json({ error: 'Database error' });
+                if (err) return res.status(500).json({ error: 'Error de base de datos' });
                 res.json({ expertise_level });
             }
         );
@@ -246,7 +246,7 @@ router.get('/visitor/map', authMiddleware, (req, res) => {
     visitorMiddleware(req, res, () => {
         const { robot_id } = req.user;
         db.get('SELECT map_id FROM robots WHERE id = ?', [robot_id], (err, robot) => {
-            if (err) return res.status(500).json({ error: 'Database error' });
+            if (err) return res.status(500).json({ error: 'Error de base de datos' });
             if (!robot?.map_id) return res.status(404).json({ error: 'Este robot no tiene un mapa asignado.' });
 
             db.get('SELECT * FROM maps WHERE id = ?', [robot.map_id], (err, map) => {
@@ -307,15 +307,15 @@ router.get('/', (req, res) => {
 router.post('/robots', authMiddleware, superAdminMiddleware, (req, res) => {
     const { name, museum_id } = req.body;
     if (!name || !museum_id) {
-        return res.status(400).json({ error: 'Name and museum_id are required' });
+        return res.status(400).json({ error: 'El nombre y museum_id son obligatorios' });
     }
     const robotId = require('crypto').randomUUID();
     db.run(
         `INSERT INTO robots (id, name, museum_id) VALUES (?, ?, ?)`,
         [robotId, name, museum_id],
         (err) => {
-            if (err) return res.status(500).json({ error: 'Error creating robot' });
-            res.status(201).json({ message: 'Robot created', id: robotId, name, museum_id, status: 'idle', battery: 100, position: {x:0, y:0, theta:0} });
+            if (err) return res.status(500).json({ error: 'Error al crear el robot' });
+            res.status(201).json({ message: 'Robot creado', id: robotId, name, museum_id, status: 'idle', battery: 100, position: {x:0, y:0, theta:0} });
         }
     );
 });
@@ -337,7 +337,7 @@ router.get('/robots', authMiddleware, staffMiddleware, (req, res) => {
     }
 
     db.all(query, params, (err, rows) => {
-        if (err) return res.status(500).json({ error: 'Database error fetching robots' });
+        if (err) return res.status(500).json({ error: 'Error de base de datos al obtener los robots' });
 
         const now = new Date();
 
@@ -393,8 +393,8 @@ router.get('/robots/:id', authMiddleware, staffMiddleware, (req, res) => {
     }
 
     db.get(query, params, (err, robot) => {
-        if (err) return res.status(500).json({ error: 'Database error fetching robot' });
-        if (!robot) return res.status(404).json({ error: 'Robot not found or unauthorized' });
+        if (err) return res.status(500).json({ error: 'Error de base de datos al obtener el robot' });
+        if (!robot) return res.status(404).json({ error: 'Robot no encontrado o no autorizado' });
 
         const formattedRobot = {
             id: robot.id,
@@ -424,7 +424,7 @@ router.put('/robots/:id', authMiddleware, staffMiddleware, (req, res) => {
     const { ip, name, map_id, museum_id } = req.body;
 
     if (ip !== undefined && ip !== '' && !IP_RE.test(ip)) {
-        return res.status(400).json({ error: 'Invalid IP address format' });
+        return res.status(400).json({ error: 'Formato de dirección IP no válido' });
     }
 
     let verifyQuery = `SELECT * FROM robots WHERE id = ?`;
@@ -435,8 +435,8 @@ router.put('/robots/:id', authMiddleware, staffMiddleware, (req, res) => {
     }
 
     db.get(verifyQuery, verifyParams, async (err, robot) => {
-        if (err) return res.status(500).json({ error: 'Database error' });
-        if (!robot) return res.status(404).json({ error: 'Robot not found or unauthorized' });
+        if (err) return res.status(500).json({ error: 'Error de base de datos' });
+        if (!robot) return res.status(404).json({ error: 'Robot no encontrado o no autorizado' });
 
         // Reasignar un robot a otro museo (o desasignarlo) es exclusivo del proveedor.
         const reassign = isSuperAdmin && museum_id !== undefined;
@@ -480,7 +480,7 @@ router.put('/robots/:id', authMiddleware, staffMiddleware, (req, res) => {
             : `UPDATE robots SET ip = ?, name = ?, map_id = ?, museum_id = ? WHERE id = ?`;
 
         db.run(updateSql, [updatedIp, updatedName, updatedMapId, newMuseumId, robotId], (err) => {
-            if (err) return res.status(500).json({ error: 'Error updating robot' });
+            if (err) return res.status(500).json({ error: 'Error al actualizar el robot' });
 
             if (ip && ip !== robot.ip && rosService.getConnectionState(robotId)) {
                 rosService.disconnect(robotId);
@@ -488,7 +488,7 @@ router.put('/robots/:id', authMiddleware, staffMiddleware, (req, res) => {
             }
 
             sseService.broadcastRobot(robotId);
-            res.json({ message: 'Robot updated successfully' });
+            res.json({ message: 'Robot actualizado correctamente' });
         });
     });
 });
@@ -496,13 +496,13 @@ router.put('/robots/:id', authMiddleware, staffMiddleware, (req, res) => {
 router.delete('/robots/:id', authMiddleware, superAdminMiddleware, (req, res) => {
     const robotId = req.params.id;
     db.get('SELECT id FROM robots WHERE id = ?', [robotId], (err, robot) => {
-        if (err) return res.status(500).json({ error: 'Database error' });
-        if (!robot) return res.status(404).json({ error: 'Robot not found' });
+        if (err) return res.status(500).json({ error: 'Error de base de datos' });
+        if (!robot) return res.status(404).json({ error: 'Robot no encontrado' });
 
         db.run('DELETE FROM robots WHERE id = ?', [robotId], (delErr) => {
-            if (delErr) return res.status(500).json({ error: 'Error deleting robot' });
+            if (delErr) return res.status(500).json({ error: 'Error al eliminar el robot' });
             rosService.disconnect(robotId); // cierra cualquier conexión ROS activa
-            res.json({ message: 'Robot deleted' });
+            res.json({ message: 'Robot eliminado' });
         });
     });
 });
@@ -521,8 +521,8 @@ router.post('/robots/:id/command', authMiddleware, staffMiddleware, (req, res) =
     }
 
     db.get(verifyQuery, verifyParams, async (err, robot) => {
-        if (err) return res.status(500).json({ error: 'Database error' });
-        if (!robot) return res.status(404).json({ error: 'Robot not found or unauthorized' });
+        if (err) return res.status(500).json({ error: 'Error de base de datos' });
+        if (!robot) return res.status(404).json({ error: 'Robot no encontrado o no autorizado' });
 
         let status = robot.status;
         let px = robot.position_x;
@@ -549,7 +549,7 @@ router.post('/robots/:id/command', authMiddleware, staffMiddleware, (req, res) =
 
         if (command === 'disconnect') {
             rosService.disconnect(robotId);
-            return res.json({ message: `ROS Connection closed for ${robot.name}` });
+            return res.json({ message: `Conexión ROS cerrada para ${robot.name}` });
         }
 
         if (command === 'move' && payload) {
@@ -574,7 +574,7 @@ router.post('/robots/:id/command', authMiddleware, staffMiddleware, (req, res) =
                  console.error(`ROS Stop error on robot ${robotId}:`, error.message);
             }
         } else {
-            return res.status(400).json({ error: 'Unknown command' });
+            return res.status(400).json({ error: 'Comando desconocido' });
         }
 
         const updateQuery = `
@@ -583,9 +583,9 @@ router.post('/robots/:id/command', authMiddleware, staffMiddleware, (req, res) =
             WHERE id = ?
         `;
         db.run(updateQuery, [status, px, py, pt, robotId], function (err) {
-            if (err) return res.status(500).json({ error: 'Database error updating robot' });
+            if (err) return res.status(500).json({ error: 'Error de base de datos al actualizar el robot' });
             sseService.broadcastRobot(robotId);
-            res.json({ message: `Command ${command} sent successfully` });
+            res.json({ message: `Comando ${command} enviado correctamente` });
         });
     });
 });
@@ -594,7 +594,7 @@ router.post('/robots/:id/command', authMiddleware, staffMiddleware, (req, res) =
 router.post('/robots/:id/nav-goal', authMiddleware, staffMiddleware, async (req, res) => {
     const { x, y, qz = 0, qw = 1 } = req.body;
     if (x === undefined || y === undefined) {
-        return res.status(400).json({ error: 'x and y are required' });
+        return res.status(400).json({ error: 'Se requieren x e y' });
     }
 
     const robotId = req.params.id;
@@ -606,15 +606,15 @@ router.post('/robots/:id/nav-goal', authMiddleware, staffMiddleware, async (req,
     if (!isSuperAdmin) { query += ` AND museum_id = ?`; params.push(museumId); }
 
     db.get(query, params, (err, robot) => {
-        if (err) return res.status(500).json({ error: 'Database error' });
-        if (!robot) return res.status(404).json({ error: 'Robot not found or unauthorized' });
+        if (err) return res.status(500).json({ error: 'Error de base de datos' });
+        if (!robot) return res.status(404).json({ error: 'Robot no encontrado o no autorizado' });
 
         try {
             rosService.sendNavGoal(robotId, Number(x), Number(y), Number(qz), Number(qw), {
                 kind:     'admin',
                 museumId: req.user.museum_id,
             });
-            res.json({ message: 'Navigation goal sent', x, y, qz, qw });
+            res.json({ message: 'Objetivo de navegación enviado', x, y, qz, qw });
         } catch (e) {
             res.status(503).json({ error: e.message });
         }
@@ -631,12 +631,12 @@ router.post('/robots/:id/cancel-nav', authMiddleware, staffMiddleware, async (re
     if (!isSuperAdmin) { query += ` AND museum_id = ?`; params.push(museumId); }
 
     db.get(query, params, async (err, robot) => {
-        if (err) return res.status(500).json({ error: 'Database error' });
-        if (!robot) return res.status(404).json({ error: 'Robot not found or unauthorized' });
+        if (err) return res.status(500).json({ error: 'Error de base de datos' });
+        if (!robot) return res.status(404).json({ error: 'Robot no encontrado o no autorizado' });
 
         try {
             const result = await rosService.cancelNavigation(robotId);
-            res.json({ message: 'Navigation cancelled', result });
+            res.json({ message: 'Navegación cancelada', result });
         } catch (e) {
             res.status(503).json({ error: e.message });
         }
@@ -653,8 +653,8 @@ router.post('/robots/:id/go-to-base', authMiddleware, staffMiddleware, async (re
     if (!isSuperAdmin) { query += ` AND museum_id = ?`; params.push(museumId); }
 
     db.get(query, params, async (err, robot) => {
-        if (err) return res.status(500).json({ error: 'Database error' });
-        if (!robot) return res.status(404).json({ error: 'Robot not found or unauthorized' });
+        if (err) return res.status(500).json({ error: 'Error de base de datos' });
+        if (!robot) return res.status(404).json({ error: 'Robot no encontrado o no autorizado' });
 
         const result = await navService.sendRobotToBase(robotId);
         if (result.ok) {
@@ -684,11 +684,11 @@ router.get('/robots/:id/map', authMiddleware, staffMiddleware, (req, res) => {
     if (!isSuperAdmin) { query += ` AND museum_id = ?`; params.push(museumId); }
 
     db.get(query, params, (err, robot) => {
-        if (err) return res.status(500).json({ error: 'Database error' });
-        if (!robot) return res.status(404).json({ error: 'Robot not found or unauthorized' });
+        if (err) return res.status(500).json({ error: 'Error de base de datos' });
+        if (!robot) return res.status(404).json({ error: 'Robot no encontrado o no autorizado' });
 
         const map = rosService.getMap(robotId);
-        if (!map) return res.status(503).json({ error: 'Map not yet available. Is the robot connected?' });
+        if (!map) return res.status(503).json({ error: 'El mapa aún no está disponible. ¿Está el robot conectado?' });
         res.json(map);
     });
 });
@@ -703,11 +703,11 @@ router.get('/robots/:id/scan', authMiddleware, staffMiddleware, (req, res) => {
     if (!isSuperAdmin) { query += ` AND museum_id = ?`; params.push(museumId); }
 
     db.get(query, params, (err, robot) => {
-        if (err) return res.status(500).json({ error: 'Database error' });
-        if (!robot) return res.status(404).json({ error: 'Robot not found or unauthorized' });
+        if (err) return res.status(500).json({ error: 'Error de base de datos' });
+        if (!robot) return res.status(404).json({ error: 'Robot no encontrado o no autorizado' });
 
         const scan = rosService.getLatestScan(robotId);
-        if (!scan) return res.status(503).json({ error: 'Scan not yet available. Is the robot connected?' });
+        if (!scan) return res.status(503).json({ error: 'El escaneo aún no está disponible. ¿Está el robot conectado?' });
         res.json(scan);
     });
 });
@@ -725,26 +725,26 @@ router.post('/robots/:id/force-end', authMiddleware, adminMiddleware, (req, res)
     }
 
     db.get(verifyQuery, verifyParams, (err, robot) => {
-        if (err) return res.status(500).json({ error: 'Database error' });
-        if (!robot) return res.status(404).json({ error: 'Robot not found or unauthorized' });
+        if (err) return res.status(500).json({ error: 'Error de base de datos' });
+        if (!robot) return res.status(404).json({ error: 'Robot no encontrado o no autorizado' });
 
         if (!robot.current_visitor_id) {
-            return res.json({ message: 'No active session to end' });
+            return res.json({ message: 'No hay ninguna sesión activa que finalizar' });
         }
 
         const visitorId = robot.current_visitor_id;
 
         db.run('BEGIN IMMEDIATE', (beginErr) => {
-            if (beginErr) return res.status(500).json({ error: 'Server error' });
+            if (beginErr) return res.status(500).json({ error: 'Error del servidor' });
 
             db.run('UPDATE robots SET locked_until = NULL, current_visitor_id = NULL WHERE id = ?', [robotId], (updErr) => {
-                if (updErr) return db.run('ROLLBACK', () => res.status(500).json({ error: 'Database error handling robot' }));
+                if (updErr) return db.run('ROLLBACK', () => res.status(500).json({ error: 'Error de base de datos al gestionar el robot' }));
 
                 db.run('UPDATE visitors SET ended_at = CURRENT_TIMESTAMP WHERE id = ?', [visitorId], (visErr) => {
                     if (visErr) console.error('Error updating visitor ended_at', visErr);
 
                     db.run('COMMIT', (commitErr) => {
-                        if (commitErr) return db.run('ROLLBACK', () => res.status(500).json({ error: 'Server error' }));
+                        if (commitErr) return db.run('ROLLBACK', () => res.status(500).json({ error: 'Error del servidor' }));
                         navService.sendRobotToBase(robotId).catch(() => {});
                         sseService.broadcastRobot(robotId);
                         res.json({ message: 'Visita finalizada exitosamente' });
@@ -821,7 +821,7 @@ router.get('/admin/stats', authMiddleware, adminMiddleware, async (req, res) => 
         });
     } catch (err) {
         console.error('[Stats] Error:', err);
-        res.status(500).json({ error: 'Error fetching stats' });
+        res.status(500).json({ error: 'Error al obtener las estadísticas' });
     }
 });
 
@@ -837,7 +837,7 @@ router.get('/admin/incidents', authMiddleware, adminMiddleware, async (req, res)
         res.json(incidents);
     } catch (err) {
         console.error('[Incidents] List error:', err);
-        res.status(500).json({ error: 'Error fetching incidents' });
+        res.status(500).json({ error: 'Error al obtener las incidencias' });
     }
 });
 
@@ -849,11 +849,11 @@ router.patch('/admin/incidents/:id/resolve', authMiddleware, adminMiddleware, as
             isSuperAdmin: req.user.role === 'platform_admin',
             museumId:     req.user.museum_id,
         });
-        if (result.changes === 0) return res.status(404).json({ error: 'Incident not found' });
-        res.json({ message: 'Incident resolved' });
+        if (result.changes === 0) return res.status(404).json({ error: 'Incidencia no encontrada' });
+        res.json({ message: 'Incidencia resuelta' });
     } catch (err) {
         console.error('[Incidents] Resolve error:', err);
-        res.status(500).json({ error: 'Error resolving incident' });
+        res.status(500).json({ error: 'Error al resolver la incidencia' });
     }
 });
 

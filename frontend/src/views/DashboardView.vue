@@ -29,6 +29,7 @@ import { Label } from '@/components/ui/label'
 import { Alert } from '@/components/ui/alert'
 import { RefreshCw, Zap, MapPin, Plus, X, Building2, Users, BarChart3, Clock, Settings, Wifi, Search, Pencil, Eye, EyeOff, Trash2, Map, Bot, History, Navigation, Loader2, AlertTriangle, Gamepad2 } from 'lucide-vue-next'
 import ConfirmDeleteModal from '@/components/ui/ConfirmDeleteModal.vue'
+import { useCrud } from '@/composables/useCrud'
 import MapTab             from '@/components/MapTab.vue'
 import ChatHistoryTab     from '@/components/ChatHistoryTab.vue'
 import StatsTab           from '@/components/StatsTab.vue'
@@ -142,77 +143,39 @@ const fetchRobots = async () => {
     }
 }
 
-const showRobotModal = ref(false)
-const showEditRobotModal = ref(false)
-const robotError = ref(null)
-const robotSuccess = ref(null)
-const robotForm = ref({ id: '', name: '', museum_id: '', ip: '' })
-
-const openRobotModal = () => {
-    robotForm.value = { id: '', name: '', museum_id: '', ip: '' }
-    robotError.value = null
-    robotSuccess.value = null
-    showRobotModal.value = true
-}
-
-const openEditRobotModal = (robot) => {
-    robotForm.value = { id: robot.id, name: robot.name, museum_id: robot.museum_id, ip: robot.ip || '127.0.0.1' }
-    robotError.value = null
-    robotSuccess.value = null
-    showEditRobotModal.value = true
-}
-
-const handleCreateRobot = async () => {
-    robotError.value = null
-    robotSuccess.value = null
-    try {
-        await robotService.create(robotForm.value.name, robotForm.value.museum_id)
-        robotSuccess.value = 'Robot creado correctamente.'
-        await fetchRobots()
-        setTimeout(() => showRobotModal.value = false, 1500)
-    } catch (err) {
-        robotError.value = err.message || 'Error al crear robot'
-    }
-}
-
-const handleEditRobot = async () => {
-    robotError.value = null
-    robotSuccess.value = null
-    try {
-        await robotService.update(robotForm.value.id, {
-            name: robotForm.value.name,
-            ip: robotForm.value.ip,
-            museum_id: robotForm.value.museum_id || null
-        })
-        robotSuccess.value = 'Robot actualizado correctamente.'
-        await fetchRobots()
-        setTimeout(() => showEditRobotModal.value = false, 1500)
-    } catch (err) {
-        robotError.value = err.message || 'Error al actualizar robot'
-    }
-}
-
-const showDeleteRobotModal = ref(false)
-const deleteRobotTarget = ref(null)
-const deleteRobotError = ref(null)
-
-const openDeleteRobotModal = (robot) => {
-    deleteRobotTarget.value = robot
-    deleteRobotError.value = null
-    showDeleteRobotModal.value = true
-}
-
-const handleDeleteRobot = async () => {
-    deleteRobotError.value = null
-    try {
-        await robotService.remove(deleteRobotTarget.value.id)
-        showDeleteRobotModal.value = false
-        deleteRobotTarget.value = null
-        await fetchRobots()
-    } catch (err) {
-        deleteRobotError.value = err.message || 'Error al eliminar robot'
-    }
-}
+// CRUD de robots (crear / editar / borrar) centralizado en useCrud.
+// Robots comparten un único formulario para crear y editar (sharedForm).
+const {
+    form:         robotForm,
+    error:        robotError,
+    success:      robotSuccess,
+    showCreate:   showRobotModal,
+    showEdit:     showEditRobotModal,
+    showDelete:   showDeleteRobotModal,
+    deleteTarget: deleteRobotTarget,
+    deleteError:  deleteRobotError,
+    openCreate:   openRobotModal,
+    openEdit:     openEditRobotModal,
+    openDelete:   openDeleteRobotModal,
+    create:       handleCreateRobot,
+    update:       handleEditRobot,
+    remove:       handleDeleteRobot,
+} = useCrud({
+    refetch:    fetchRobots,
+    sharedForm: true,
+    blankForm:  () => ({ id: '', name: '', museum_id: '', ip: '' }),
+    toEditForm: (robot) => ({ id: robot.id, name: robot.name, museum_id: robot.museum_id, ip: robot.ip || '127.0.0.1' }),
+    createFn:   (f) => robotService.create(f.name, f.museum_id),
+    updateFn:   (f) => robotService.update(f.id, { name: f.name, ip: f.ip, museum_id: f.museum_id || null }),
+    removeFn:   (t) => robotService.remove(t.id),
+    messages: {
+        created:     'Robot creado correctamente.',
+        updated:     'Robot actualizado correctamente.',
+        createError: 'Error al crear robot',
+        updateError: 'Error al actualizar robot',
+        deleteError: 'Error al eliminar robot',
+    },
+})
 
 const pendingCommandId = ref(null)
 const commandError = ref(null)   // { id, message } | null - acotado al robot que falla

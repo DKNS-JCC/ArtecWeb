@@ -27,7 +27,8 @@ import { Card, CardContent, CardHeader } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Alert } from '@/components/ui/alert'
-import { RefreshCw, Zap, MapPin, Plus, X, Building2, Users, BarChart3, Clock, Settings, Wifi, Search, Pencil, Eye, EyeOff, Trash2, ShieldAlert, Map, Bot, History, Navigation, Loader2, AlertTriangle, Gamepad2 } from 'lucide-vue-next'
+import { RefreshCw, Zap, MapPin, Plus, X, Building2, Users, BarChart3, Clock, Settings, Wifi, Search, Pencil, Eye, EyeOff, Trash2, Map, Bot, History, Navigation, Loader2, AlertTriangle, Gamepad2 } from 'lucide-vue-next'
+import ConfirmDeleteModal from '@/components/ui/ConfirmDeleteModal.vue'
 import MapTab             from '@/components/MapTab.vue'
 import ChatHistoryTab     from '@/components/ChatHistoryTab.vue'
 import StatsTab           from '@/components/StatsTab.vue'
@@ -1038,30 +1039,14 @@ onUnmounted(() => {
         </div>
 
         <!-- MODAL DE CONFIRMAR ELIMINACIÓN DE PERSONAL -->
-        <div v-if="showDeleteStaffModal"
-            class="fixed inset-0 bg-background/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-            <Card class="w-full max-w-sm">
-                <div class="p-6">
-                    <div class="flex items-center gap-3 mb-4">
-                        <div class="w-10 h-10 rounded-full bg-destructive/10 flex items-center justify-center flex-shrink-0">
-                            <ShieldAlert class="w-5 h-5 text-destructive" />
-                        </div>
-                        <div>
-                            <h2 class="font-display font-medium tracking-tight text-foreground">Eliminar cuenta</h2>
-                            <p class="text-sm text-muted-foreground">Esta acción no se puede deshacer</p>
-                        </div>
-                    </div>
-                    <p class="text-sm text-muted-foreground mb-6">
-                        Se eliminará la cuenta de <strong class="text-foreground">{{ deleteStaffTarget?.name }}</strong>.
-                        Solo es posible eliminar cuentas que aún no han sido activadas.
-                    </p>
-                    <div class="flex gap-3">
-                        <Button variant="outline" class="flex-1" @click="showDeleteStaffModal = false">Cancelar</Button>
-                        <Button variant="destructive" class="flex-1" @click="handleDeleteStaff">Eliminar</Button>
-                    </div>
-                </div>
-            </Card>
-        </div>
+        <ConfirmDeleteModal
+            :show="showDeleteStaffModal"
+            title="Eliminar cuenta"
+            @cancel="showDeleteStaffModal = false"
+            @confirm="handleDeleteStaff">
+            Se eliminará la cuenta de <strong class="text-foreground">{{ deleteStaffTarget?.name }}</strong>.
+            Solo es posible eliminar cuentas que aún no han sido activadas.
+        </ConfirmDeleteModal>
 
         <!-- MODAL DE ROBOT -->
         <div v-if="showRobotModal"
@@ -1178,61 +1163,25 @@ onUnmounted(() => {
         </div>
 
         <!-- MODAL DE CONFIRMAR ELIMINACIÓN DE MUSEO -->
-        <div v-if="showDeleteMuseumModal"
-            class="fixed inset-0 bg-background/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-            <Card class="w-full max-w-sm">
-                <div class="p-6">
-                    <div class="flex items-center gap-3 mb-4">
-                        <div class="w-10 h-10 rounded-full bg-destructive/10 flex items-center justify-center flex-shrink-0">
-                            <ShieldAlert class="w-5 h-5 text-destructive" />
-                        </div>
-                        <div>
-                            <h2 class="font-display font-medium tracking-tight text-foreground">Eliminar museo</h2>
-                            <p class="text-sm text-muted-foreground">Esta acción no se puede deshacer</p>
-                        </div>
-                    </div>
-                    <p class="text-sm text-muted-foreground mb-6">
-                        Se eliminará <strong class="text-foreground">{{ deleteMuseumTarget?.name }}</strong> y, en cascada,
-                        <strong class="text-foreground">todos sus usuarios, robots, mapas, zonas e historial de visitas</strong>.
-                    </p>
-                    <Alert v-if="deleteMuseumError" variant="destructive" class="mb-4">
-                        <p>{{ deleteMuseumError }}</p>
-                    </Alert>
-                    <div class="flex gap-3">
-                        <Button variant="outline" class="flex-1" @click="showDeleteMuseumModal = false">Cancelar</Button>
-                        <Button variant="destructive" class="flex-1" @click="handleDeleteMuseum">Eliminar</Button>
-                    </div>
-                </div>
-            </Card>
-        </div>
+        <ConfirmDeleteModal
+            :show="showDeleteMuseumModal"
+            title="Eliminar museo"
+            :error="deleteMuseumError"
+            @cancel="showDeleteMuseumModal = false"
+            @confirm="handleDeleteMuseum">
+            Se eliminará <strong class="text-foreground">{{ deleteMuseumTarget?.name }}</strong> y, en cascada,
+            <strong class="text-foreground">todos sus usuarios, robots, mapas, zonas e historial de visitas</strong>.
+        </ConfirmDeleteModal>
 
         <!-- MODAL DE CONFIRMAR ELIMINACIÓN DE ROBOT -->
-        <div v-if="showDeleteRobotModal"
-            class="fixed inset-0 bg-background/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-            <Card class="w-full max-w-sm">
-                <div class="p-6">
-                    <div class="flex items-center gap-3 mb-4">
-                        <div class="w-10 h-10 rounded-full bg-destructive/10 flex items-center justify-center flex-shrink-0">
-                            <ShieldAlert class="w-5 h-5 text-destructive" />
-                        </div>
-                        <div>
-                            <h2 class="font-display font-medium tracking-tight text-foreground">Eliminar robot</h2>
-                            <p class="text-sm text-muted-foreground">Esta acción no se puede deshacer</p>
-                        </div>
-                    </div>
-                    <p class="text-sm text-muted-foreground mb-6">
-                        Se eliminará el robot <strong class="text-foreground">{{ deleteRobotTarget?.name }}</strong> junto con
-                        <strong class="text-foreground">su historial de visitas, chat e incidencias</strong>.
-                    </p>
-                    <Alert v-if="deleteRobotError" variant="destructive" class="mb-4">
-                        <p>{{ deleteRobotError }}</p>
-                    </Alert>
-                    <div class="flex gap-3">
-                        <Button variant="outline" class="flex-1" @click="showDeleteRobotModal = false">Cancelar</Button>
-                        <Button variant="destructive" class="flex-1" @click="handleDeleteRobot">Eliminar</Button>
-                    </div>
-                </div>
-            </Card>
-        </div>
+        <ConfirmDeleteModal
+            :show="showDeleteRobotModal"
+            title="Eliminar robot"
+            :error="deleteRobotError"
+            @cancel="showDeleteRobotModal = false"
+            @confirm="handleDeleteRobot">
+            Se eliminará el robot <strong class="text-foreground">{{ deleteRobotTarget?.name }}</strong> junto con
+            <strong class="text-foreground">su historial de visitas, chat e incidencias</strong>.
+        </ConfirmDeleteModal>
     </div>
 </template>

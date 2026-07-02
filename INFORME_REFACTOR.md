@@ -32,6 +32,6 @@ Verificación de la Fase A: `cd backend && npm test` → 121/121 en verde. `api.
 |--------|--------|----------------------|-------|
 | C1.1 · `ui/ConfirmDeleteModal.vue` | HECHO | — | Unifica los 3 modales de borrado (robot/cuenta/museo) casi idénticos; mensaje por slot. |
 | C1.2 · `composables/useCrud.js` | HECHO | `DashboardView` 1238→1079 | Centraliza el CRUD triplicado (robots/personal/museos). Nombres re-mapeados a los de la plantilla → HTML intacto. |
-| C1.3 · Extraer `RobotsTab`/`StaffTab`/`MuseumsTab` | PENDIENTE | — | Siguiente paso opcional (mayor riesgo: props/eventos). |
-| C2 · Partir `ChatView` | PENDIENTE | — | Otra tanda. |
+| C1.3 · Extraer `RobotsTab`/`StaffTab`/`MuseumsTab` | HECHO | `DashboardView` 1079→744 | Pestañas presentacionales en `components/dashboard/`. Las listas (robots/museos) siguen en el padre por estar compartidas (MapTab usa robots). StaffTab se lleva sus filtros. ⚠️ Sin tests: requiere prueba manual del CRUD. |
+| C2 · Partir `ChatView` | EN CURSO | — | Empezando por extraer el tutorial/coachmarks a un composable. |
 | C3 · Partir `MapTab` | PENDIENTE | — | Otra tanda. |

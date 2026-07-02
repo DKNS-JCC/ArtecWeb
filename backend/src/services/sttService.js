@@ -11,8 +11,10 @@
  *
  * Contrato de audio: el frontend graba la voz del visitante, la remuestrea a
  * 16 kHz mono y la sube como WAV PCM-16. Esto mantiene el backend libre de
- * dependencias de ffmpeg/audio nativo: solo parseamos un buffer WAV bien formado.
+ * dependencias de ffmpeg/audio nativo: solo decodificamos un buffer WAV bien formado.
  */
+
+const wav = require('node-wav');
 
 // Modelo multilingüe. `whisper-tiny` es el más rápido; `whisper-base` es más
 // preciso en español a costa de algo de latencia. Se sobreescribe con WHISPER_MODEL.
@@ -50,9 +52,9 @@ async function getTranscriber() {
 }
 
 /**
- * Parsea un buffer WAV PCM-16 a un Float32Array normalizado (mono).
- * Recorre los sub-chunks RIFF en lugar de asumir una cabecera fija de 44 bytes, de
- * forma que tolera chunks de metadatos extra que algunos codificadores insertan.
+ * Decodifica un buffer WAV a un Float32Array normalizado (mono) usando `node-wav`.
+ * La librería tolera cabeceras con chunks de metadatos extra y distintas
+ * profundidades de bits; aquí solo mezclamos los canales a mono.
  *
  * @returns {{ samples: Float32Array, sampleRate: number }}
  */
@@ -60,56 +62,29 @@ function parseWav(buffer) {
     if (!buffer || buffer.length < 44) {
         throw new Error('Audio inválido o demasiado corto.');
     }
-    if (buffer.toString('ascii', 0, 4) !== 'RIFF' || buffer.toString('ascii', 8, 12) !== 'WAVE') {
+
+    let decoded;
+    try {
+        decoded = wav.decode(buffer);   // { sampleRate, channelData: [Float32Array, ...] } normalizado a [-1, 1]
+    } catch {
         throw new Error('Formato de audio no soportado (se esperaba WAV).');
     }
 
-    let sampleRate    = TARGET_SAMPLE_RATE;
-    let numChannels   = 1;
-    let bitsPerSample = 16;
-    let dataOffset    = -1;
-    let dataLength    = 0;
-
-    // Recorre la lista de chunks: [id de 4 bytes][tamaño little-endian de 4 bytes][payload]
-    let offset = 12;
-    while (offset + 8 <= buffer.length) {
-        const chunkId   = buffer.toString('ascii', offset, offset + 4);
-        const chunkSize = buffer.readUInt32LE(offset + 4);
-
-        if (chunkId === 'fmt ') {
-            numChannels   = buffer.readUInt16LE(offset + 10);
-            sampleRate    = buffer.readUInt32LE(offset + 12);
-            bitsPerSample = buffer.readUInt16LE(offset + 22);
-        } else if (chunkId === 'data') {
-            dataOffset = offset + 8;
-            dataLength = Math.min(chunkSize, buffer.length - dataOffset);
-            break;
-        }
-        // Los chunks están alineados a palabra (con relleno a tamaños pares).
-        offset += 8 + chunkSize + (chunkSize % 2);
-    }
-
-    if (dataOffset === -1 || dataLength <= 0) {
+    const channels = decoded.channelData;
+    if (!channels || channels.length === 0 || !channels[0].length) {
         throw new Error('El archivo de audio no contiene datos PCM.');
     }
-    if (bitsPerSample !== 16) {
-        throw new Error('Solo se admite audio PCM de 16 bits.');
-    }
 
-    // Decodifica PCM-16 intercalado → Float32 mono en [-1, 1].
-    const totalSamples = Math.floor(dataLength / 2);
-    const frames       = Math.floor(totalSamples / numChannels);
-    const mono         = new Float32Array(frames);
-
+    // Mezcla los canales a mono promediándolos (para mono es una copia directa).
+    const frames = channels[0].length;
+    const mono   = new Float32Array(frames);
     for (let i = 0; i < frames; i++) {
         let acc = 0;
-        for (let c = 0; c < numChannels; c++) {
-            acc += buffer.readInt16LE(dataOffset + (i * numChannels + c) * 2);
-        }
-        mono[i] = (acc / numChannels) / 32768;
+        for (let c = 0; c < channels.length; c++) acc += channels[c][i];
+        mono[i] = acc / channels.length;
     }
 
-    return { samples: mono, sampleRate };
+    return { samples: mono, sampleRate: decoded.sampleRate };
 }
 
 /** Remuestrea linealmente el audio mono a 16 kHz si la frecuencia de origen difiere. */

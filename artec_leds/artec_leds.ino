@@ -1,13 +1,4 @@
-/*
- * artec_leds.ino — ESP32 + WS2812B 96 LEDs
- * Kobuki LED controller. Serial 115200, ASCII commands.
- * States: idle | navigate | success | error | charging | standby | stop
- * Telemetry: "T:<state>\n" each second
- *
- * FIX: readSerial() ahora acepta LF, CR o CRLF como fin de línea.
- *      Antes, un '\r' borraba el buffer y los comandos se ignoraban
- *      (la placa se quedaba en idle según la config del monitor serie).
- */
+
 #include <FastLED.h>
 #include <math.h>
 
@@ -18,14 +9,14 @@
 #define BRIGHTNESS  70
 #define MAX_MA      2000
 
-// Palette — warm amber/gold, saturated
-static const CRGB C_PRIMARY  = CRGB(200, 90,  5);   // deep amber
-static const CRGB C_ACCENT   = CRGB(230, 140, 10);  // golden
-static const CRGB C_WARM     = CRGB(180, 60,  0);   // burnt orange
-static const CRGB C_BG_DIM   = CRGB( 25, 10,  0);   // near-black amber
+
+static const CRGB C_PRIMARY  = CRGB(200, 90,  5);   
+static const CRGB C_ACCENT   = CRGB(230, 140, 10);  
+static const CRGB C_WARM     = CRGB(180, 60,  0);   
+static const CRGB C_BG_DIM   = CRGB( 25, 10,  0);   
 static const CRGB C_SUCCESS  = CRGB( 55, 155, 40);
 static const CRGB C_ERROR    = CRGB(220,  30, 10);
-static const CRGB C_CHARGE   = CRGB(220, 160,  0);  // bright gold for charge pulses
+static const CRGB C_CHARGE   = CRGB(220, 160,  0);  
 
 enum State : uint8_t {
   S_IDLE = 0, S_NAVIGATE, S_SUCCESS, S_ERROR,
@@ -42,10 +33,10 @@ static unsigned long lastTelemMs  = 0;
 static char          rxBuf[32];
 static int           rxLen = 0;
 
-// Charging animation state
-static int           chargeFill = 0;            // how many LEDs are "filled"
+
+static int           chargeFill = 0;            
 static unsigned long chargeLastPulseMs = 0;
-static int           chargePulsePos = -1;       // current pulse head position (-1 = no pulse)
+static int           chargePulsePos = -1;
 
 void setState(State s) {
   if (s == currentState) return;
@@ -66,8 +57,6 @@ void handleCommand(const char* cmd) {
   }
 }
 
-// Acepta LF ('\n'), CR ('\r') o CRLF como fin de línea.
-// Cualquier otro byte no imprimible simplemente se ignora SIN borrar el buffer.
 void readSerial() {
   while (Serial.available()) {
     uint8_t b = Serial.read();
@@ -80,7 +69,6 @@ void readSerial() {
     } else if (b >= 0x20 && b < 0x7F) {
       if (rxLen < (int)(sizeof(rxBuf) - 1)) rxBuf[rxLen++] = b;
     }
-    // otros bytes (control, ruido) se descartan sin afectar al buffer
   }
 }
 
@@ -146,15 +134,12 @@ void animError() {
   FastLED.show();
 }
 
-// Charging: pulses travel up and stack, filling the strip like a battery.
-// Once full, reset and start over.
 void animCharging() {
   const int PULSE_WIDTH = 6;
-  const unsigned long PULSE_SPEED_MS = 12;     // ms per LED advance
-  const unsigned long PAUSE_AFTER_STACK = 300; // pause between pulses
+  const unsigned long PULSE_SPEED_MS = 12;
+  const unsigned long PAUSE_AFTER_STACK = 300;
   unsigned long now = millis();
 
-  // Draw background: dim below fill, solid charge color at fill level
   fill_solid(leds, NUM_LEDS, CRGB::Black);
   for (int i = 0; i < chargeFill; i++) {
     CRGB c = C_CHARGE;
@@ -163,17 +148,16 @@ void animCharging() {
   }
 
   if (chargePulsePos < 0) {
-    // No pulse active — wait then launch a new one
+    
     if (now - chargeLastPulseMs >= PAUSE_AFTER_STACK) {
       chargePulsePos = NUM_LEDS - 1 + PULSE_WIDTH;
       chargeLastPulseMs = now;
     }
   } else {
-    // Advance pulse towards chargeFill
+    
     if (now - chargeLastPulseMs >= PULSE_SPEED_MS) {
       chargeLastPulseMs = now;
       chargePulsePos--;
-      // Pulse reached the stack top — lock it in
       if (chargePulsePos <= chargeFill) {
         int newFill = chargeFill + PULSE_WIDTH;
         if (newFill > NUM_LEDS) newFill = NUM_LEDS;
@@ -184,13 +168,11 @@ void animCharging() {
         }
         chargeFill = newFill;
         chargePulsePos = -1;
-        // Battery full — reset
         if (chargeFill >= NUM_LEDS) {
           chargeFill = 0;
         }
       }
     }
-    // Draw the travelling pulse
     for (int i = 0; i < PULSE_WIDTH; i++) {
       int idx = chargePulsePos + i;
       if (idx < chargeFill || idx >= NUM_LEDS) continue;

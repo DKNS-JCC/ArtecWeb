@@ -285,10 +285,6 @@ const handleToggleActive = async (member) => {
 const museums = ref([])
 const loadingMuseums = ref(false)
 const museumName = (id) => museums.value.find(m => m.id === id)?.name || 'Sin asignar'
-const showMuseumModal = ref(false)
-const museumError = ref(null)
-const museumSuccess = ref(null)
-const museumForm = ref({ name: '', company: '' })
 
 const fetchMuseums = async () => {
     if (!isPlatformAdmin.value) return;
@@ -302,73 +298,39 @@ const fetchMuseums = async () => {
     }
 }
 
-const openMuseumModal = () => {
-    museumForm.value = { name: '', company: '' }
-    museumError.value = null
-    museumSuccess.value = null
-    showMuseumModal.value = true
-}
-
-const handleCreateMuseum = async () => {
-    museumError.value = null
-    museumSuccess.value = null
-    try {
-        await museumService.create(museumForm.value)
-        museumSuccess.value = 'Museo creado correctamente.'
-        await fetchMuseums()
-        setTimeout(() => showMuseumModal.value = false, 1500)
-    } catch (err) {
-        museumError.value = err.message || 'Error al crear museo'
-    }
-}
-
-const showEditMuseumModal = ref(false)
-const editMuseumForm = ref({ id: '', name: '', company: '' })
-
-const openEditMuseumModal = (museum) => {
-    editMuseumForm.value = { id: museum.id, name: museum.name, company: museum.company }
-    museumError.value = null
-    museumSuccess.value = null
-    showEditMuseumModal.value = true
-}
-
-const handleUpdateMuseum = async () => {
-    museumError.value = null
-    museumSuccess.value = null
-    try {
-        await museumService.update(editMuseumForm.value.id, {
-            name: editMuseumForm.value.name,
-            company: editMuseumForm.value.company,
-        })
-        museumSuccess.value = 'Museo actualizado correctamente.'
-        await fetchMuseums()
-        setTimeout(() => showEditMuseumModal.value = false, 1500)
-    } catch (err) {
-        museumError.value = err.message || 'Error al actualizar museo'
-    }
-}
-
-const showDeleteMuseumModal = ref(false)
-const deleteMuseumTarget = ref(null)
-const deleteMuseumError = ref(null)
-
-const openDeleteMuseumModal = (museum) => {
-    deleteMuseumTarget.value = museum
-    deleteMuseumError.value = null
-    showDeleteMuseumModal.value = true
-}
-
-const handleDeleteMuseum = async () => {
-    deleteMuseumError.value = null
-    try {
-        await museumService.remove(deleteMuseumTarget.value.id)
-        showDeleteMuseumModal.value = false
-        deleteMuseumTarget.value = null
-        await fetchMuseums()
-    } catch (err) {
-        deleteMuseumError.value = err.message || 'Error al eliminar museo'
-    }
-}
+// CRUD de museos centralizado en useCrud (formularios crear/editar separados).
+const {
+    form:         museumForm,
+    editForm:     editMuseumForm,
+    error:        museumError,
+    success:      museumSuccess,
+    showCreate:   showMuseumModal,
+    showEdit:     showEditMuseumModal,
+    showDelete:   showDeleteMuseumModal,
+    deleteTarget: deleteMuseumTarget,
+    deleteError:  deleteMuseumError,
+    openCreate:   openMuseumModal,
+    openEdit:     openEditMuseumModal,
+    openDelete:   openDeleteMuseumModal,
+    create:       handleCreateMuseum,
+    update:       handleUpdateMuseum,
+    remove:       handleDeleteMuseum,
+} = useCrud({
+    refetch:       fetchMuseums,
+    blankForm:     () => ({ name: '', company: '' }),
+    blankEditForm: () => ({ id: '', name: '', company: '' }),
+    toEditForm:    (museum) => ({ id: museum.id, name: museum.name, company: museum.company }),
+    createFn:      (f) => museumService.create(f),
+    updateFn:      (f) => museumService.update(f.id, { name: f.name, company: f.company }),
+    removeFn:      (t) => museumService.remove(t.id),
+    messages: {
+        created:     'Museo creado correctamente.',
+        updated:     'Museo actualizado correctamente.',
+        createError: 'Error al crear museo',
+        updateError: 'Error al actualizar museo',
+        deleteError: 'Error al eliminar museo',
+    },
+})
 
 // ---------------- ESTADÍSTICAS ----------------
 const statsTabRef = ref(null)

@@ -11,6 +11,7 @@ const SALT_ROUNDS = 10;
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 const { dbGet, dbRun } = require('../utils/db');
+const { museumScope } = require('../utils/access');
 
 const VALID_EXPERTISE_LEVELS = ['nino', 'general', 'estudiante', 'experto'];
 const VALID_LANGUAGES = ['es', 'en', 'fr', 'de', 'it'];
@@ -418,20 +419,15 @@ exports.deleteStaff = (req, res) => {
 
 exports.listUsers = (req, res) => {
     const isSuperAdmin = req.user.role === 'platform_admin';
-    const userMuseumId = req.user.museum_id;
+    const { clause, params } = museumScope(isSuperAdmin, req.user.museum_id, 'u.museum_id');
 
     let query = `
-        SELECT u.id, u.name, u.email, u.role, u.must_change_password, u.created_at, u.museum_id, u.active, m.name as museum_name 
+        SELECT u.id, u.name, u.email, u.role, u.must_change_password, u.created_at, u.museum_id, u.active, m.name as museum_name
         FROM users u
         LEFT JOIN museums m ON u.museum_id = m.id
     `;
-    const params = [];
-
-    if (!isSuperAdmin) {
-        query += ` WHERE u.museum_id = ? AND u.role IN ('museum_admin', 'technician')`;
-        params.push(userMuseumId);
-    }
-
+    // Los no-superadmin solo ven administradores/técnicos de su propio museo.
+    if (clause) query += ` WHERE ${clause} AND u.role IN ('museum_admin', 'technician')`;
     query += ` ORDER BY u.created_at DESC`;
 
     db.all(query, params, (err, rows) => {

@@ -1,5 +1,6 @@
 const crypto = require('crypto');
 const { dbGet, dbAll, dbRun } = require('../utils/db');
+const { museumScope } = require('../utils/access');
 
 /**
  * Registro de incidencias operativas. Ahora mismo registra fallos de navegación (un
@@ -55,18 +56,16 @@ function list({ isSuperAdmin, museumId, limit = 100 }) {
         LEFT JOIN robots   r ON r.id = i.robot_id
         LEFT JOIN museums  m ON m.id = i.museum_id
         LEFT JOIN visitors v ON v.id = i.visitor_id`;
-    if (isSuperAdmin) {
-        return dbAll(`${base} ORDER BY i.created_at DESC LIMIT ?`, [limit]);
-    }
-    return dbAll(`${base} WHERE i.museum_id = ? ORDER BY i.created_at DESC LIMIT ?`, [museumId, limit]);
+    const { clause, params } = museumScope(isSuperAdmin, museumId, 'i.museum_id');
+    const where = clause ? `WHERE ${clause}` : '';
+    return dbAll(`${base} ${where} ORDER BY i.created_at DESC LIMIT ?`, [...params, limit]);
 }
 
 /** Marca una incidencia como resuelta, limitada al museo del solicitante salvo que sea superadmin. */
 function resolve({ id, isSuperAdmin, museumId }) {
-    if (isSuperAdmin) {
-        return dbRun(`UPDATE incidents SET resolved = 1 WHERE id = ?`, [id]);
-    }
-    return dbRun(`UPDATE incidents SET resolved = 1 WHERE id = ? AND museum_id = ?`, [id, museumId]);
+    const { clause, params } = museumScope(isSuperAdmin, museumId, 'museum_id');
+    const extra = clause ? ` AND ${clause}` : '';
+    return dbRun(`UPDATE incidents SET resolved = 1 WHERE id = ?${extra}`, [id, ...params]);
 }
 
 module.exports = { recordNavFailure, list, resolve };

@@ -1,4 +1,5 @@
 const { dbGet, dbAll, dbRun } = require('../utils/db');
+const { museumScope } = require('../utils/access');
 
 // Lista las sesiones (excluye las borradas con soft-delete). Admite filtros robot_id, date_from, date_to.
 
@@ -12,13 +13,11 @@ exports.listSessions = async (req, res) => {
     const offset       = Math.max(parseInt(req.query.offset) || 0,  0);
 
     try {
+        const { clause, params: scopeParams } = museumScope(isSuperAdmin, museumId, 'r.museum_id');
         const conditions = [];
-        const params     = [];
+        const params     = [...scopeParams];
 
-        if (!isSuperAdmin) {
-            conditions.push('r.museum_id = ?');
-            params.push(museumId);
-        }
+        if (clause) conditions.push(clause);
 
         // Soft-delete: oculta del historial las sesiones borradas
         conditions.push('v.deleted_at IS NULL');
@@ -169,14 +168,12 @@ exports.deleteSession = async (req, res) => {
 
 exports.listRobotsForFilter = async (req, res) => {
     const isSuperAdmin = req.user.role === 'platform_admin';
-    const museumId     = req.user.museum_id;
+    const { clause, params } = museumScope(isSuperAdmin, req.user.museum_id, 'museum_id');
 
     try {
         const rows = await dbAll(
-            isSuperAdmin
-                ? `SELECT id, name, museum_id FROM robots ORDER BY name`
-                : `SELECT id, name, museum_id FROM robots WHERE museum_id = ? ORDER BY name`,
-            isSuperAdmin ? [] : [museumId]
+            `SELECT id, name, museum_id FROM robots ${clause ? `WHERE ${clause}` : ''} ORDER BY name`,
+            params
         );
         res.json(rows);
     } catch (_err) {

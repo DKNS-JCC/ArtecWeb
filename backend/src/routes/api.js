@@ -18,6 +18,8 @@ const rateLimit = require('express-rate-limit');
 const navService = require('../services/navService');
 const { findNearestZone, BASE_CATEGORY } = require('../utils/geo');
 const { JWT_SECRET } = require('../config/secrets');
+const { museumScope, loadRobotForUser } = require('../utils/access');
+const statsService = require('../services/statsService');
 
 // Limitador de tasa específico del chat (más estricto: 15 msgs/min)
 const chatLimiter = rateLimit({
@@ -321,19 +323,14 @@ router.post('/robots', authMiddleware, superAdminMiddleware, (req, res) => {
 
 router.get('/robots', authMiddleware, staffMiddleware, (req, res) => {
     const isSuperAdmin = req.user.role === 'platform_admin';
-    const museumId = req.user.museum_id;
 
-    let query = `
+    const { clause, params } = museumScope(isSuperAdmin, req.user.museum_id, 'r.museum_id');
+    const query = `
         SELECT r.*, v.name as visitor_name
         FROM robots r
         LEFT JOIN visitors v ON r.current_visitor_id = v.id
+        ${clause ? `WHERE ${clause}` : ''}
     `;
-    let params = [];
-
-    if (!isSuperAdmin) {
-        query += ` WHERE r.museum_id = ?`;
-        params.push(museumId);
-    }
 
     db.all(query, params, (err, rows) => {
         if (err) return res.status(500).json({ error: 'Error de base de datos al obtener los robots' });
@@ -378,24 +375,12 @@ router.get('/robots', authMiddleware, staffMiddleware, (req, res) => {
     });
 });
 
-router.get('/robots/:id', authMiddleware, staffMiddleware, (req, res) => {
-    const isSuperAdmin = req.user.role === 'platform_admin';
-    const museumId = req.user.museum_id;
-    const robotId = req.params.id;
-
-    let query = `SELECT * FROM robots WHERE id = ?`;
-    let params = [robotId];
-
-    if (!isSuperAdmin) {
-        query += ` AND museum_id = ?`;
-        params.push(museumId);
-    }
-
-    db.get(query, params, (err, robot) => {
-        if (err) return res.status(500).json({ error: 'Error de base de datos al obtener el robot' });
+router.get('/robots/:id', authMiddleware, staffMiddleware, async (req, res) => {
+    try {
+        const robot = await loadRobotForUser(req.params.id, req.user);
         if (!robot) return res.status(404).json({ error: 'Robot no encontrado o no autorizado' });
 
-        const formattedRobot = {
+        res.json({
             id: robot.id,
             name: robot.name,
             ip: robot.ip,
@@ -406,14 +391,15 @@ router.get('/robots/:id', authMiddleware, staffMiddleware, (req, res) => {
             last_update: robot.last_update,
             museum_id: robot.museum_id,
             map_id: robot.map_id
-        };
-        res.json(formattedRobot);
-    });
+        });
+    } catch {
+        res.status(500).json({ error: 'Error de base de datos al obtener el robot' });
+    }
 });
 
 const IP_RE = /^(\d{1,3}\.){3}\d{1,3}$/;
 
-router.put('/robots/:id', authMiddleware, staffMiddleware, (req, res) => {
+router.put('/robots/:id', authMiddleware, staffMiddleware, async (req, res) => {
     const isSuperAdmin = req.user.role === 'platform_admin';
     // Técnicos y museum_admin pueden editar nombre e IP de los robots de su museo.
     // Asignar mapa queda para admins; mover de museo, solo para el proveedor (super-admin).
@@ -426,15 +412,8 @@ router.put('/robots/:id', authMiddleware, staffMiddleware, (req, res) => {
         return res.status(400).json({ error: 'Formato de dirección IP no válido' });
     }
 
-    let verifyQuery = `SELECT * FROM robots WHERE id = ?`;
-    let verifyParams = [robotId];
-    if (!isSuperAdmin) {
-        verifyQuery += ` AND museum_id = ?`;
-        verifyParams.push(museumId);
-    }
-
-    db.get(verifyQuery, verifyParams, async (err, robot) => {
-        if (err) return res.status(500).json({ error: 'Error de base de datos' });
+    try {
+        const robot = await loadRobotForUser(robotId, req.user);
         if (!robot) return res.status(404).json({ error: 'Robot no encontrado o no autorizado' });
 
         // Reasignar un robot a otro museo (o desasignarlo) es exclusivo del proveedor.
@@ -489,7 +468,9 @@ router.put('/robots/:id', authMiddleware, staffMiddleware, (req, res) => {
             sseService.broadcastRobot(robotId);
             res.json({ message: 'Robot actualizado correctamente' });
         });
-    });
+    } catch {
+        res.status(500).json({ error: 'Error de base de datos' });
+    }
 });
 
 router.delete('/robots/:id', authMiddleware, superAdminMiddleware, (req, res) => {
@@ -506,21 +487,12 @@ router.delete('/robots/:id', authMiddleware, superAdminMiddleware, (req, res) =>
     });
 });
 
-router.post('/robots/:id/command', authMiddleware, staffMiddleware, (req, res) => {
+router.post('/robots/:id/command', authMiddleware, staffMiddleware, async (req, res) => {
     const { command, payload } = req.body;
-    const isSuperAdmin = req.user.role === 'platform_admin';
-    const museumId = req.user.museum_id;
     const robotId = req.params.id;
 
-    let verifyQuery = `SELECT * FROM robots WHERE id = ?`;
-    let verifyParams = [robotId];
-    if (!isSuperAdmin) {
-        verifyQuery += ` AND museum_id = ?`;
-        verifyParams.push(museumId);
-    }
-
-    db.get(verifyQuery, verifyParams, async (err, robot) => {
-        if (err) return res.status(500).json({ error: 'Error de base de datos' });
+    try {
+        const robot = await loadRobotForUser(robotId, req.user);
         if (!robot) return res.status(404).json({ error: 'Robot no encontrado o no autorizado' });
 
         let status = robot.status;
@@ -586,7 +558,9 @@ router.post('/robots/:id/command', authMiddleware, staffMiddleware, (req, res) =
             sseService.broadcastRobot(robotId);
             res.json({ message: `Comando ${command} enviado correctamente` });
         });
-    });
+    } catch {
+        res.status(500).json({ error: 'Error de base de datos' });
+    }
 });
 
 
@@ -597,62 +571,50 @@ router.post('/robots/:id/nav-goal', authMiddleware, staffMiddleware, async (req,
     }
 
     const robotId = req.params.id;
-    const isSuperAdmin = req.user.role === 'platform_admin';
-    const museumId = req.user.museum_id;
 
-    let query = `SELECT id FROM robots WHERE id = ?`;
-    let params = [robotId];
-    if (!isSuperAdmin) { query += ` AND museum_id = ?`; params.push(museumId); }
+    let robot;
+    try {
+        robot = await loadRobotForUser(robotId, req.user, 'id');
+    } catch {
+        return res.status(500).json({ error: 'Error de base de datos' });
+    }
+    if (!robot) return res.status(404).json({ error: 'Robot no encontrado o no autorizado' });
 
-    db.get(query, params, (err, robot) => {
-        if (err) return res.status(500).json({ error: 'Error de base de datos' });
-        if (!robot) return res.status(404).json({ error: 'Robot no encontrado o no autorizado' });
-
-        try {
-            rosService.sendNavGoal(robotId, Number(x), Number(y), Number(qz), Number(qw), {
-                kind:     'admin',
-                museumId: req.user.museum_id,
-            });
-            res.json({ message: 'Objetivo de navegación enviado', x, y, qz, qw });
-        } catch (e) {
-            res.status(503).json({ error: e.message });
-        }
-    });
+    try {
+        rosService.sendNavGoal(robotId, Number(x), Number(y), Number(qz), Number(qw), {
+            kind:     'admin',
+            museumId: req.user.museum_id,
+        });
+        res.json({ message: 'Objetivo de navegación enviado', x, y, qz, qw });
+    } catch (e) {
+        res.status(503).json({ error: e.message });
+    }
 });
 
 router.post('/robots/:id/cancel-nav', authMiddleware, staffMiddleware, async (req, res) => {
     const robotId = req.params.id;
-    const isSuperAdmin = req.user.role === 'platform_admin';
-    const museumId = req.user.museum_id;
 
-    let query = `SELECT id FROM robots WHERE id = ?`;
-    let params = [robotId];
-    if (!isSuperAdmin) { query += ` AND museum_id = ?`; params.push(museumId); }
+    let robot;
+    try {
+        robot = await loadRobotForUser(robotId, req.user, 'id');
+    } catch {
+        return res.status(500).json({ error: 'Error de base de datos' });
+    }
+    if (!robot) return res.status(404).json({ error: 'Robot no encontrado o no autorizado' });
 
-    db.get(query, params, async (err, robot) => {
-        if (err) return res.status(500).json({ error: 'Error de base de datos' });
-        if (!robot) return res.status(404).json({ error: 'Robot no encontrado o no autorizado' });
-
-        try {
-            const result = await rosService.cancelNavigation(robotId);
-            res.json({ message: 'Navegación cancelada', result });
-        } catch (e) {
-            res.status(503).json({ error: e.message });
-        }
-    });
+    try {
+        const result = await rosService.cancelNavigation(robotId);
+        res.json({ message: 'Navegación cancelada', result });
+    } catch (e) {
+        res.status(503).json({ error: e.message });
+    }
 });
 
 router.post('/robots/:id/go-to-base', authMiddleware, staffMiddleware, async (req, res) => {
     const robotId = req.params.id;
-    const isSuperAdmin = req.user.role === 'platform_admin';
-    const museumId = req.user.museum_id;
 
-    let query = `SELECT id FROM robots WHERE id = ?`;
-    let params = [robotId];
-    if (!isSuperAdmin) { query += ` AND museum_id = ?`; params.push(museumId); }
-
-    db.get(query, params, async (err, robot) => {
-        if (err) return res.status(500).json({ error: 'Error de base de datos' });
+    try {
+        const robot = await loadRobotForUser(robotId, req.user, 'id');
         if (!robot) return res.status(404).json({ error: 'Robot no encontrado o no autorizado' });
 
         const result = await navService.sendRobotToBase(robotId);
@@ -668,86 +630,72 @@ router.post('/robots/:id/go-to-base', authMiddleware, staffMiddleware, async (re
             ros_error:     result.error || 'Error al enviar el objetivo de navegación.',
         };
         return res.status(409).json({ error: messages[result.reason] || 'No se pudo enviar el robot a la base.' });
-    });
+    } catch {
+        res.status(500).json({ error: 'Error de base de datos' });
+    }
 });
 
 router.post('/robots/:id/capture-map', authMiddleware, adminMiddleware, mapController.captureMapFromRobot);
 
-router.get('/robots/:id/map', authMiddleware, staffMiddleware, (req, res) => {
+router.get('/robots/:id/map', authMiddleware, staffMiddleware, async (req, res) => {
     const robotId = req.params.id;
-    const isSuperAdmin = req.user.role === 'platform_admin';
-    const museumId = req.user.museum_id;
-
-    let query = `SELECT id FROM robots WHERE id = ?`;
-    let params = [robotId];
-    if (!isSuperAdmin) { query += ` AND museum_id = ?`; params.push(museumId); }
-
-    db.get(query, params, (err, robot) => {
-        if (err) return res.status(500).json({ error: 'Error de base de datos' });
+    try {
+        const robot = await loadRobotForUser(robotId, req.user, 'id');
         if (!robot) return res.status(404).json({ error: 'Robot no encontrado o no autorizado' });
 
         const map = rosService.getMap(robotId);
         if (!map) return res.status(503).json({ error: 'El mapa aún no está disponible. ¿Está el robot conectado?' });
         res.json(map);
-    });
+    } catch {
+        res.status(500).json({ error: 'Error de base de datos' });
+    }
 });
 
-router.get('/robots/:id/scan', authMiddleware, staffMiddleware, (req, res) => {
+router.get('/robots/:id/scan', authMiddleware, staffMiddleware, async (req, res) => {
     const robotId = req.params.id;
-    const isSuperAdmin = req.user.role === 'platform_admin';
-    const museumId = req.user.museum_id;
-
-    let query = `SELECT id FROM robots WHERE id = ?`;
-    let params = [robotId];
-    if (!isSuperAdmin) { query += ` AND museum_id = ?`; params.push(museumId); }
-
-    db.get(query, params, (err, robot) => {
-        if (err) return res.status(500).json({ error: 'Error de base de datos' });
+    try {
+        const robot = await loadRobotForUser(robotId, req.user, 'id');
         if (!robot) return res.status(404).json({ error: 'Robot no encontrado o no autorizado' });
 
         const scan = rosService.getLatestScan(robotId);
         if (!scan) return res.status(503).json({ error: 'El escaneo aún no está disponible. ¿Está el robot conectado?' });
         res.json(scan);
-    });
+    } catch {
+        res.status(500).json({ error: 'Error de base de datos' });
+    }
 });
 
-router.post('/robots/:id/force-end', authMiddleware, adminMiddleware, (req, res) => {
-    const isSuperAdmin = req.user.role === 'platform_admin';
-    const museumId = req.user.museum_id;
+router.post('/robots/:id/force-end', authMiddleware, adminMiddleware, async (req, res) => {
     const robotId = req.params.id;
 
-    let verifyQuery = `SELECT * FROM robots WHERE id = ?`;
-    let verifyParams = [robotId];
-    if (!isSuperAdmin) {
-        verifyQuery += ` AND museum_id = ?`;
-        verifyParams.push(museumId);
+    let robot;
+    try {
+        robot = await loadRobotForUser(robotId, req.user);
+    } catch {
+        return res.status(500).json({ error: 'Error de base de datos' });
+    }
+    if (!robot) return res.status(404).json({ error: 'Robot no encontrado o no autorizado' });
+
+    if (!robot.current_visitor_id) {
+        return res.json({ message: 'No hay ninguna sesión activa que finalizar' });
     }
 
-    db.get(verifyQuery, verifyParams, (err, robot) => {
-        if (err) return res.status(500).json({ error: 'Error de base de datos' });
-        if (!robot) return res.status(404).json({ error: 'Robot no encontrado o no autorizado' });
+    const visitorId = robot.current_visitor_id;
 
-        if (!robot.current_visitor_id) {
-            return res.json({ message: 'No hay ninguna sesión activa que finalizar' });
-        }
+    db.run('BEGIN IMMEDIATE', (beginErr) => {
+        if (beginErr) return res.status(500).json({ error: 'Error del servidor' });
 
-        const visitorId = robot.current_visitor_id;
+        db.run('UPDATE robots SET locked_until = NULL, current_visitor_id = NULL WHERE id = ?', [robotId], (updErr) => {
+            if (updErr) return db.run('ROLLBACK', () => res.status(500).json({ error: 'Error de base de datos al gestionar el robot' }));
 
-        db.run('BEGIN IMMEDIATE', (beginErr) => {
-            if (beginErr) return res.status(500).json({ error: 'Error del servidor' });
+            db.run('UPDATE visitors SET ended_at = CURRENT_TIMESTAMP WHERE id = ?', [visitorId], (visErr) => {
+                if (visErr) console.error('Error updating visitor ended_at', visErr);
 
-            db.run('UPDATE robots SET locked_until = NULL, current_visitor_id = NULL WHERE id = ?', [robotId], (updErr) => {
-                if (updErr) return db.run('ROLLBACK', () => res.status(500).json({ error: 'Error de base de datos al gestionar el robot' }));
-
-                db.run('UPDATE visitors SET ended_at = CURRENT_TIMESTAMP WHERE id = ?', [visitorId], (visErr) => {
-                    if (visErr) console.error('Error updating visitor ended_at', visErr);
-
-                    db.run('COMMIT', (commitErr) => {
-                        if (commitErr) return db.run('ROLLBACK', () => res.status(500).json({ error: 'Error del servidor' }));
-                        navService.sendRobotToBase(robotId).catch(() => {});
-                        sseService.broadcastRobot(robotId);
-                        res.json({ message: 'Visita finalizada exitosamente' });
-                    });
+                db.run('COMMIT', (commitErr) => {
+                    if (commitErr) return db.run('ROLLBACK', () => res.status(500).json({ error: 'Error del servidor' }));
+                    navService.sendRobotToBase(robotId).catch(() => {});
+                    sseService.broadcastRobot(robotId);
+                    res.json({ message: 'Visita finalizada exitosamente' });
                 });
             });
         });
@@ -755,69 +703,12 @@ router.post('/robots/:id/force-end', authMiddleware, adminMiddleware, (req, res)
 });
 
 router.get('/admin/stats', authMiddleware, adminMiddleware, async (req, res) => {
-    const isSuperAdmin = req.user.role === 'platform_admin';
-    const museumId = req.user.museum_id;
-    const p = isSuperAdmin ? [] : [museumId];
-
-    const qGet = (sql, params) => new Promise((resolve, reject) => {
-        db.get(sql, params, (err, row) => {
-            if (err) reject(err);
-            else resolve(row || {});
-        });
-    });
-    const qAll = (sql, params) => new Promise((resolve, reject) => {
-        db.all(sql, params, (err, rows) => {
-            if (err) reject(err);
-            else resolve(rows || []);
-        });
-    });
-
     try {
-        const [
-            totVisitors, avgSession, totRobots, activeRobots, totMuseums,
-            visitorsByDay, expertiseDist, intentDist, robotActivity
-        ] = await Promise.all([
-            qGet(isSuperAdmin
-                ? `SELECT COUNT(*) AS count FROM visitors`
-                : `SELECT COUNT(v.id) AS count FROM visitors v JOIN robots r ON r.id=v.robot_id WHERE r.museum_id=?`, p),
-            qGet(isSuperAdmin
-                ? `SELECT AVG((julianday(ended_at)-julianday(created_at))*1440) AS avg FROM visitors WHERE ended_at IS NOT NULL`
-                : `SELECT AVG((julianday(v.ended_at)-julianday(v.created_at))*1440) AS avg FROM visitors v JOIN robots r ON r.id=v.robot_id WHERE v.ended_at IS NOT NULL AND r.museum_id=?`, p),
-            qGet(isSuperAdmin
-                ? `SELECT COUNT(*) AS count FROM robots`
-                : `SELECT COUNT(*) AS count FROM robots WHERE museum_id=?`, p),
-            qGet(isSuperAdmin
-                ? `SELECT COUNT(*) AS count FROM robots WHERE status!='idle'`
-                : `SELECT COUNT(*) AS count FROM robots WHERE museum_id=? AND status!='idle'`, p),
-            isSuperAdmin
-                ? qGet(`SELECT COUNT(*) AS count FROM museums`, [])
-                : Promise.resolve({ count: null }),
-            qAll(isSuperAdmin
-                ? `SELECT date(created_at) AS day, COUNT(*) AS count FROM visitors WHERE created_at >= date('now','-6 days') GROUP BY date(created_at) ORDER BY day`
-                : `SELECT date(v.created_at) AS day, COUNT(*) AS count FROM visitors v JOIN robots r ON r.id=v.robot_id WHERE r.museum_id=? AND v.created_at >= date('now','-6 days') GROUP BY date(v.created_at) ORDER BY day`, p),
-            qAll(isSuperAdmin
-                ? `SELECT expertise_level AS level, COUNT(*) AS count FROM visitors GROUP BY expertise_level ORDER BY count DESC`
-                : `SELECT v.expertise_level AS level, COUNT(*) AS count FROM visitors v JOIN robots r ON r.id=v.robot_id WHERE r.museum_id=? GROUP BY v.expertise_level ORDER BY count DESC`, p),
-            qAll(isSuperAdmin
-                ? `SELECT intent, COUNT(*) AS count FROM chat_messages WHERE role='assistant' AND intent IS NOT NULL AND intent NOT IN ('none','greet','farewell') GROUP BY intent ORDER BY count DESC LIMIT 5`
-                : `SELECT cm.intent, COUNT(*) AS count FROM chat_messages cm JOIN visitors v ON v.session_id=cm.session_id JOIN robots r ON r.id=v.robot_id WHERE r.museum_id=? AND cm.role='assistant' AND cm.intent IS NOT NULL AND cm.intent NOT IN ('none','greet','farewell') GROUP BY cm.intent ORDER BY count DESC LIMIT 5`, p),
-            qAll(isSuperAdmin
-                ? `SELECT r.name AS robot_name, COUNT(v.id) AS count FROM robots r LEFT JOIN visitors v ON v.robot_id=r.id GROUP BY r.id ORDER BY count DESC LIMIT 6`
-                : `SELECT r.name AS robot_name, COUNT(v.id) AS count FROM robots r LEFT JOIN visitors v ON v.robot_id=r.id WHERE r.museum_id=? GROUP BY r.id ORDER BY count DESC LIMIT 6`, p),
-        ]);
-
-        res.json({
-            totalRobots:    totRobots.count    || 0,
-            activeRobots:   activeRobots.count || 0,
-            totalVisitors:  totVisitors.count  || 0,
-            avgSessionTime: Math.round((avgSession.avg || 0) * 10) / 10,
-            // El recuento de museos solo tiene sentido a nivel de plataforma, así que se expone solo a los superadmins.
-            ...(isSuperAdmin && { totalMuseums: totMuseums.count || 0 }),
-            visitorsByDay,
-            expertiseDist,
-            intentDist,
-            robotActivity,
+        const stats = await statsService.getDashboardStats({
+            isSuperAdmin: req.user.role === 'platform_admin',
+            museumId:     req.user.museum_id,
         });
+        res.json(stats);
     } catch (err) {
         console.error('[Stats] Error:', err);
         res.status(500).json({ error: 'Error al obtener las estadísticas' });

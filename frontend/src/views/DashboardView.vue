@@ -206,14 +206,6 @@ const handleEndVisit = async (id) => {
 // ---------------- PERSONAL ----------------
 const staff = ref([])
 const loadingStaff = ref(false)
-const showStaffModal = ref(false)
-const showEditStaffModal = ref(false)
-const showDeleteStaffModal = ref(false)
-const staffError = ref(null)
-const staffSuccess = ref(null)
-const staffForm = ref({ name: '', email: '', role: 'technician', museum_id: '' })
-const editStaffForm = ref({ id: '', name: '', email: '', role: '' })
-const deleteStaffTarget = ref(null)
 const staffSearch = ref('')
 const staffRoleFilter = ref('all')
 const staffStatusFilter = ref('all')
@@ -245,69 +237,44 @@ const fetchStaff = async () => {
     }
 }
 
-const openStaffModal = () => {
-    staffForm.value = { name: '', email: '', role: 'technician', museum_id: user.value?.museum_id || '' }
-    staffError.value = null
-    staffSuccess.value = null
-    showStaffModal.value = true
-}
-
-const handleCreateStaff = async () => {
-    staffError.value = null
-    staffSuccess.value = null
-    try {
-        await authService.createStaff(staffForm.value.name, staffForm.value.email, staffForm.value.role, staffForm.value.museum_id)
-        staffSuccess.value = 'Invitación enviada. El usuario activará su cuenta en el primer inicio de sesión.'
-        await fetchStaff()
-        setTimeout(() => showStaffModal.value = false, 2000)
-    } catch (err) {
-        staffError.value = err.message || 'Error al crear personal'
-    }
-}
-
-const openEditStaffModal = (member) => {
-    editStaffForm.value = { id: member.id, name: member.name, email: member.email, role: member.role }
-    staffError.value = null
-    staffSuccess.value = null
-    showEditStaffModal.value = true
-}
-
-const handleEditStaff = async () => {
-    staffError.value = null
-    staffSuccess.value = null
-    try {
-        await authService.updateStaff(editStaffForm.value.id, {
-            name: editStaffForm.value.name,
-            email: editStaffForm.value.email,
-            role: editStaffForm.value.role
-        })
-        staffSuccess.value = 'Usuario actualizado correctamente.'
-        await fetchStaff()
-        setTimeout(() => showEditStaffModal.value = false, 1500)
-    } catch (err) {
-        staffError.value = err.message || 'Error al actualizar usuario'
-    }
-}
+// CRUD de personal centralizado en useCrud. Crear y editar usan formularios
+// distintos (staffForm / editStaffForm); el borrado no muestra error en la UI.
+const {
+    form:         staffForm,
+    editForm:     editStaffForm,
+    error:        staffError,
+    success:      staffSuccess,
+    showCreate:   showStaffModal,
+    showEdit:     showEditStaffModal,
+    showDelete:   showDeleteStaffModal,
+    deleteTarget: deleteStaffTarget,
+    openCreate:   openStaffModal,
+    openEdit:     openEditStaffModal,
+    openDelete:   openDeleteStaffModal,
+    create:       handleCreateStaff,
+    update:       handleEditStaff,
+    remove:       handleDeleteStaff,
+} = useCrud({
+    refetch:         fetchStaff,
+    showDeleteError: false,
+    delays:          { create: 2000 },
+    blankForm:       () => ({ name: '', email: '', role: 'technician', museum_id: user.value?.museum_id || '' }),
+    blankEditForm:   () => ({ id: '', name: '', email: '', role: '' }),
+    toEditForm:      (member) => ({ id: member.id, name: member.name, email: member.email, role: member.role }),
+    createFn:        (f) => authService.createStaff(f.name, f.email, f.role, f.museum_id),
+    updateFn:        (f) => authService.updateStaff(f.id, { name: f.name, email: f.email, role: f.role }),
+    removeFn:        (t) => authService.deleteStaff(t.id),
+    messages: {
+        created:     'Invitación enviada. El usuario activará su cuenta en el primer inicio de sesión.',
+        updated:     'Usuario actualizado correctamente.',
+        createError: 'Error al crear personal',
+        updateError: 'Error al actualizar usuario',
+    },
+})
 
 const handleToggleActive = async (member) => {
     try {
         await authService.toggleStaffActive(member.id)
-        await fetchStaff()
-    } catch (err) {
-        console.error(err)
-    }
-}
-
-const openDeleteStaffModal = (member) => {
-    deleteStaffTarget.value = member
-    showDeleteStaffModal.value = true
-}
-
-const handleDeleteStaff = async () => {
-    try {
-        await authService.deleteStaff(deleteStaffTarget.value.id)
-        showDeleteStaffModal.value = false
-        deleteStaffTarget.value = null
         await fetchStaff()
     } catch (err) {
         console.error(err)

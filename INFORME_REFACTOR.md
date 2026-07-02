@@ -16,3 +16,22 @@
 | A4 · Extraer `robotController` | HECHO | `api.js` 611→203 | 13 handlers movidos a `controllers/robotController.js`. DTO robot: los 2 objetos (lista/detalle) no son idénticos, se dejan en el controller; merge con `sseService.formatRobot` NO hecho (opcional, mayor riesgo). |
 
 Verificación de la Fase A: `cd backend && npm test` → 121/121 en verde. `api.js` reducido a enrutado fino (611 → 203 líneas).
+
+## Simplificación STT (huella de IA, T7 auditoría)
+
+| Unidad | Estado | Notas |
+|--------|--------|-------|
+| Backend: parser WAV binario a mano → `node-wav` | HECHO | ~50 líneas de lectura de offsets sustituidas por la librería. `resampleTo16k` se conserva como red de seguridad. |
+| Frontend: `encodeWav` (DataView a mano) → `audiobuffer-to-wav` | HECHO | ~30 líneas menos. Resto del pipeline (OfflineAudioContext) intacto. |
+
+## Fase C · Frontend — partición de god-components (riesgo ALTO, sin tests)
+
+> Verificación por unidad: `cd frontend && npm run build`.
+
+| Unidad | Estado | Líneas antes→después | Notas |
+|--------|--------|----------------------|-------|
+| C1.1 · `ui/ConfirmDeleteModal.vue` | HECHO | — | Unifica los 3 modales de borrado (robot/cuenta/museo) casi idénticos; mensaje por slot. |
+| C1.2 · `composables/useCrud.js` | HECHO | `DashboardView` 1238→1079 | Centraliza el CRUD triplicado (robots/personal/museos). Nombres re-mapeados a los de la plantilla → HTML intacto. |
+| C1.3 · Extraer `RobotsTab`/`StaffTab`/`MuseumsTab` | PENDIENTE | — | Siguiente paso opcional (mayor riesgo: props/eventos). |
+| C2 · Partir `ChatView` | PENDIENTE | — | Otra tanda. |
+| C3 · Partir `MapTab` | PENDIENTE | — | Otra tanda. |

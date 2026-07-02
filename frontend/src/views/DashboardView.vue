@@ -30,6 +30,7 @@ import { Alert } from '@/components/ui/alert'
 import { RefreshCw, Zap, MapPin, Plus, X, Building2, Users, BarChart3, Clock, Settings, Wifi, Search, Pencil, Eye, EyeOff, Trash2, Map, Bot, History, Navigation, Loader2, AlertTriangle, Gamepad2 } from 'lucide-vue-next'
 import ConfirmDeleteModal from '@/components/ui/ConfirmDeleteModal.vue'
 import { useCrud } from '@/composables/useCrud'
+import MuseumsTab        from '@/components/dashboard/MuseumsTab.vue'
 import MapTab             from '@/components/MapTab.vue'
 import ChatHistoryTab     from '@/components/ChatHistoryTab.vue'
 import StatsTab           from '@/components/StatsTab.vue'
@@ -741,40 +742,12 @@ onUnmounted(() => {
         </div>
 
         <!-- PESTAÑA: MUSEOS -->
-        <div v-if="isMuseumAdmin" v-show="activeTab === 'museums'">
-            <div class="flex justify-between items-center mb-6">
-                <h2 class="font-display text-xl font-medium tracking-tight text-foreground">Museos Integrados</h2>
-                <Button @click="openMuseumModal" class="gap-2">
-                    <Plus class="w-4 h-4" /> Añadir Museo
-                </Button>
-            </div>
-
-            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                <div v-if="museums.length === 0"
-                    class="col-span-full p-12 text-center border border-dashed border-border rounded-md text-muted-foreground">
-                    No hay museos registrados actualmente en el sistema.
-                </div>
-                <Card v-for="museum in museums" :key="museum.id" class="p-6">
-                    <div class="flex items-center gap-4 mb-4">
-                        <div class="w-12 h-12 bg-primary/10 rounded-sm flex items-center justify-center text-primary">
-                            <Building2 class="w-6 h-6" />
-                        </div>
-                        <div>
-                            <h3 class="font-display text-lg font-medium tracking-tight text-foreground leading-tight">{{ museum.name }}</h3>
-                            <p class="text-sm text-muted-foreground">{{ museum.company }}</p>
-                        </div>
-                    </div>
-                    <div class="flex gap-2 pt-4 border-t border-border/50">
-                        <Button variant="outline" size="sm" class="flex-1 gap-1.5" @click="openEditMuseumModal(museum)">
-                            <Pencil class="w-3.5 h-3.5" /> Editar
-                        </Button>
-                        <Button variant="ghost" size="sm" class="gap-1.5 text-destructive hover:text-destructive" @click="openDeleteMuseumModal(museum)">
-                            <Trash2 class="w-3.5 h-3.5" /> Eliminar
-                        </Button>
-                    </div>
-                </Card>
-            </div>
-        </div>
+        <MuseumsTab
+            v-if="isMuseumAdmin" v-show="activeTab === 'museums'"
+            :museums="museums"
+            @create="openMuseumModal"
+            @edit="openEditMuseumModal"
+            @delete="openDeleteMuseumModal" />
 
         <!-- PESTAÑA: HISTORIAL -->
         <div v-if="isMuseumAdmin" v-show="activeTab === 'history'">

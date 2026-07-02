@@ -17,11 +17,10 @@ const mapUpload = require('../config/mapUploadConfig');
 const rateLimit = require('express-rate-limit');
 const navService = require('../services/navService');
 const { findNearestZone, BASE_CATEGORY } = require('../utils/geo');
-const { JWT_SECRET } = require('../config/secrets');
 const { museumScope, loadRobotForUser } = require('../utils/access');
 const statsService = require('../services/statsService');
-const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
+const { verifySseToken } = require('../middleware/sseAuth');
 
 // Limitador de tasa específico del chat (más estricto: 15 msgs/min)
 const chatLimiter = rateLimit({
@@ -44,16 +43,8 @@ const audioUpload = require('../config/audioUploadConfig');
 // EventSource no puede enviar cabeceras personalizadas, así que el JWT se pasa como ?token=...
 // Lo validamos aquí en línea en vez de usar authMiddleware (que lee la cabecera).
 router.get('/robots/stream', (req, res) => {
-    const token = req.query.token;
-
-    if (!token) return res.status(401).json({ error: 'Se requiere token' });
-
-    let user;
-    try {
-        user = jwt.verify(token, JWT_SECRET);
-    } catch {
-        return res.status(401).json({ error: 'Token no válido' });
-    }
+    const user = verifySseToken(req, res);
+    if (!user) return;
 
     if (!['technician', 'museum_admin', 'platform_admin'].includes(user.role)) {
         return res.status(403).json({ error: 'Se requiere acceso de personal' });
@@ -63,16 +54,8 @@ router.get('/robots/stream', (req, res) => {
 });
 
 router.get('/robots/position-stream', (req, res) => {
-    const token = req.query.token;
-
-    if (!token) return res.status(401).json({ error: 'Se requiere token' });
-
-    let user;
-    try {
-        user = jwt.verify(token, JWT_SECRET);
-    } catch {
-        return res.status(401).json({ error: 'Token no válido' });
-    }
+    const user = verifySseToken(req, res);
+    if (!user) return;
 
     if (user.role !== 'visitor' || !user.robot_id) {
         return res.status(403).json({ error: 'Se requiere acceso de visitante' });

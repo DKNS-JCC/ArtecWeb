@@ -33,5 +33,7 @@ Verificación de la Fase A: `cd backend && npm test` → 121/121 en verde. `api.
 | C1.1 · `ui/ConfirmDeleteModal.vue` | HECHO | — | Unifica los 3 modales de borrado (robot/cuenta/museo) casi idénticos; mensaje por slot. |
 | C1.2 · `composables/useCrud.js` | HECHO | `DashboardView` 1238→1079 | Centraliza el CRUD triplicado (robots/personal/museos). Nombres re-mapeados a los de la plantilla → HTML intacto. |
 | C1.3 · Extraer `RobotsTab`/`StaffTab`/`MuseumsTab` | HECHO | `DashboardView` 1079→744 | Pestañas presentacionales en `components/dashboard/`. Las listas (robots/museos) siguen en el padre por estar compartidas (MapTab usa robots). StaffTab se lleva sus filtros. ⚠️ Sin tests: requiere prueba manual del CRUD. |
-| C2 · Partir `ChatView` | EN CURSO | — | Empezando por extraer el tutorial/coachmarks a un composable. |
+| C2.1 · Extraer tutorial/coachmarks a `composables/useTutorial.js` | HECHO | `ChatView` 1212→1129 | Toda la mecánica (medición DOM, foco, burbuja, cola, navegación, resize) fuera. ChatView conserva `TUTORIAL_STEPS` y la decisión de primera visita. ⚠️ Sin tests: probar el tutorial a mano (borrar `artec_chat_tutorial_done` de localStorage). |
+| C2.2 · Extraer overlay a `ChatTutorial.vue` | PENDIENTE | — | Pospuesto: reutiliza la transición `modal` vía CSS scoped; mover los estilos `.tour-*` tiene riesgo de regresión visual silenciosa. Hacer tras verificación manual. |
+| C2.3 · `ChatMessages`/`ChatComposer` | PENDIENTE | — | Opcional, otra tanda. |
 | C3 · Partir `MapTab` | PENDIENTE | — | Otra tanda. |

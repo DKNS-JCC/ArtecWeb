@@ -22,6 +22,7 @@ import { Send, LogOut, Bot, Clock, Navigation, Check, X, Loader2, Map as MapIcon
 import VisitorMap from '@/components/VisitorMap.vue';
 import { useTextToSpeech } from '@/composables/useTextToSpeech';
 import { useSpeechToText } from '@/composables/useSpeechToText';
+import { useTutorial } from '@/composables/useTutorial';
 
 const router   = useRouter();
 const authStore = useAuthStore();
@@ -65,93 +66,13 @@ const TUTORIAL_STEPS = [
     },
 ];
 
-const showTutorial = ref(false);
-const tutorialStep = ref(0);
-const targetRect   = ref(null);   // caja delimitadora del elemento del paso actual
-
-/** Pasos visibles: descarta aquellos cuyo elemento objetivo no esté renderizado ahora mismo. */
-const visibleSteps = computed(() =>
-    TUTORIAL_STEPS.filter(s => document.querySelector(`[data-tour="${s.target}"]`))
-);
-
-const currentTutorialStep = computed(() => visibleSteps.value[tutorialStep.value] || null);
-
-const VIEWPORT = () => ({ w: window.innerWidth, h: window.innerHeight });
-
-/** Vuelve a medir el elemento resaltado para que el foco y la burbuja lo sigan. */
-const measureTarget = () => {
-    const step = currentTutorialStep.value;
-    if (!step) { targetRect.value = null; return; }
-    const el = document.querySelector(`[data-tour="${step.target}"]`);
-    if (!el) { targetRect.value = null; return; }
-    const r = el.getBoundingClientRect();
-    targetRect.value = { top: r.top, left: r.left, width: r.width, height: r.height,
-                         bottom: r.bottom, right: r.right, cx: r.left + r.width / 2 };
-};
-
-/** Recorte del foco: un anillo con relleno sobre el elemento con una sombra exterior enorme. */
-const spotlightStyle = computed(() => {
-    const r = targetRect.value;
-    if (!r) return { display: 'none' };
-    const pad = 8;
-    return {
-        top:    `${r.top - pad}px`,
-        left:   `${r.left - pad}px`,
-        width:  `${r.width + pad * 2}px`,
-        height: `${r.height + pad * 2}px`,
-    };
-});
-
-const BUBBLE_W = 280;
-
-/** Caja de la burbuja, ajustada al viewport y desplazada encima/debajo del elemento. */
-const bubbleStyle = computed(() => {
-    const r = targetRect.value;
-    const step = currentTutorialStep.value;
-    if (!r || !step) return { display: 'none' };
-    const { w } = VIEWPORT();
-    const margin = 12;
-    let left = r.cx - BUBBLE_W / 2;
-    left = Math.max(margin, Math.min(left, w - BUBBLE_W - margin));
-    const style = { width: `${BUBBLE_W}px`, left: `${left}px` };
-    if (step.place === 'below') style.top = `${r.bottom + 16}px`;
-    else style.bottom = `${VIEWPORT().h - r.top + 16}px`;
-    return style;
-});
-
-/** Desplazamiento horizontal de la cola de la burbuja para que apunte al centro del elemento. */
-const tailStyle = computed(() => {
-    const r = targetRect.value;
-    if (!r) return { display: 'none' };
-    const { w } = VIEWPORT();
-    const margin = 12;
-    let left = r.cx - BUBBLE_W / 2;
-    left = Math.max(margin, Math.min(left, w - BUBBLE_W - margin));
-    return { left: `${Math.max(16, Math.min(r.cx - left, BUBBLE_W - 16))}px` };
-});
-
-const startTutorial = async () => {
-    tutorialStep.value = 0;
-    showTutorial.value = true;
-    await nextTick();
-    measureTarget();
-};
-
-const nextTutorialStep = async () => {
-    if (tutorialStep.value < visibleSteps.value.length - 1) {
-        tutorialStep.value++;
-        await nextTick();
-        measureTarget();
-    } else {
-        closeTutorial();
-    }
-};
-
-const closeTutorial = () => {
-    showTutorial.value = false;
-    targetRect.value = null;
-    localStorage.setItem(TUTORIAL_KEY, '1');
-};
+// Toda la mecánica del tutorial (medición de DOM, foco, burbuja y navegación de
+// pasos) vive en useTutorial; aquí solo se aportan los pasos y la clave de guardado.
+const {
+    showTutorial, tutorialStep, visibleSteps, currentTutorialStep,
+    spotlightStyle, bubbleStyle, tailStyle,
+    startTutorial, nextTutorialStep, closeTutorial,
+} = useTutorial(TUTORIAL_STEPS, TUTORIAL_KEY);
 
 /** Pista de onboarding puntual para el gesto (poco obvio) de mantener pulsado para hablar. */
 const showMicHint = ref(false);
@@ -634,12 +555,9 @@ const sendSuggestion = (prompt) => {
     sendMessage();
 };
 
-const onViewportChange = () => { if (showTutorial.value) measureTarget(); };
-
 onMounted(() => {
     startTimer();
     scrollToBottom();
-    window.addEventListener('resize', onViewportChange);
     if (!localStorage.getItem(TUTORIAL_KEY)) {
         // Espera al primer render para que todos los controles sean medibles.
         nextTick(() => startTutorial());
@@ -652,7 +570,6 @@ onMounted(() => {
 onUnmounted(() => {
     if (timerInterval) clearInterval(timerInterval);
     if (micHintTimer) clearTimeout(micHintTimer);
-    window.removeEventListener('resize', onViewportChange);
     stopArrivalTracking();
 });
 </script>

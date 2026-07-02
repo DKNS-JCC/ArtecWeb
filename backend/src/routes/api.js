@@ -20,6 +20,8 @@ const { findNearestZone, BASE_CATEGORY } = require('../utils/geo');
 const { JWT_SECRET } = require('../config/secrets');
 const { museumScope, loadRobotForUser } = require('../utils/access');
 const statsService = require('../services/statsService');
+const jwt = require('jsonwebtoken');
+const crypto = require('crypto');
 
 // Limitador de tasa específico del chat (más estricto: 15 msgs/min)
 const chatLimiter = rateLimit({
@@ -42,7 +44,6 @@ const audioUpload = require('../config/audioUploadConfig');
 // EventSource no puede enviar cabeceras personalizadas, así que el JWT se pasa como ?token=...
 // Lo validamos aquí en línea en vez de usar authMiddleware (que lee la cabecera).
 router.get('/robots/stream', (req, res) => {
-    const jwt = require('jsonwebtoken');
     const token = req.query.token;
 
     if (!token) return res.status(401).json({ error: 'Se requiere token' });
@@ -62,7 +63,6 @@ router.get('/robots/stream', (req, res) => {
 });
 
 router.get('/robots/position-stream', (req, res) => {
-    const jwt = require('jsonwebtoken');
     const token = req.query.token;
 
     if (!token) return res.status(401).json({ error: 'Se requiere token' });
@@ -142,9 +142,7 @@ router.post('/chat/stt', sttLimiter, authMiddleware, visitorMiddleware, audioUpl
  * Lanza el goal real de Nav2 vía rosService y persiste la confirmación en el historial de chat.
  */
 router.post('/chat/confirm-nav', chatLimiter, authMiddleware, async (req, res) => {
-    const { visitorMiddleware } = require('../middleware/visitorMiddleware');
     visitorMiddleware(req, res, async () => {
-        const crypto = require('crypto');
         const { place_id } = req.body;
         const { id: visitorId, session_id, robot_id } = req.user;
 
@@ -219,7 +217,6 @@ router.post('/chat/confirm-nav', chatLimiter, authMiddleware, async (req, res) =
  * Actualiza el nivel de conocimiento del visitante actual (la IA lo lee de la BD en cada mensaje).
  */
 router.patch('/visitor/expertise', authMiddleware, (req, res) => {
-    const { visitorMiddleware } = require('../middleware/visitorMiddleware');
     visitorMiddleware(req, res, () => {
         const { id: visitorId } = req.user;
         const { expertise_level } = req.body;
@@ -243,7 +240,6 @@ router.patch('/visitor/expertise', authMiddleware, (req, res) => {
  * Devuelve los metadatos del mapa y las zonas del robot asignado al visitante actual.
  */
 router.get('/visitor/map', authMiddleware, (req, res) => {
-    const { visitorMiddleware } = require('../middleware/visitorMiddleware');
     visitorMiddleware(req, res, () => {
         const { robot_id } = req.user;
         db.get('SELECT map_id FROM robots WHERE id = ?', [robot_id], (err, robot) => {
@@ -310,7 +306,7 @@ router.post('/robots', authMiddleware, superAdminMiddleware, (req, res) => {
     if (!name || !museum_id) {
         return res.status(400).json({ error: 'El nombre y museum_id son obligatorios' });
     }
-    const robotId = require('crypto').randomUUID();
+    const robotId = crypto.randomUUID();
     db.run(
         `INSERT INTO robots (id, name, museum_id) VALUES (?, ?, ?)`,
         [robotId, name, museum_id],

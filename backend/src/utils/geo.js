@@ -23,19 +23,19 @@ function findNearestZone(x, y, zones, opts = {}) {
 
     const { excludeCategory, maxDistance } = opts;
     let best = null;
-    let bestSq = Infinity;
+    let bestDistancia = Infinity;
 
     for (const z of zones) {
         if (z.map_x == null || z.map_y == null) continue;
         if (excludeCategory && z.category === excludeCategory) continue;
         const dx = x - z.map_x;
         const dy = y - z.map_y;
-        const sq = dx * dx + dy * dy;
-        if (sq < bestSq) { bestSq = sq; best = z; }
+        const distanciatotal = dx * dx + dy * dy;
+        if (distanciatotal < bestDistancia) { bestDistancia = distanciatotal; best = z; }
     }
 
     if (!best) return null;
-    const distance = Math.sqrt(bestSq);
+    const distance = Math.sqrt(bestDistancia);
     if (maxDistance != null && distance > maxDistance) return null;
 
     return { id: best.id, name: best.name, category: best.category, distance };

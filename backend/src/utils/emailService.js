@@ -9,6 +9,23 @@ const transporter = nodemailer.createTransport({
 });
 
 /**
+ * Envuelve el contenido específico de cada correo en la plantilla común de Artec:
+ * contenedor con marco, cabecera de marca y pie de "correo automático". Así los
+ * dos correos comparten un único layout y solo aportan su cuerpo.
+ * @param {string} contenido HTML interno propio del mensaje
+ * @returns {string} HTML completo del correo
+ */
+const renderEmailLayout = (contenido) => `
+                <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 8px;">
+                    <h2 style="color: #2563eb; text-align: center;">Artec Robotics</h2>
+                    ${contenido}
+                    <p style="font-size: 12px; color: #94a3b8; text-align: center; margin-top: 40px;">
+                        Este es un correo automático. Por favor, no respondas a este mensaje.
+                    </p>
+                </div>
+            `;
+
+/**
  * Envía un correo de bienvenida con credenciales temporales al personal recién creado.
  * @param {string} toEmail Dirección de correo del destinatario
  * @param {string} name Nombre del usuario
@@ -24,9 +41,7 @@ const sendWelcomeEmail = async (toEmail, name, tempPassword, role, museumName) =
             from: `"Artec Robotics" <${process.env.GMAIL_USER}>`,
             to: toEmail,
             subject: 'Bienvenido a Artec Robotics - Credenciales de Acceso',
-            html: `
-                <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 8px;">
-                    <h2 style="color: #2563eb; text-align: center;">Artec Robotics</h2>
+            html: renderEmailLayout(`
                     <p>Hola <strong>${name}</strong>,</p>
                     <p>Se ha creado una cuenta para ti en la plataforma de gestión de sistemas robóticos de Artec.</p>
 
@@ -43,12 +58,7 @@ const sendWelcomeEmail = async (toEmail, name, tempPassword, role, museumName) =
                     <div style="text-align: center; margin: 30px 0;">
                         <a href="${loginUrl}" style="background-color: #2563eb; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold;">Acceder a la plataforma</a>
                     </div>
-
-                    <p style="font-size: 12px; color: #64748b; text-align: center; margin-top: 40px;">
-                        Este es un correo automático. Por favor, no respondas a este mensaje.
-                    </p>
-                </div>
-            `
+            `)
         });
 
         return true;
@@ -73,9 +83,7 @@ const sendPasswordResetEmail = async (toEmail, name, rawToken) => {
             from:    `"Artec Robotics" <${process.env.GMAIL_USER}>`,
             to:      toEmail,
             subject: 'Recuperación de contraseña - Artec Robotics',
-            html: `
-                <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 8px;">
-                    <h2 style="color: #2563eb; text-align: center;">Artec Robotics</h2>
+            html: renderEmailLayout(`
                     <p>Hola <strong>${name}</strong>,</p>
                     <p>Recibimos una solicitud para restablecer la contraseña de tu cuenta.</p>
                     <p>Haz clic en el botón de abajo para crear una nueva contraseña. Este enlace es válido durante <strong>1 hora</strong>.</p>
@@ -92,11 +100,7 @@ const sendPasswordResetEmail = async (toEmail, name, rawToken) => {
                         Si no solicitaste este cambio, puedes ignorar este correo.
                         Tu contraseña actual seguirá siendo válida.
                     </p>
-                    <p style="font-size: 12px; color: #94a3b8; text-align: center; margin-top: 40px;">
-                        Este es un correo automático. Por favor, no respondas a este mensaje.
-                    </p>
-                </div>
-            `
+            `)
         });
         return true;
     } catch (error) {

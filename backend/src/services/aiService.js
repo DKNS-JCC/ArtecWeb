@@ -134,7 +134,10 @@ function buildSystemPrompt(context) {
         : null;
 
     const locationSection = currentLocation
-        ? `\nROBOT CURRENT LOCATION:\nYou are currently next to "${currentLocation}". If the visitor asks where you are or what's nearby, use this information naturally.\n`
+        ? `\nROBOT CURRENT LOCATION (LIVE):
+You are physically at "${currentLocation}" right now; that is the visitor's current surroundings.
+- If the visitor asks what they are seeing, what is here, what is in front of them, where they are, or says "explain this" WITHOUT naming a place, they mean "${currentLocation}". Explain THAT place using its entry in the AVAILABLE PLACES list.
+- Earlier messages may discuss other places the visitor has since walked away from. NEVER assume an unqualified question ("what am I looking at?", "tell me about this") is about a previously mentioned place: it is about "${currentLocation}" unless the visitor names a different one.\n`
         : '';
 
     return `You are ${robotName}, a museum guide robot at "${museumName}".

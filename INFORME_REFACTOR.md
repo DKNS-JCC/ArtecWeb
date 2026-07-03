@@ -37,4 +37,12 @@ Verificación de la Fase A: `cd backend && npm test` → 121/121 en verde. `api.
 | C2.2 · Extraer overlay a `ChatTutorial.vue` | HECHO | — | Overlay + estilos `.tour-*`/`.step-*` fuera, con transición `fade` propia (equivale a la `modal` que reutilizaba). La transición `modal` del modal de navegación queda intacta en ChatView. |
 | C2.3 · Extraer `ChatComposer.vue` (pie de entrada) | HECHO | `ChatView` 1068→989 | v-model para messageText/showMap, `stt` por prop, eventos send/mic-down/mic-up. Mueve estilos glass-footer/scrollbar-hide/banner. ⚠️ Probar a mano: escribir+enviar, y micro mantener-pulsado. |
 | C2.4 · Extraer `ChatMessages.vue` (lista) | PENDIENTE | — | Opcional; requiere exponer `scrollToBottom` (el padre controla el scroll del contenedor). |
-| C3 · Partir `MapTab` | PENDIENTE | — | Otra tanda. |
+| C3.1 · Extraer `map/MapCanvasEditor.vue` (lienzo) | HECHO | `MapTab` 1258→780 | Componente controlado: posee solo el estado de vista (escala/pan/imagen); datos e interacción (`isPlacingMode`/`placingBase`/`hoveredZone`/`pendingZone`) llegan por props/v-model. La carga de imagen se dispara en `onMounted`+watch de `mapData` (antes lo hacía `fetchMapAndZones`). ⚠️ Sin tests: probar a mano pan/zoom, colocar zona, editar y fijar base. |
+| C3.2 · Extraer `map/MapZonesSidebar.vue` (barra lateral) | HECHO | — | Presentacional: lista de zonas + punto base + asignación de robots. Todo por props y eventos (`hover`/`edit-zone`/`start-placing-base`/`delete-base`/`assign`/`unassign`). |
+
+## Fase D · Opcionales de pulido
+
+| Unidad | Estado | Notas |
+|--------|--------|-------|
+| D1 · Unificar configs de multer | HECHO | Nueva fábrica `config/uploadFactory.js` (`almacenamientoEnDisco` + `filtroPorTipo`); `uploadConfig`/`mapUploadConfig`/`audioUploadConfig` reescritas sobre ella conservando subcarpeta, nombre, formatos y límites exactos. `npm test` verde. |
+| D2 · Plantilla base de email | HECHO | `renderEmailLayout(contenido)` en `utils/emailService.js` envuelve ambos correos (contenedor+cabecera+pie). Se unificó el color del pie (`#94a3b8`); el resto del HTML es idéntico. |

@@ -24,6 +24,13 @@ Verificación de la Fase A: `cd backend && npm test` → 121/121 en verde. `api.
 | Backend: parser WAV binario a mano → `node-wav` | HECHO | ~50 líneas de lectura de offsets sustituidas por la librería. `resampleTo16k` se conserva como red de seguridad. |
 | Frontend: `encodeWav` (DataView a mano) → `audiobuffer-to-wav` | HECHO | ~30 líneas menos. Resto del pipeline (OfflineAudioContext) intacto. |
 
+## Fase B · Frontend — utilidades compartidas (riesgo bajo)
+
+| Unidad | Estado | Notas |
+|--------|--------|-------|
+| B1 · Centralizar claves de `localStorage` | HECHO | Nuevo `constants/storageKeys.js` con las 6 claves (`token`/`user`/`language`/`chat_messages`/`chat_tutorial_done`/`chat_autospeak`; esta última no la listaba el plan). Todos los literales `'artec_*'` sustituidos en auth store, `api.js`, `mapService.js`, `useTextToSpeech.js`, `VisitorMap.vue`, `ChatView.vue`, `DashboardView.vue`, `RobotControlView.vue`. `grep` de control: solo quedan en el propio `storageKeys.js`. |
+| B2 · Unificar manejo de 401 en `services/api.js` | HECHO | Extraída `handleUnauthorized(res, token)`; la usan `request()` y `uploadFormData()`. Comportamiento idéntico (limpia sesión + redirige a `/login`). Landed junto a B1 por tocar el mismo archivo. |
+
 ## Fase C · Frontend — partición de god-components (riesgo ALTO, sin tests)
 
 > Verificación por unidad: `cd frontend && npm run build`.

@@ -20,10 +20,10 @@ export function useTutorial(steps, storageKey) {
     const tutorialStep = ref(0)
     const targetRect   = ref(null)   // caja delimitadora del elemento del paso actual
 
-    /** Pasos visibles: descarta aquellos cuyo elemento objetivo no esté renderizado ahora mismo. */
-    const visibleSteps = computed(() =>
-        steps.filter(s => document.querySelector(`[data-tour="${s.target}"]`))
-    )
+    // Pasos visibles: los que tienen su elemento en el DOM. Se calcula al arrancar el
+    // tutorial (no con un computed), porque `querySelector` no es reactivo y evaluarlo
+    // en el primer render —antes de montar el DOM— cachearía una lista vacía para siempre.
+    const visibleSteps = ref([])
 
     const currentTutorialStep = computed(() => visibleSteps.value[tutorialStep.value] || null)
 
@@ -82,6 +82,8 @@ export function useTutorial(steps, storageKey) {
     })
 
     const startTutorial = async () => {
+        // Recalcula qué pasos tienen su elemento renderizado justo al arrancar (DOM ya montado).
+        visibleSteps.value = steps.filter(s => document.querySelector(`[data-tour="${s.target}"]`))
         tutorialStep.value = 0
         showTutorial.value = true
         await nextTick()

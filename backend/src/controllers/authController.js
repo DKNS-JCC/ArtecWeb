@@ -35,7 +35,11 @@ exports.createVisitor = async (req, res) => {
         const preRobot = await dbGet('SELECT id, ip FROM robots WHERE id = ?', [robotId]);
         if (!preRobot) return res.status(404).json({ error: 'Robot no válido o no encontrado' });
 
-        let online = rosService.getConnectionState(preRobot.id);
+        // Bypass solo para desarrollo/demo: con ALLOW_OFFLINE_VISITOR=1 se omite la
+        // exigencia de robot conectado a ROS, para probar el chat sin un robot físico.
+        const allowOffline = process.env.ALLOW_OFFLINE_VISITOR === '1';
+
+        let online = rosService.getConnectionState(preRobot.id) || allowOffline;
         if (!online && preRobot.ip) {
             rosService.connect(preRobot.id, preRobot.ip);
             online = await rosService.waitForConnection(preRobot.id);

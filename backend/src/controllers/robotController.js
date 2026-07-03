@@ -21,7 +21,11 @@ exports.availability = (req, res) => {
 
         const occupied = !!(robot.locked_until && new Date(robot.locked_until) > new Date());
 
-        let online = rosService.getConnectionState(robot.id);
+        // Bypass solo para desarrollo/demo: con ALLOW_OFFLINE_VISITOR=1 se da el robot por
+        // disponible sin ROS, para poder probar el chat sin un robot físico conectado.
+        const allowOffline = process.env.ALLOW_OFFLINE_VISITOR === '1';
+
+        let online = rosService.getConnectionState(robot.id) || allowOffline;
         if (!online && robot.ip) {
             await rosService.connect(robot.id, robot.ip);
             online = await rosService.waitForConnection(robot.id);

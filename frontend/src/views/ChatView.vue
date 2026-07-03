@@ -20,6 +20,7 @@ import { useAuthStore } from '@/stores/auth';
 import { chatService } from '@/services/chatService';
 import { Send, LogOut, Bot, Clock, Navigation, Check, X, Loader2, Map as MapIcon, MapPin, Settings, ChevronRight, Mic, Volume2, VolumeX, AlertTriangle, RotateCw } from 'lucide-vue-next';
 import VisitorMap from '@/components/VisitorMap.vue';
+import ChatTutorial from '@/components/ChatTutorial.vue';
 import { useTextToSpeech } from '@/composables/useTextToSpeech';
 import { useSpeechToText } from '@/composables/useSpeechToText';
 import { useTutorial } from '@/composables/useTutorial';
@@ -992,62 +993,17 @@ onUnmounted(() => {
         </Transition>
         <!-- ── FIN MODAL DE NIVEL DE CONOCIMIENTO ──────────────────────────────────── -->
 
-        <!-- ── TUTORIAL DE LA PRIMERA VEZ (COACHMARKS) ──────────────────────────── -->
-        <Transition name="modal">
-            <div v-if="showTutorial && currentTutorialStep" class="fixed inset-0 z-[400]">
-
-                <!-- Capa de oscurecimiento + recorte de foco sobre el control resaltado.
-                     Hacer clic en cualquier parte de la capa avanza al siguiente paso. -->
-                <div class="absolute inset-0" @click="nextTutorialStep" />
-                <div class="tour-spotlight absolute rounded-2xl pointer-events-none" :style="spotlightStyle" />
-
-                <!-- Burbuja de diálogo anclada junto al elemento -->
-                <Transition name="step" mode="out-in">
-                    <div :key="tutorialStep" class="tour-bubble absolute bg-card rounded-2xl shadow-2xl px-4 pt-3.5 pb-3"
-                        :style="bubbleStyle">
-
-                        <!-- Cola: un cuadrado rotado apoyado en el borde que mira al elemento -->
-                        <div class="tour-tail absolute w-3.5 h-3.5 bg-card rotate-45"
-                            :class="currentTutorialStep.place === 'below' ? '-top-1.5' : '-bottom-1.5'"
-                            :style="tailStyle" />
-
-                        <!-- Contador de pasos -->
-                        <div class="flex items-center justify-between mb-1.5">
-                            <span class="text-[0.65rem] font-semibold uppercase tracking-wider text-primary">
-                                Paso {{ tutorialStep + 1 }} de {{ visibleSteps.length }}
-                            </span>
-                            <button @click="closeTutorial"
-                                class="text-muted-foreground hover:text-foreground active:scale-90 transition-all">
-                                <X class="w-4 h-4" />
-                            </button>
-                        </div>
-
-                        <!-- Text -->
-                        <h3 class="font-semibold text-[0.95rem] text-foreground mb-1 leading-tight">
-                            {{ currentTutorialStep.title }}
-                        </h3>
-                        <p class="text-[0.8rem] text-muted-foreground leading-snug mb-3">
-                            {{ currentTutorialStep.desc }}
-                        </p>
-
-                        <!-- Actions -->
-                        <div class="flex items-center justify-between gap-3">
-                            <button @click="closeTutorial"
-                                class="text-xs font-medium text-muted-foreground active:scale-95 transition-all">
-                                Saltar
-                            </button>
-                            <button @click="nextTutorialStep"
-                                class="flex items-center gap-1 bg-primary text-primary-foreground text-xs font-semibold rounded-full px-4 py-2 active:scale-95 transition-all">
-                                {{ tutorialStep === visibleSteps.length - 1 ? 'Entendido' : 'Siguiente' }}
-                                <ChevronRight v-if="tutorialStep < visibleSteps.length - 1" class="w-3.5 h-3.5" />
-                                <Check v-else class="w-3.5 h-3.5" />
-                            </button>
-                        </div>
-                    </div>
-                </Transition>
-            </div>
-        </Transition>
-        <!-- ── FIN TUTORIAL DE LA PRIMERA VEZ ────────────────────────────────────── -->
+        <!-- Tutorial de la primera vez (coachmarks). La lógica está en useTutorial. -->
+        <ChatTutorial
+            :show="showTutorial"
+            :step="tutorialStep"
+            :step-count="visibleSteps.length"
+            :current="currentTutorialStep"
+            :spotlight-style="spotlightStyle"
+            :bubble-style="bubbleStyle"
+            :tail-style="tailStyle"
+            @next="nextTutorialStep"
+            @close="closeTutorial" />
     </div>
 </template>
 
@@ -1109,21 +1065,4 @@ onUnmounted(() => {
     opacity: 0;
     transform: scale(0.95) translateY(10px);
 }
-
-/* Foco del tutorial: oscurece todo excepto un anillo alrededor del objetivo */
-.tour-spotlight {
-    box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.6), 0 0 0 2px var(--color-primary);
-    transition: top 0.3s cubic-bezier(0.16, 1, 0.3, 1),
-                left 0.3s cubic-bezier(0.16, 1, 0.3, 1),
-                width 0.3s cubic-bezier(0.16, 1, 0.3, 1),
-                height 0.3s cubic-bezier(0.16, 1, 0.3, 1);
-}
-
-.tour-bubble { max-width: calc(100vw - 24px); }
-.tour-tail { box-shadow: -2px -2px 4px rgba(0, 0, 0, 0.04); }
-
-/* Transición del paso del tutorial (contenido de la burbuja) */
-.step-enter-active { transition: opacity 0.2s ease; }
-.step-leave-active { transition: opacity 0.12s ease; }
-.step-enter-from, .step-leave-to { opacity: 0; }
 </style>

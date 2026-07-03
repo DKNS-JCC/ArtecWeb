@@ -295,8 +295,9 @@ exports.createStaff = async (req, res) => {
 
     const assignedMuseumId = reqUserRole === 'museum_admin' ? req.user.museum_id : museum_id;
 
-    // Genera una contraseña temporal segura (alfanumérica con símbolos)
-    const tempPassword = crypto.randomBytes(4).toString('hex') + 'Aa1!';
+    // Contraseña temporal aleatoria: 16 caracteres hexadecimales (8 bytes de entropía).
+    // El usuario está obligado a cambiarla en el primer inicio de sesión (must_change_password).
+    const tempPassword = crypto.randomBytes(8).toString('hex');
 
     try {
         const passwordHash = await bcrypt.hash(tempPassword, SALT_ROUNDS);

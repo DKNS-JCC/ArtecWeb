@@ -34,6 +34,7 @@ Verificación de la Fase A: `cd backend && npm test` → 121/121 en verde. `api.
 | C1.2 · `composables/useCrud.js` | HECHO | `DashboardView` 1238→1079 | Centraliza el CRUD triplicado (robots/personal/museos). Nombres re-mapeados a los de la plantilla → HTML intacto. |
 | C1.3 · Extraer `RobotsTab`/`StaffTab`/`MuseumsTab` | HECHO | `DashboardView` 1079→744 | Pestañas presentacionales en `components/dashboard/`. Las listas (robots/museos) siguen en el padre por estar compartidas (MapTab usa robots). StaffTab se lleva sus filtros. ⚠️ Sin tests: requiere prueba manual del CRUD. |
 | C2.1 · Extraer tutorial/coachmarks a `composables/useTutorial.js` | HECHO | `ChatView` 1212→1129 | Toda la mecánica (medición DOM, foco, burbuja, cola, navegación, resize) fuera. ChatView conserva `TUTORIAL_STEPS` y la decisión de primera visita. ⚠️ Sin tests: probar el tutorial a mano (borrar `artec_chat_tutorial_done` de localStorage). |
-| C2.2 · Extraer overlay a `ChatTutorial.vue` | PENDIENTE | — | Pospuesto: reutiliza la transición `modal` vía CSS scoped; mover los estilos `.tour-*` tiene riesgo de regresión visual silenciosa. Hacer tras verificación manual. |
-| C2.3 · `ChatMessages`/`ChatComposer` | PENDIENTE | — | Opcional, otra tanda. |
+| C2.2 · Extraer overlay a `ChatTutorial.vue` | HECHO | — | Overlay + estilos `.tour-*`/`.step-*` fuera, con transición `fade` propia (equivale a la `modal` que reutilizaba). La transición `modal` del modal de navegación queda intacta en ChatView. |
+| C2.3 · Extraer `ChatComposer.vue` (pie de entrada) | HECHO | `ChatView` 1068→989 | v-model para messageText/showMap, `stt` por prop, eventos send/mic-down/mic-up. Mueve estilos glass-footer/scrollbar-hide/banner. ⚠️ Probar a mano: escribir+enviar, y micro mantener-pulsado. |
+| C2.4 · Extraer `ChatMessages.vue` (lista) | PENDIENTE | — | Opcional; requiere exponer `scrollToBottom` (el padre controla el scroll del contenedor). |
 | C3 · Partir `MapTab` | PENDIENTE | — | Otra tanda. |

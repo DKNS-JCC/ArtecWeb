@@ -148,35 +148,23 @@ function draw() {
         ctx.fillText(label, x, by + bh / 2)
     }
 
-    // Posición del robot - flecha de navegación (distinta de los círculos de zona)
+    // Posición del robot: marcador sin orientación. La pose angular no se obtiene
+    // del robot (limitación conocida), así que una flecha fingiría una dirección.
+    // Un cuadrado redondeado lo distingue con claridad de los círculos de zona.
     if (robotPos.value && mapData.value) {
         const { x, y } = worldToPixel(robotPos.value.x, robotPos.value.y)
-        // Negate theta: image Y is flipped relative to ROS frame
-        const angle = -robotPos.value.theta
-        const s     = 14 / scale.value   // arrow half-size
+        const half   = 11 / scale.value   // medio lado del marcador
+        const radius = 4 / scale.value    // redondeo de las esquinas
 
         ctx.save()
-        ctx.translate(x, y)
-        ctx.rotate(angle)
 
-        // Shadow/glow
-        ctx.shadowColor   = ROBOT_COLOR + '99'
-        ctx.shadowBlur    = 8 / scale.value
+        // Halo suave para que destaque sobre el mapa
+        ctx.shadowColor = ROBOT_COLOR + '99'
+        ctx.shadowBlur  = 8 / scale.value
 
-        // Teardrop navigation arrow pointing up (rotated to match angle)
-        // tip at (0, -s*1.4), base at ±(s*0.7, s*0.5), notch at (0, s*0.1)
-        const tip   =  s * 1.4
-        const bx    =  s * 0.7
-        const by    =  s * 0.5
-        const notch =  s * 0.15
-
+        // Ficha cuadrada del robot
         ctx.beginPath()
-        ctx.moveTo(0, -tip)             // tip (front)
-        ctx.lineTo( bx,  by)            // bottom-right
-        ctx.lineTo( 0,   notch)         // centre notch
-        ctx.lineTo(-bx,  by)            // bottom-left
-        ctx.closePath()
-
+        ctx.roundRect(x - half, y - half, half * 2, half * 2, radius)
         ctx.fillStyle = ROBOT_COLOR
         ctx.fill()
 
@@ -185,6 +173,12 @@ function draw() {
         ctx.lineWidth   = 2 / scale.value
         ctx.lineJoin    = 'round'
         ctx.stroke()
+
+        // Punto blanco central: refuerza que es una posición en vivo
+        ctx.beginPath()
+        ctx.arc(x, y, 2.5 / scale.value, 0, Math.PI * 2)
+        ctx.fillStyle = '#fff'
+        ctx.fill()
 
         ctx.restore()
     }

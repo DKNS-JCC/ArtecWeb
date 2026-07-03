@@ -16,6 +16,7 @@
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { robotService } from '@/services/robotService'
+import { STORAGE_KEYS } from '@/constants/storageKeys'
 import RobotControlPanel from '@/components/RobotControlPanel.vue'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
@@ -37,7 +38,7 @@ let robotEventSource = null
 const startRobotStream = () => {
     if (robotEventSource) robotEventSource.close()
 
-    const token = localStorage.getItem('artec_token')
+    const token = localStorage.getItem(STORAGE_KEYS.TOKEN)
     if (!token) return
 
     const API_BASE = import.meta.env.VITE_API_URL || '/api'

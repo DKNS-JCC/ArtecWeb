@@ -5,6 +5,7 @@
  * @module services/mapService
  */
 import { api } from './api'
+import { STORAGE_KEYS } from '@/constants/storageKeys'
 
 const API_BASE = import.meta.env.VITE_API_URL || '/api'
 
@@ -32,7 +33,7 @@ export const mapService = /** @lends module:services/mapService.mapService */ {
      * @throws {Error} Si la respuesta no es `ok`.
      */
     async uploadMap(museumId, formData) {
-        const token = localStorage.getItem('artec_token')
+        const token = localStorage.getItem(STORAGE_KEYS.TOKEN)
         const headers = {}
         if (token) headers['Authorization'] = `Bearer ${token}`
 

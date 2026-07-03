@@ -25,6 +25,7 @@ import ChatComposer from '@/components/ChatComposer.vue';
 import { useTextToSpeech } from '@/composables/useTextToSpeech';
 import { useSpeechToText } from '@/composables/useSpeechToText';
 import { useTutorial } from '@/composables/useTutorial';
+import { STORAGE_KEYS } from '@/constants/storageKeys';
 
 const router   = useRouter();
 const authStore = useAuthStore();
@@ -37,7 +38,7 @@ const stt = useSpeechToText();
 // Ilumina cada control real y ancla junto a él una pequeña burbuja de diálogo, con
 // una cola que apunta al elemento. Las posiciones se miden en vivo desde el DOM para que
 // la burbuja siga al botón real independientemente del tamaño de pantalla.
-const TUTORIAL_KEY = 'artec_chat_tutorial_done';
+const TUTORIAL_KEY = STORAGE_KEYS.CHAT_TUTORIAL_DONE;
 
 /**
  * Cada paso apunta a un elemento real mediante su atributo `data-tour`. `place`
@@ -101,7 +102,7 @@ const handleMicUp = async () => {
     }
 };
 
-const STORAGE_KEY          = 'artec_chat_messages';
+const STORAGE_KEY          = STORAGE_KEYS.CHAT_MESSAGES;
 const MAX_MESSAGE_LENGTH   = 500;
 const EXCLUSIVITY_TIME_SEC = 600;
 
@@ -176,7 +177,7 @@ const updateExpertise = async (level) => {
         await chatService.updateExpertise(level);
         if (authStore.user) {
             authStore.user.expertise_level = level;
-            localStorage.setItem('artec_user', JSON.stringify(authStore.user));
+            localStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(authStore.user));
         }
     } catch { /* ignore - level update is best-effort */ }
     finally {
@@ -327,7 +328,7 @@ const trackArrival = (target) => {
     if (!target || target.map_x == null || target.map_y == null) return;
     arrivalTarget.value = target;
 
-    const token = localStorage.getItem('artec_token');
+    const token = localStorage.getItem(STORAGE_KEYS.TOKEN);
     if (!token) return;
     const API_BASE = import.meta.env.VITE_API_URL || '/api';
     const url      = `${API_BASE}/robots/position-stream?token=${encodeURIComponent(token)}`;

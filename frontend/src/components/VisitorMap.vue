@@ -17,6 +17,7 @@
  */
 import { ref, onMounted, onUnmounted, nextTick } from 'vue'
 import { chatService } from '@/services/chatService'
+import { STORAGE_KEYS } from '@/constants/storageKeys'
 import { Navigation, Loader2, X } from 'lucide-vue-next'
 import { categoryColor, categoryLabel } from '@/lib/mapCategories'
 
@@ -309,7 +310,7 @@ let positionSource = null
 function startPositionStream() {
     if (positionSource) positionSource.close()
 
-    const token = localStorage.getItem('artec_token')
+    const token = localStorage.getItem(STORAGE_KEYS.TOKEN)
     if (!token) return
 
     const API_BASE = import.meta.env.VITE_API_URL || '/api'

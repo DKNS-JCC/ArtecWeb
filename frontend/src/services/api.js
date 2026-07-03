@@ -4,11 +4,31 @@
  * errores (un 401 cierra la sesión y redirige al login).
  * @module services/api
  */
+import { STORAGE_KEYS } from '@/constants/storageKeys'
+
 // Por defecto usa una ruta relativa del MISMO ORIGEN ('/api'), que Vite redirige
 // (proxy) al backend. Así la app funciona en cualquier red sin configurar ninguna IP:
 // el host desde el que el móvil cargó la página es el host al que van las llamadas a la API.
 // Define VITE_API_URL solo para sobreescribirlo (p. ej. apuntar a un backend remoto).
 const API_BASE = import.meta.env.VITE_API_URL || '/api'
+
+/**
+ * Ante un `401` con sesión activa, cierra la sesión (limpia `localStorage`) y
+ * redirige al login. Compartido por {@link request} y `uploadFormData`.
+ * @private
+ * @param {Response} res  Respuesta de `fetch`.
+ * @param {string|null} token  Token con el que se hizo la petición.
+ * @returns {boolean} `true` si se manejó un 401 (el llamador debe abortar).
+ */
+function handleUnauthorized(res, token) {
+    if (res.status === 401 && token) {
+        localStorage.removeItem(STORAGE_KEYS.TOKEN)
+        localStorage.removeItem(STORAGE_KEYS.USER)
+        window.location.href = '/login'
+        return true
+    }
+    return false
+}
 
 /**
  * Realiza una petición HTTP contra la API e implementa la lógica transversal:
@@ -22,7 +42,7 @@ const API_BASE = import.meta.env.VITE_API_URL || '/api'
  * @throws {Error} Si la respuesta no es `ok`; el error lleva `status` con el código HTTP.
  */
 async function request(endpoint, options = {}) {
-    const token = localStorage.getItem('artec_token')
+    const token = localStorage.getItem(STORAGE_KEYS.TOKEN)
 
     const headers = {
         'Content-Type': 'application/json',
@@ -38,10 +58,7 @@ async function request(endpoint, options = {}) {
         headers,
     })
 
-    if (res.status === 401 && token) {
-        localStorage.removeItem('artec_token')
-        localStorage.removeItem('artec_user')
-        window.location.href = '/login'
+    if (handleUnauthorized(res, token)) {
         throw new Error('Sesión expirada')
     }
 
@@ -119,7 +136,7 @@ export const api = /** @lends module:services/api.api */ {
      * @throws {Error} Si la respuesta no es `ok` (un `401` cierra sesión).
      */
     uploadFormData: async (endpoint, formData) => {
-        const token = localStorage.getItem('artec_token')
+        const token = localStorage.getItem(STORAGE_KEYS.TOKEN)
         const headers = {}
         if (token) headers['Authorization'] = `Bearer ${token}`
 
@@ -129,10 +146,7 @@ export const api = /** @lends module:services/api.api */ {
             headers
         })
 
-        if (res.status === 401 && token) {
-            localStorage.removeItem('artec_token')
-            localStorage.removeItem('artec_user')
-            window.location.href = '/login'
+        if (handleUnauthorized(res, token)) {
             throw new Error('Sesión expirada')
         }
 

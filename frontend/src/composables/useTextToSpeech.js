@@ -3,8 +3,9 @@
  * @module composables/useTextToSpeech
  */
 import { ref, shallowRef, onMounted, onBeforeUnmount } from 'vue'
+import { STORAGE_KEYS } from '@/constants/storageKeys'
 
-const AUTO_SPEAK_KEY = 'artec_chat_autospeak'
+const AUTO_SPEAK_KEY = STORAGE_KEYS.CHAT_AUTOSPEAK
 
 /**
  * Composable *Text-to-Speech* - 100% local y gratuito.

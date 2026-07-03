@@ -30,6 +30,7 @@ import { Alert } from '@/components/ui/alert'
 import { RefreshCw, Plus, X, Building2, Users, BarChart3, Settings, Pencil, Map, Bot, History, AlertTriangle } from 'lucide-vue-next'
 import ConfirmDeleteModal from '@/components/ui/ConfirmDeleteModal.vue'
 import { useCrud } from '@/composables/useCrud'
+import { STORAGE_KEYS } from '@/constants/storageKeys'
 import RobotsTab         from '@/components/dashboard/RobotsTab.vue'
 import MuseumsTab        from '@/components/dashboard/MuseumsTab.vue'
 import StaffTab          from '@/components/dashboard/StaffTab.vue'
@@ -76,7 +77,7 @@ const applyRobotUpdate = (updated) => {
 const startRobotStream = () => {
     if (robotEventSource) robotEventSource.close()
 
-    const token = localStorage.getItem('artec_token')
+    const token = localStorage.getItem(STORAGE_KEYS.TOKEN)
     if (!token) return
 
     const API_BASE = import.meta.env.VITE_API_URL || '/api'

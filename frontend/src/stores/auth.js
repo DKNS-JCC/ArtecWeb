@@ -28,6 +28,7 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { authService } from '@/services/authService'
+import { STORAGE_KEYS } from '@/constants/storageKeys'
 
 /**
  * Decodifica el *payload* de un JWT sin verificar la firma.
@@ -70,9 +71,9 @@ export const useAuthStore = defineStore('auth', () => {
 
     /** Rehidrata la sesión (token, usuario e idioma) desde `localStorage`. */
     function initFromStorage() {
-        const savedToken = localStorage.getItem('artec_token')
-        const savedUser = localStorage.getItem('artec_user')
-        const savedLanguage = localStorage.getItem('artec_language')
+        const savedToken = localStorage.getItem(STORAGE_KEYS.TOKEN)
+        const savedUser = localStorage.getItem(STORAGE_KEYS.USER)
+        const savedLanguage = localStorage.getItem(STORAGE_KEYS.LANGUAGE)
         if (savedToken) {
             token.value = savedToken
             user.value = savedUser ? JSON.parse(savedUser) : decodeToken(savedToken)
@@ -91,8 +92,8 @@ export const useAuthStore = defineStore('auth', () => {
     function persist(newToken, newUser) {
         token.value = newToken
         user.value = newUser
-        localStorage.setItem('artec_token', newToken)
-        localStorage.setItem('artec_user', JSON.stringify(newUser))
+        localStorage.setItem(STORAGE_KEYS.TOKEN, newToken)
+        localStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(newUser))
     }
 
     /**
@@ -162,7 +163,7 @@ export const useAuthStore = defineStore('auth', () => {
     async function changePassword(currentPassword, newPassword) {
         const data = await authService.changePassword(currentPassword, newPassword)
         token.value = data.token
-        localStorage.setItem('artec_token', data.token)
+        localStorage.setItem(STORAGE_KEYS.TOKEN, data.token)
         return data
     }
 
@@ -173,7 +174,7 @@ export const useAuthStore = defineStore('auth', () => {
     function updateUserAvatar(avatarUrl) {
         if (user.value) {
             user.value.avatar = avatarUrl
-            localStorage.setItem('artec_user', JSON.stringify(user.value))
+            localStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(user.value))
         }
     }
 
@@ -181,8 +182,8 @@ export const useAuthStore = defineStore('auth', () => {
     function logout() {
         token.value = null
         user.value = null
-        localStorage.removeItem('artec_token')
-        localStorage.removeItem('artec_user')
+        localStorage.removeItem(STORAGE_KEYS.TOKEN)
+        localStorage.removeItem(STORAGE_KEYS.USER)
     }
 
     /**
@@ -191,7 +192,7 @@ export const useAuthStore = defineStore('auth', () => {
      */
     function setLanguage(lang) {
         language.value = lang
-        localStorage.setItem('artec_language', lang)
+        localStorage.setItem(STORAGE_KEYS.LANGUAGE, lang)
     }
 
     return {

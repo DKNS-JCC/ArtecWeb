@@ -93,7 +93,7 @@ const handleChange = async () => {
                 <div>
                     <Label for="new-password">Nueva contraseña</Label>
                     <Input id="new-password" type="password" v-model="newPassword"
-                        placeholder="Mínimo 6 caracteres" required autocomplete="new-password" />
+                        placeholder="Mínimo 8 caracteres" required autocomplete="new-password" />
                 </div>
 
                 <div>

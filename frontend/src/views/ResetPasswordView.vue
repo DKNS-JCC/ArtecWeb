@@ -97,7 +97,7 @@ const handleSubmit = async () => {
                 <div>
                     <Label for="newpwd">Nueva contraseña</Label>
                     <Input id="newpwd" type="password" v-model="newPassword"
-                        placeholder="Mínimo 6 caracteres" autocomplete="new-password" autofocus />
+                        placeholder="Mínimo 8 caracteres" autocomplete="new-password" autofocus />
                 </div>
 
                 <div>

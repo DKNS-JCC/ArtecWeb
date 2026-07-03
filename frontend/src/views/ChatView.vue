@@ -138,14 +138,14 @@ function loadMessages() {
             const parsed = JSON.parse(saved);
             if (Array.isArray(parsed) && parsed.length > 0) return parsed;
         }
-    } catch { /* ignore */ }
+    } catch { /* se ignora */ }
     return [welcomeMessage];
 }
 
 function saveMessages() {
     try {
         sessionStorage.setItem(STORAGE_KEY, JSON.stringify(messages.value.filter(m => !m.isTyping)));
-    } catch { /* ignore */ }
+    } catch { /* se ignora */ }
 }
 
 const messages  = ref(loadMessages());
@@ -179,7 +179,7 @@ const updateExpertise = async (level) => {
             authStore.user.expertise_level = level;
             localStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(authStore.user));
         }
-    } catch { /* ignore - level update is best-effort */ }
+    } catch { /* se ignora: actualizar el nivel no es crítico */ }
     finally {
         isUpdatingExpertise.value = false;
         showExpertiseModal.value = false;

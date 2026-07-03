@@ -315,7 +315,7 @@ function startPositionStream() {
         try {
             robotPos.value = JSON.parse(e.data)
             draw()
-        } catch { /* ignore malformed event */ }
+        } catch { /* ignora eventos malformados */ }
     })
     // EventSource se reconecta automáticamente ante errores - el overlay no es crítico.
 }

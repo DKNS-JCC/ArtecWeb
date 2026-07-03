@@ -4,17 +4,18 @@ const RETENTION_DAYS = Math.max(1, parseInt(process.env.CHAT_RETENTION_DAYS || '
 const CLEANUP_INTERVAL_MS = 24 * 60 * 60 * 1000;
 
 async function runCleanup() {
-    const cutoff = `datetime('now', '-${RETENTION_DAYS} days')`;
+    // El intervalo se pasa como parámetro (en vez de interpolarlo) para no construir SQL con texto.
+    const cutoff = `-${RETENTION_DAYS} days`;
     try {
-        const msgs = (await dbRun(`DELETE FROM chat_messages WHERE created_at < ${cutoff}`)).changes;
+        const msgs = (await dbRun(`DELETE FROM chat_messages WHERE created_at < datetime('now', ?)`, [cutoff])).changes;
         const sessions = (await dbRun(
-            `DELETE FROM visitors WHERE ended_at IS NOT NULL AND ended_at < ${cutoff}`
+            `DELETE FROM visitors WHERE ended_at IS NOT NULL AND ended_at < datetime('now', ?)`, [cutoff]
         )).changes;
         if (msgs > 0 || sessions > 0) {
-            console.log(`[Cleanup] Removed ${msgs} messages, ${sessions} sessions (retention: ${RETENTION_DAYS}d)`);
+            console.log(`[Cleanup] Eliminados ${msgs} mensajes, ${sessions} sesiones (retención: ${RETENTION_DAYS}d)`);
         }
     } catch (err) {
-        console.error('[Cleanup] Error during cleanup:', err.message);
+        console.error('[Cleanup] Error durante la limpieza:', err.message);
     }
 }
 
